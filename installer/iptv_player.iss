@@ -1,10 +1,10 @@
-; Script do Inno Setup para gerar o instalador (Setup.exe) do Cubos.
+; Script do Inno Setup para gerar o instalador (Setup.exe) do MIP (MyIptvPlayer).
 ; Passo a passo: installer\COMO_GERAR.md
 ; Não testado por quem escreveu (Claude não roda Windows nem Flutter).
 
-#define MyAppName "Cubos"
+#define MyAppName "MIP"
 ; Troque a versão a cada lançamento.
-#define MyAppVersion "10.2"
+#define MyAppVersion "1.0.0"
 ; Nome do executável gerado pelo Flutter (em build\windows\x64\runner\Release).
 ; Confira o nome real nessa pasta; se for outro, mude aqui.
 #define MyAppExe "iptv_player.exe"
@@ -20,7 +20,7 @@ DefaultGroupName={#MyAppName}
 ; Instala só para o usuário atual: não pede senha de administrador.
 PrivilegesRequired=lowest
 OutputDir=output
-OutputBaseFilename=IPTV-Player-Setup-{#MyAppVersion}
+OutputBaseFilename=MIP-Setup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

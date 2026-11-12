@@ -12,7 +12,8 @@ class AppInfo {
 
   /// Endereço (https) do manifesto de atualização. Vazio = sem atualizador até
   /// ser informado em Conta e ajustes → Configurações → Atualizações.
-  static const defaultManifestUrl = '';
+  static const defaultManifestUrl =
+      'https://github.com/gbrlinsk3/MyIptvPLayer/releases/latest/download/latest.json';
 
   /// Pasta padrão de downloads/gravações dentro de "Vídeos".
   static const downloadsFolder = 'MyIptvPlayer';

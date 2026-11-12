@@ -530,3 +530,11 @@ Duas formas (ambas *não testadas*):
 - **Atualizações**: só https e só com SHA-256 igual ao do manifesto; manifesto inválido é rejeitado (há testes em `test/update_test.dart`).
 - **Logs**: já mascaravam usuário/senha em links e parâmetros (`AppLog.scrub`) — nada mudou, e a senha não é exibida na tela sem clicar no olho.
 - **Não feito / limites:** servidores IPTV costumam ser `http://` (sem criptografia) e o app não pode forçar https; o `latest.json` não é assinado digitalmente (o hash protege contra download corrompido, não contra quem controla o seu host); os downloads/gravações em arquivo não são criptografados; o `.exe` não é assinado (o Windows SmartScreen pode avisar).
+
+### Publicação pelo GitHub (build 6D)
+- Guia em `GITHUB.md`: dois repositórios (código **privado** + `mip-releases` **público** só com instalador/atualização), porque o atualizador não faz login e repositório privado não pode ser baixado por amigos sem conta. *Escrito sem testar no seu GitHub.*
+- `montar_instalador.ps1` agora recebe `-Repo usuario/mip-releases` e `-Publicar` (usa `gh release create`).
+- O atualizador agora **espelha** a versão nova na pasta do programa (`robocopy /MIR`): copia o que mudou e apaga arquivos que não existem mais; remove o zip/pasta temporários. Mantém `desinstalar.ps1`. *Não verificado em execução.*
+
+### Um só repositório (build 6F)
+Decisão do usuário: **um único repositório público** (`gbrlinsk3/MyIptvPLayer`) com código e Releases. `defaultManifestUrl` aponta para ele e o script é chamado com `-Repo gbrlinsk3/MyIptvPLayer`. Consequência: o código-fonte fica visível para qualquer pessoa. Não coloque senhas, links de provedores ou dados pessoais nos arquivos do repositório.

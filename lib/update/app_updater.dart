@@ -184,8 +184,14 @@ for (\$i = 0; \$i -lt 30; \$i++) {
 }
 if (Test-Path ${q(stage)}) { Remove-Item ${q(stage)} -Recurse -Force }
 Expand-Archive -LiteralPath ${q(zip.path)} -DestinationPath ${q(stage)} -Force
-Copy-Item -Path (Join-Path ${q(stage)} '*') -Destination ${q(appDir)} -Recurse -Force
+# Espelha a versão nova na pasta do programa: copia o que mudou e APAGA o que
+# não existe mais na versão nova (arquivos inúteis). O desinstalador é mantido.
+robocopy ${q(stage)} ${q(appDir)} /MIR /XF desinstalar.ps1 /R:3 /W:1 /NFL /NDL /NJH /NJS | Out-Null
+if (\$LASTEXITCODE -ge 8) { exit 1 }
 Start-Process -FilePath ${q(exe)}
+# Limpeza dos arquivos temporários da atualização.
+Remove-Item ${q(stage)} -Recurse -Force
+Remove-Item ${q(zip.path)} -Force
 ''');
       await Process.start(
         'powershell.exe',

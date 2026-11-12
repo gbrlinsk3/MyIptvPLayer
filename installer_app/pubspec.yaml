@@ -1,0 +1,20 @@
+name: mip_setup
+description: Instalador do MIP (MyIptvPlayer), feito em Flutter.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    # Gerado por installer_app/tools/montar_instalador.ps1 (zip da pasta Release do MIP).
+    - assets/payload.zip
