@@ -3,7 +3,7 @@
 Player IPTV (Xtream Codes) para Windows, feito em Flutter. Reproduz TV ao vivo, filmes e séries da sua conta Xtream, com perfis, downloads, biblioteca própria e atualização automática.
 
 - **Repositório:** https://github.com/gbrlinsk3/MyIptvPLayer (código e Releases)
-- **Versão atual:** 1.0.5 (Release publicada).
+- **Versão atual:** 1.0.6 (Release publicada).
 - O programa **não traz conteúdo nem contas**: cada pessoa usa a própria conta Xtream.
 
 ## Instalar e atualizar
@@ -82,6 +82,7 @@ O script confere a versão, compila, gera `release\MIP-Setup-X.Y.Z.exe` e `lates
 
 | Versão | Principais mudanças |
 |---|---|
+| 1.0.6 | Corrige o perfil que não abria na 1.0.5 (o `navigatorKey` reaproveitava o Navigator da tela de perfis); "Detalhes" abre um cartão próprio |
 | 1.0.5 | Animação de abertura do perfil, botão "Detalhes" no aviso de atualização e aviso no canto inferior direito |
 | 1.0.4 | Botões da janela corrigidos (cópia duplicada à esquerda) e centralizados com o perfil; Continuar assistindo e banner ajustados em "Preenchido" |
 | 1.0.3 | Builds 7A e 7B: banners do Início, Continuar assistindo corrigido, tema Automático, tamanho da interface, largura do catálogo, pôsteres por linha |

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'core/app_info.dart';
-import 'core/navigation.dart';
 import 'core/theme.dart';
 import 'playback/playback_controller.dart';
 import 'profiles/profiles_controller.dart';
@@ -135,7 +134,6 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
     AppColors.applyBrightness(dark);
     return MaterialApp(
       key: ValueKey(dark),
-      navigatorKey: appNavigatorKey,
       title: AppInfo.name,
       debugShowCheckedModeBanner: false,
       theme: _themeFor(dark),

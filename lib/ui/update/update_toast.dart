@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_info.dart';
-import '../../core/navigation.dart';
 import '../../core/theme.dart';
 import '../../update/app_updater.dart';
 import '../../update/update_info.dart';
@@ -46,8 +45,17 @@ class StartupSplash extends StatelessWidget {
 }
 
 /// Aviso no canto inferior direito quando há atualização disponível.
-class UpdateToast extends StatelessWidget {
+class UpdateToast extends StatefulWidget {
   const UpdateToast({super.key});
+
+  @override
+  State<UpdateToast> createState() => _UpdateToastState();
+}
+
+class _UpdateToastState extends State<UpdateToast> {
+  // "Detalhes" aberto. O aviso fica fora do Navigator (no builder do app), por
+  // isso as novidades aparecem num cartão próprio, não num showDialog.
+  bool _details = false;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +71,7 @@ class UpdateToast extends StatelessWidget {
         final info = u.available!;
         final busy = u.state == UpdateState.downloading;
         final ready = u.state == UpdateState.ready;
-        return Align(
+        final toast = Align(
           alignment: Alignment.bottomRight,
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -135,7 +143,7 @@ class UpdateToast extends StatelessWidget {
                         ),
                         if (info.hasDetails || info.notes.isNotEmpty)
                           TextButton(
-                            onPressed: () => showUpdateDetails(context, info),
+                            onPressed: () => setState(() => _details = true),
                             child: const Text('Detalhes'),
                           ),
                       ],
@@ -147,6 +155,17 @@ class UpdateToast extends StatelessWidget {
           ),
           ),
         );
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_details)
+              _UpdateDetails(
+                info: info,
+                onClose: () => setState(() => _details = false),
+              ),
+            toast,
+          ],
+        );
       },
     );
   }
@@ -154,60 +173,101 @@ class UpdateToast extends StatelessWidget {
 
 /// "Detalhes" do aviso de atualização: novos recursos, melhorias de design e
 /// correções da versão (ou o texto curto das notas, se a versão não trouxe
-/// o detalhamento).
-Future<void> showUpdateDetails(BuildContext context, UpdateInfo info) {
-  // O aviso fica fora do Navigator (no builder do app): usa o do app.
-  final nav = appNavigatorKey.currentContext;
-  if (nav == null) return Future.value();
-  return showDialog<void>(
-    context: nav,
-    builder: (context) => AlertDialog(
-      title: Text('Novidades da versão ${info.version}'),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 420),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (info.hasDetails)
-                for (final e in UpdateInfo.sectionTitles.entries)
-                  if (info.details[e.key]?.isNotEmpty ?? false) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6, bottom: 6),
-                      child: Text(
-                        e.value,
-                        style: TextStyle(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
+/// o detalhamento). Cartão central com fundo escurecido; clicar fora fecha.
+class _UpdateDetails extends StatelessWidget {
+  const _UpdateDetails({required this.info, required this.onClose});
+
+  final UpdateInfo info;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onClose,
+          child: const ColoredBox(color: Color(0x99000000)),
+        ),
+        Center(
+          child: Material(
+            color: AppColors.surface,
+            elevation: 12,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppShape.rounded ? 12 : 2),
+              side: BorderSide(color: AppColors.border),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480, maxHeight: 480),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(22, 20, 22, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Novidades da versão ${info.version}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
                       ),
                     ),
-                    for (final item in info.details[e.key]!)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('•  '),
-                            Expanded(child: Text(item)),
+                            if (info.hasDetails)
+                              for (final e in UpdateInfo.sectionTitles.entries)
+                                if (info.details[e.key]?.isNotEmpty ?? false) ...[
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.only(top: 8, bottom: 6),
+                                    child: Text(
+                                      e.value,
+                                      style: TextStyle(
+                                        color: AppColors.accent,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                  for (final item in info.details[e.key]!)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('•  '),
+                                          Expanded(child: Text(item)),
+                                        ],
+                                      ),
+                                    ),
+                                ]
+                            else
+                              Text(info.notes),
                           ],
                         ),
                       ),
-                  ]
-              else
-                Text(info.notes),
-            ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: onClose,
+                        child: const Text('Fechar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fechar'),
-        ),
       ],
-    ),
-  );
+    );
+  }
 }
