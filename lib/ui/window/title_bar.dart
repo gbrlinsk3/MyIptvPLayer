@@ -25,11 +25,13 @@ class _TitleBarState extends State<TitleBar> with WindowListener {
     super.initState();
     windowManager.addListener(this);
     _sync();
+    _TitleBarHeight.push(widget.height);
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
+    _TitleBarHeight.pop(widget.height);
     super.dispose();
   }
 
@@ -66,13 +68,37 @@ class _TitleBarState extends State<TitleBar> with WindowListener {
             child: widget.child ??
                 const DragToMoveArea(child: SizedBox.expand()),
           ),
+          // Centralizados na altura da barra (alinhados ao perfil).
           Align(
-            alignment: Alignment.topCenter,
+            alignment: Alignment.center,
             child: WindowButtons(maximized: _maximized, onToggleMaximize: _toggleMaximize),
           ),
         ],
       ),
     );
+  }
+}
+
+/// Altura da barra de título aberta no momento (a mais recente). A cópia
+/// flutuante dos botões usa para ficar exatamente sobre os botões da barra.
+class _TitleBarHeight {
+  static final ValueNotifier<double> value = ValueNotifier(36);
+  static final List<double> _stack = [];
+
+  static void push(double h) {
+    _stack.add(h);
+    _publish();
+  }
+
+  static void pop(double h) {
+    _stack.remove(h);
+    _publish();
+  }
+
+  // Fora do build (a barra pode estar sendo montada/desmontada agora).
+  static void _publish() {
+    final h = _stack.isEmpty ? 36.0 : _stack.last;
+    WidgetsBinding.instance.addPostFrameCallback((_) => value.value = h);
   }
 }
 
@@ -92,7 +118,7 @@ class WindowButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
+    return Row(mainAxisSize: MainAxisSize.min, children: [
       _WindowButton(
         icon: Icons.remove,
         tooltip: 'Minimizar',
@@ -178,10 +204,18 @@ class _WindowButtonsOverlayState extends State<WindowButtonsOverlay>
     if (_full) return const SizedBox.shrink();
     return Align(
       alignment: Alignment.topRight,
-      child: WindowButtons(
-        maximized: _maximized,
-        onToggleMaximize: _toggle,
-        tooltips: false,
+      child: ValueListenableBuilder<double>(
+        valueListenable: _TitleBarHeight.value,
+        builder: (context, h, child) =>
+            SizedBox(
+          height: h,
+          child: Align(alignment: Alignment.centerRight, child: child),
+        ),
+        child: WindowButtons(
+          maximized: _maximized,
+          onToggleMaximize: _toggle,
+          tooltips: false,
+        ),
       ),
     );
   }

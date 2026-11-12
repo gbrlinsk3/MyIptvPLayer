@@ -617,3 +617,9 @@ Feito pelo Claude Code **com compilação**: `flutter analyze` sem avisos e `flu
 **Não feito:** 7C (botão "Detalhes" do aviso de atualização e animação de abertura do perfil). Versão (`AppInfo.version`/`pubspec.yaml`) intacta; nenhum instalador gerado.
 
 **Versão 1.0.3:** publicada como Release com os builds 7A e 7B.
+
+### Ajustes após testar a 1.0.3
+- **Botões da janela duplicados à esquerda:** eram a cópia flutuante (`WindowButtonsOverlay`), cuja linha ocupava a largura toda e ficava à esquerda; agora ela tem tamanho mínimo e fica sobre os botões da barra (confirmado por teste de posição: os dois coincidem). Esse bug já existia antes do 7B.
+- **Botões centralizados com o perfil:** ficam no centro vertical da barra do topo (64 px no Início); a cópia flutuante acompanha a altura da barra aberta.
+- **Continuar assistindo em "Preenchido":** cartão recolhido limitado a 200 px de largura (`RowMetrics.maxCollapsed`); em janela larga sobra espaço à direita. Larguras fixas não mudam.
+- **Banner em "Preenchido":** altura passa a considerar também a largura (28 %, até 640) e os banners da direita crescem mais com a altura (fator 1,6). Larguras fixas ficam iguais. Valores escolhidos por mim; **não vi o resultado**, ajuste `HeroMetrics` se precisar.

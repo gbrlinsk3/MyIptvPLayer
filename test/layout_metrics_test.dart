@@ -34,14 +34,19 @@ void main() {
   test('horizontais por linha: 6 / 6 / 5 / 4, com 1 expandido', () {
     const expected = {100: 6, 115: 6, 130: 5, 150: 4};
     for (final e in expected.entries) {
-      final w = contentWidth(e.key);
+      // Largura sem o teto: a fileira inteira é usada (6/6/5/4 cabem).
+      final w = e.value * 100.0 + 400;
       final s = RowMetrics.landscapeSizes(w, e.value);
       // margem + (n-1) recolhidos + 1 expandido + n espaços = fileira inteira.
       final total = RowMetrics.pad +
           (e.value - 1) * s.collapsed +
           s.expanded +
           e.value * RowMetrics.landscapeGap;
+      expect(s.collapsed, lessThan(RowMetrics.maxCollapsed));
       expect(total, closeTo(w, 0.001), reason: '${e.key} %');
+      // Janela larga ("Preenchido"): o cartão não passa do teto.
+      final wide = RowMetrics.landscapeSizes(contentWidth(e.key), e.value);
+      expect(wide.collapsed, RowMetrics.maxCollapsed);
       // Proporções de antes: 150×200 recolhido, 340×200 expandido.
       expect(s.expanded / s.collapsed, closeTo(340 / 150, 1e-9));
       expect(s.height / s.collapsed, closeTo(200 / 150, 1e-9));
@@ -61,6 +66,9 @@ void main() {
     expect(tall, greaterThan(500));
     expect(tall, lessThanOrEqualTo(HeroMetrics.maxHeight));
     expect(HeroMetrics.sideMax(tall), greaterThan(HeroMetrics.baseSideMax));
+    // Largura fixa (1600) não muda; "Preenchido" largo fica mais alto.
+    expect(HeroMetrics.height(1328, width: 1600), tall);
+    expect(HeroMetrics.height(1328, width: 2160), greaterThan(tall));
   });
 
   test('valores inválidos salvos voltam ao padrão', () {

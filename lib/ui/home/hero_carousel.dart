@@ -28,8 +28,14 @@ class HeroCarousel extends StatefulWidget {
 
   /// Altura do banner: 440 como sempre; em telas altas (1440p) cresce
   /// (40 % da altura útil, até 640) e os banners da direita acompanham.
-  static double heightFor(BuildContext context) =>
-      HeroMetrics.height(MediaQuery.sizeOf(context).height - _topBar);
+  static double heightFor(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    // Largura útil: janela menos o trilho, ou a largura fixa escolhida.
+    var width = size.width - 68;
+    final fixed = AppScope.read(context).catalogWidth;
+    if (fixed != CatalogWidth.fill && fixed < width) width = fixed.toDouble();
+    return HeroMetrics.height(size.height - _topBar, width: width);
+  }
 
   /// Altura da barra do topo (ver `Shell`).
   static const double _topBar = 64;

@@ -63,6 +63,10 @@ class RowMetrics {
   static const double landscapeGap = 12;
   static const double minCollapsed = 150;
 
+  /// Teto do cartão recolhido: em "Preenchido" (janela larga) os cartões não
+  /// passam daqui; sobra espaço à direita em vez de cartões enormes.
+  static const double maxCollapsed = 200;
+
   /// Proporções de antes: recolhido 150×200 e expandido 340×200.
   static const double expandedRatio = 340 / 150;
   static const double heightRatio = 200 / 150;
@@ -73,11 +77,13 @@ class RowMetrics {
     double width,
     int count,
   ) {
-    final c = math.max(
-      minCollapsed,
-      (width - pad - landscapeGap * count) / (count - 1 + expandedRatio),
+    final c = (width - pad - landscapeGap * count) / (count - 1 + expandedRatio);
+    final capped = math.max(minCollapsed, math.min(maxCollapsed, c)).toDouble();
+    return (
+      collapsed: capped,
+      expanded: capped * expandedRatio,
+      height: capped * heightRatio,
     );
-    return (collapsed: c, expanded: c * expandedRatio, height: c * heightRatio);
   }
 
   // ---- grade ("Ver tudo", favoritos) ----------------------------------------
@@ -100,10 +106,14 @@ class HeroMetrics {
 
   /// Altura do banner grande para a altura útil [contentHeight] (janela menos
   /// a barra do topo). Em telas baixas continua 440, como antes.
-  static double height(double contentHeight) =>
-      (contentHeight * 0.40).clamp(baseHeight, maxHeight).toDouble();
+  /// Com [width] (largura útil), telas muito largas ("Preenchido") também
+  /// ganham altura: 28 % da largura, para o banner não ficar achatado.
+  static double height(double contentHeight, {double width = 0}) =>
+      math.max(contentHeight * 0.40, width * 0.28)
+          .clamp(baseHeight, maxHeight)
+          .toDouble();
 
   /// Largura máxima dos banners menores da direita para um banner de [height].
   static double sideMax(double height) =>
-      baseSideMax + (height - baseHeight) * 1.2;
+      baseSideMax + (height - baseHeight) * 1.6;
 }
