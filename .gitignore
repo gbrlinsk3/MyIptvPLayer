@@ -46,3 +46,10 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Binarios de build (vao para as Releases, nao para o codigo)
+/release/
+/installer/output/
+
+# Arquivo da ferramenta AIMaster
+AIMASTER.md

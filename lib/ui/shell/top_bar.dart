@@ -144,7 +144,7 @@ class _ProfileMenu extends StatelessWidget {
           case 'account':
             onOpenAccount();
           case 'theme':
-            app.setThemeMode(dark ? ThemeMode.light : ThemeMode.dark);
+            app.setThemePref(dark ? ThemePref.light : ThemePref.dark);
           case 'switch':
             profiles.leave();
         }

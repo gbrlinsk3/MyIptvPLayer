@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show ThemeMode;
 
 import '../catalog/catalog_controller.dart';
 import '../core/format.dart' show formatDateTime;
@@ -16,7 +15,8 @@ import '../library/library_import.dart';
 import '../epg/epg_controller.dart';
 import '../playback/playback_controller.dart';
 import '../core/app_log.dart';
-import '../core/theme.dart' show AppShape;
+import '../core/layout_metrics.dart';
+import '../core/theme.dart' show AppShape, ThemePref;
 
 enum AppPhase { booting, loggedOut, ready }
 
@@ -78,8 +78,8 @@ class AppController extends ChangeNotifier {
   String streamExt = 'ts';
 
   /// O que acontece ao tocar num título baixado em Minha biblioteca:
-  /// 'player' (padrão), 'panel' (painel lateral) ou 'expanded' (card expandido).
-  String libraryOpenMode = 'player';
+  /// 'panel' (padrão, card lateral), 'player' ou 'expanded' (card expandido).
+  String libraryOpenMode = 'panel';
 
   /// Dicas que já foram mostradas uma vez (ex.: `live`, `movies`, `series`).
   final Set<String> _hintsSeen = {};
@@ -211,10 +211,37 @@ class AppController extends ChangeNotifier {
     headers: () => playbackHeaders,
   );
 
-  /// Tema do perfil (claro, escuro ou o do Windows). Muda a interface inteira,
-  /// por isso tem um notificador próprio, escutado no topo do app.
-  ThemeMode themeMode = ThemeMode.dark;
-  final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+  /// Tema do perfil (claro, escuro, o do Windows ou por horário). Muda a
+  /// interface inteira, por isso tem um notificador próprio, escutado no topo
+  /// do app.
+  ThemePref themePref = ThemePref.dark;
+  final ValueNotifier<ThemePref> themeNotifier = ValueNotifier(ThemePref.dark);
+
+  /// Tamanho da interface (100/115/130/150 %, padrão 115 %). Amplia o app
+  /// inteiro (ver `UiScale`), por isso tem notificador próprio, como o tema.
+  int uiScalePercent = UiSizes.defaultPercent;
+  final ValueNotifier<int> scaleNotifier = ValueNotifier(UiSizes.defaultPercent);
+  double get uiScale => uiScalePercent / 100;
+
+  /// Largura máxima do conteúdo, em pixels lógicos (0 = preenchido).
+  int catalogWidth = CatalogWidth.fill;
+
+  /// Pôsteres por linha para o tamanho de interface atual.
+  int get portraitPerRow => RowMetrics.portraitCount(uiScalePercent);
+  int get landscapePerRow => RowMetrics.landscapeCount(uiScalePercent);
+
+  Future<void> setUiScalePercent(int percent) async {
+    uiScalePercent = UiSizes.normalize(percent);
+    scaleNotifier.value = uiScalePercent;
+    notifyListeners();
+    await _db.setSetting('ui_scale', '$uiScalePercent');
+  }
+
+  Future<void> setCatalogWidth(int px) async {
+    catalogWidth = CatalogWidth.normalize(px);
+    notifyListeners();
+    await _db.setSetting('catalog_width', '$catalogWidth');
+  }
 
   /// Página aberta e estado da barra lateral; guardados aqui para sobreviver
   /// à reconstrução da interface ao trocar de tema.
@@ -245,11 +272,11 @@ class AppController extends ChangeNotifier {
     await _db.setSetting('button_shape', shape);
   }
 
-  Future<void> setThemeMode(ThemeMode mode) async {
-    themeMode = mode;
-    themeNotifier.value = mode;
+  Future<void> setThemePref(ThemePref pref) async {
+    themePref = pref;
+    themeNotifier.value = pref;
     notifyListeners();
-    await _db.setSetting('theme_mode', mode.name);
+    await _db.setSetting('theme_mode', pref.name);
   }
 
   bool get dbRecovered => _db.recoveredFromCorruption;
@@ -270,6 +297,7 @@ class AppController extends ChangeNotifier {
     downloads.dispose();
     imports.dispose();
     themeNotifier.dispose();
+    scaleNotifier.dispose();
     shapeRevision.dispose();
     super.dispose();
   }
@@ -291,7 +319,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> init() async {
     streamExt = await _db.getSetting('stream_ext') ?? 'ts';
-    libraryOpenMode = await _db.getSetting('library_open_mode') ?? 'player';
+    libraryOpenMode = await _db.getSetting('library_open_mode') ?? 'panel';
     _hintsSeen
       ..clear()
       ..addAll(
@@ -313,11 +341,17 @@ class AppController extends ChangeNotifier {
     await downloads.load();
     await imports.load();
     final savedTheme = await _db.getSetting('theme_mode');
-    themeMode = ThemeMode.values.firstWhere(
+    themePref = ThemePref.values.firstWhere(
       (m) => m.name == savedTheme,
-      orElse: () => ThemeMode.dark,
+      orElse: () => ThemePref.dark,
     );
-    themeNotifier.value = themeMode;
+    themeNotifier.value = themePref;
+    uiScalePercent =
+        UiSizes.normalize(int.tryParse(await _db.getSetting('ui_scale') ?? ''));
+    scaleNotifier.value = uiScalePercent;
+    catalogWidth = CatalogWidth.normalize(
+      int.tryParse(await _db.getSetting('catalog_width') ?? ''),
+    );
     buttonShape = await _db.getSetting('button_shape') ?? 'square';
     AppShape.radius = buttonShape == 'rounded' ? 8 : 0;
     final savedVolume = double.tryParse(await _db.getSetting('volume') ?? '');

@@ -168,3 +168,22 @@ InputDecoration fieldDecoration({
     focusedBorder: border(AppColors.accent),
   );
 }
+
+/// Escolha de tema do perfil. `system` segue o claro/escuro do Windows;
+/// `auto` é por horário: claro das 9h às 17h, escuro das 17h às 9h.
+enum ThemePref { light, dark, system, auto }
+
+/// Se o tema efetivo é escuro para a escolha [pref] (usa [now] só no `auto`).
+bool resolveDark(ThemePref pref, {required bool platformDark, DateTime? now}) {
+  switch (pref) {
+    case ThemePref.light:
+      return false;
+    case ThemePref.dark:
+      return true;
+    case ThemePref.system:
+      return platformDark;
+    case ThemePref.auto:
+      final h = (now ?? DateTime.now()).hour;
+      return h < 9 || h >= 17;
+  }
+}

@@ -36,8 +36,9 @@ class BannerTitleRef {
   }
 }
 
-/// Um banner do Início configurável (o 1º, "Continue de onde parou", é fixo e
-/// não aparece aqui). No máximo [maxExtra] configuráveis (total 5 com o fixo).
+/// Um banner do Início configurável (o "Continue de onde parou" é fixo, só
+/// aparece quando há algo em andamento e não entra aqui nem no limite). De 1 a
+/// [maxExtra] configuráveis.
 class BannerConfig {
   BannerConfig({
     required this.name,

@@ -92,6 +92,12 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
     final app = AppScope.read(context);
     _details = app.catalog.details(widget.title.kind, widget.title.id);
     _loadProgress(app);
+    // Séries abrem na temporada do último episódio assistido.
+    if (!_isMovie) {
+      app.catalog.lastWatchedSeason(widget.title.id).then((s) {
+        if (mounted && s != null && _season == -1) setState(() => _season = s);
+      });
+    }
   }
 
   @override

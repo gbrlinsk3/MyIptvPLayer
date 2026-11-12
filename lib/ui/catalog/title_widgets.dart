@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/layout_metrics.dart';
 import '../../core/theme.dart';
+import '../../state/app_scope.dart';
 import '../../data/catalog_models.dart';
 import 'favorite_button.dart';
 import 'poster_image.dart';
@@ -157,8 +159,7 @@ class TitleRow extends StatefulWidget {
   final VoidCallback? onSeeAll;
   final bool showProgress;
 
-  static const double posterWidth = 148;
-  static const double gap = 14;
+  static const double gap = RowMetrics.gap;
 
   @override
   State<TitleRow> createState() => _TitleRowState();
@@ -195,9 +196,14 @@ class _TitleRowState extends State<TitleRow> {
             (list == null || list.isEmpty)) {
           return const SizedBox.shrink();
         }
-        final itemWidth = TitleRow.posterWidth + TitleRow.gap;
+        // O pôster se ajusta à largura da fileira para caber a quantidade por
+        // linha do tamanho de interface escolhido (12/11/11/9).
+        final perRow = AppScope.of(context).portraitPerRow;
+        return LayoutBuilder(builder: (context, box) {
+        final posterWidth = RowMetrics.portraitWidth(box.maxWidth, perRow);
+        final itemWidth = posterWidth + TitleRow.gap;
         // Altura: pôster 2:3 + espaço do texto.
-        final rowHeight = TitleRow.posterWidth * 1.5 + 56 + 24;
+        final rowHeight = posterWidth * 1.5 + 56 + 24;
         return Padding(
           padding: const EdgeInsets.only(bottom: 20),
           child: MouseRegion(
@@ -270,6 +276,7 @@ class _TitleRowState extends State<TitleRow> {
             ),
           ),
         );
+        });
       },
     );
   }
@@ -375,12 +382,8 @@ class TitleGrid extends StatelessWidget {
   final List<CatalogTitle> extra;
   final String extraLabel;
 
-  static const _delegate = SliverGridDelegateWithMaxCrossAxisExtent(
-    maxCrossAxisExtent: 176,
-    crossAxisSpacing: 16,
-    mainAxisSpacing: 16,
-    childAspectRatio: 0.54,
-  );
+  /// Altura do nome/subtítulo embaixo do pôster na grade.
+  static const double _textHeight = 62;
 
   /// Só a grade (com margens), para usar dentro de um CustomScrollView maior.
   static Widget sliver({
@@ -389,29 +392,38 @@ class TitleGrid extends StatelessWidget {
   }) {
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-      sliver: SliverGrid(
-        gridDelegate: _delegate,
-        delegate: SliverChildBuilderDelegate(
-          (context, i) => PosterCard(
-            title: titles[i],
-            onTap: () => onOpen(titles[i]),
-          ),
-          childCount: titles.length,
-        ),
-      ),
+      sliver: _grid(titles, onOpen),
     );
   }
 
-  SliverGrid _grid(List<CatalogTitle> list) => SliverGrid(
-        gridDelegate: _delegate,
-        delegate: SliverChildBuilderDelegate(
-          (context, i) => PosterCard(
-            title: list[i],
-            onTap: () => onOpen(list[i]),
+  /// Grade com a mesma quantidade de pôsteres por linha das fileiras (12/11/11/9
+  /// conforme o tamanho da interface), reduzida só se a janela for estreita.
+  static Widget _grid(List<CatalogTitle> list, ValueChanged<CatalogTitle> onOpen) {
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final perRow = AppScope.of(context).portraitPerRow;
+        final cols = RowMetrics.gridColumns(constraints.crossAxisExtent, perRow);
+        final w = (constraints.crossAxisExtent -
+                RowMetrics.gridGap * (cols - 1)) /
+            cols;
+        return SliverGrid(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: RowMetrics.gridGap,
+            mainAxisSpacing: RowMetrics.gridGap,
+            mainAxisExtent: w * 1.5 + _textHeight,
           ),
-          childCount: list.length,
-        ),
-      );
+          delegate: SliverChildBuilderDelegate(
+            (context, i) => PosterCard(
+              title: list[i],
+              onTap: () => onOpen(list[i]),
+            ),
+            childCount: list.length,
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -419,13 +431,13 @@ class TitleGrid extends StatelessWidget {
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-          sliver: _grid(titles),
+          sliver: _grid(titles, onOpen),
         ),
         if (extra.isNotEmpty) ...[
           SliverToBoxAdapter(child: SearchDivider(label: extraLabel)),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            sliver: _grid(extra),
+            sliver: _grid(extra, onOpen),
           ),
         ] else
           const SliverToBoxAdapter(child: SizedBox(height: 16)),

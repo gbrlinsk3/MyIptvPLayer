@@ -257,10 +257,12 @@ class CatalogController extends ChangeNotifier {
       for (final k in animRaw.split('|'))
         if (k.length > 2 && (k.startsWith('m:') || k.startsWith('s:'))) k,
     };
+    // Sempre há ao menos 1 banner: sem nada salvo (ou lista vazia/inválida),
+    // valem os padrões (Filmes novos, Séries novas, Adicionados recentemente).
     final rawBanners = await _db.getSetting('home_banners');
-    banners = rawBanners == null
-        ? BannerConfig.defaults(animationCategories)
-        : BannerConfig.decode(rawBanners);
+    final saved =
+        rawBanners == null ? const <BannerConfig>[] : BannerConfig.decode(rawBanners);
+    banners = saved.isEmpty ? BannerConfig.defaults(animationCategories) : saved;
     _invalidate();
     notifyListeners();
   }
@@ -365,10 +367,10 @@ class CatalogController extends ChangeNotifier {
   Future<List<HeroSlide>>? _slides;
   final int _heroSeed = DateTime.now().millisecondsSinceEpoch;
 
-  /// Banners da Home (até 5, na ordem): último assistido, filmes novos, séries
-  /// novas, mistura recente (leva ao catálogo) e animações das categorias que
-  /// o usuário marcou. Slides sem títulos são omitidos. Sorteios ficam fixos
-  /// até o catálogo ou o progresso mudar.
+  /// Banners da Home, na ordem: "Continue de onde parou" (só se houver algo em
+  /// andamento) e os banners configurados (padrão: filmes novos, séries novas,
+  /// adicionados recentemente). Slides sem títulos são omitidos. Sorteios ficam
+  /// fixos até o catálogo ou o progresso mudar.
   Future<List<HeroSlide>> heroSlides() => _slides ??= _buildSlides();
 
   bool _hasImage(CatalogTitle t) => (t.image ?? '').startsWith('http');
@@ -486,12 +488,14 @@ class CatalogController extends ChangeNotifier {
     return slides;
   }
 
-  /// Banners do Início depois do fixo "Continue de onde parou" (até 4).
+  /// Banners do Início configuráveis (de 1 a 4). O "Continue de onde parou"
+  /// vem à parte: só entra quando há algo em andamento e não conta aqui.
   List<BannerConfig> banners = [];
   int bannersRevision = 0;
 
   Future<void> setBanners(List<BannerConfig> value) async {
-    banners = [for (final b in value.take(BannerConfig.maxExtra)) b.copy()];
+    final list = value.isEmpty ? BannerConfig.defaults(animationCategories) : value;
+    banners = [for (final b in list.take(BannerConfig.maxExtra)) b.copy()];
     bannersRevision++;
     _slides = null;
     await _db.setSetting('home_banners', BannerConfig.encode(banners));
@@ -543,9 +547,83 @@ class CatalogController extends ChangeNotifier {
   Future<List<CatalogTitle>> continueTitles(CatalogKind kind) {
     return _rows.putIfAbsent(
       '${kind.key}:continue:$progressRevision',
-      () => _db.catalog.continueWatching(kind),
+      () => kind == CatalogKind.series
+          ? _continueSeries()
+          : _db.catalog.continueMovies(),
     );
   }
+
+  /// Séries em "continuar assistindo": a que tem episódio em andamento volta
+  /// nele; a que teve o último episódio terminado mostra o **próximo** (some
+  /// só quando não há mais episódios).
+  Future<List<CatalogTitle>> _continueSeries() async {
+    // 12 bastam: o "continuar assistindo" geral mostra no máximo 12 títulos.
+    final activity = await _db.catalog.seriesActivity(limit: 12);
+    final titles = await Future.wait([
+      for (final a in activity) _continueEntry(a),
+    ]);
+    return [for (final t in titles) ?t];
+  }
+
+  Future<CatalogTitle?> _continueEntry(SeriesActivity a) async {
+    if (!a.watched) {
+      return CatalogTitle(
+        kind: CatalogKind.series,
+        id: a.seriesId,
+        name: a.title,
+        categoryId: '',
+        image: a.image,
+        positionMs: a.positionMs,
+        durationMs: a.durationMs,
+        subtitle: a.subtitle,
+        updatedAt: a.updatedAt,
+        resumeEpisodeId: a.episodeId,
+      );
+    }
+    final next = await _nextEpisode(a);
+    if (next == null) return null;
+    return CatalogTitle(
+      kind: CatalogKind.series,
+      id: a.seriesId,
+      name: a.title,
+      categoryId: '',
+      image: a.image,
+      subtitle: '${next.code} — ${next.title}',
+      updatedAt: a.updatedAt,
+      resumeEpisodeId: next.id,
+    );
+  }
+
+  /// O episódio que vem depois de [a] na ordem de temporadas/episódios; null se
+  /// era o último ou se os detalhes da série não chegaram.
+  Future<Episode?> _nextEpisode(SeriesActivity a) async {
+    TitleDetails? d;
+    try {
+      d = await detailsOrNull(CatalogKind.series, a.seriesId)
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      return null;
+    }
+    if (d == null) return null;
+    final all = [
+      for (final list in d.seasons.values) ...list,
+    ]..sort((x, y) => x.season != y.season
+        ? x.season.compareTo(y.season)
+        : x.number.compareTo(y.number));
+    final i = all.indexWhere((e) => e.id == a.episodeId);
+    if (i >= 0) return i + 1 < all.length ? all[i + 1] : null;
+    // O episódio não existe mais no catálogo: usa a temporada/número salvos.
+    final s = a.season, n = a.episode;
+    if (s == null || n == null) return null;
+    for (final e in all) {
+      if (e.season > s || (e.season == s && e.number > n)) return e;
+    }
+    return null;
+  }
+
+  /// Temporada do último episódio assistido da série (para abrir o card nela).
+  Future<int?> lastWatchedSeason(int seriesId) =>
+      _db.catalog.lastEpisodeSeason(seriesId);
 
   /// Filmes e séries em andamento juntos, do mais recente para o mais antigo.
   Future<List<CatalogTitle>> continueAll() {

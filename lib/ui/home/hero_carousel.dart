@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../catalog/catalog_controller.dart';
+import '../../core/layout_metrics.dart';
 import '../../core/theme.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/play_actions.dart';
 import '../catalog/poster_image.dart';
 import '../catalog/title_details_panel.dart';
+import '../widgets/content_frame.dart';
 import 'hero_buttons.dart';
 
 /// Carrossel do Início, de borda a borda: banner grande à esquerda (até 5
-/// slides, troca a cada 12 s; pausa com o mouse) e, à direita, dois banners
-/// menores com os próximos slides (clique para ir até eles). Setas e pílulas
+/// slides; a cada 12 s passa ao próximo título do banner e, depois do último,
+/// ao próximo banner; pausa com o mouse) e, à direita, dois banners menores
+/// (clique para ir até eles). Setas (só com mais de um banner) e pílulas
 /// também trocam de slide.
 class HeroCarousel extends StatefulWidget {
   const HeroCarousel({
@@ -23,7 +26,13 @@ class HeroCarousel extends StatefulWidget {
   final Future<List<HeroSlide>> future;
   final VoidCallback onOpenCatalog;
 
-  static const double height = 440;
+  /// Altura do banner: 440 como sempre; em telas altas (1440p) cresce
+  /// (40 % da altura útil, até 640) e os banners da direita acompanham.
+  static double heightFor(BuildContext context) =>
+      HeroMetrics.height(MediaQuery.sizeOf(context).height - _topBar);
+
+  /// Altura da barra do topo (ver `Shell`).
+  static const double _topBar = 64;
 
   @override
   State<HeroCarousel> createState() => _HeroCarouselState();
@@ -36,12 +45,13 @@ class _HeroCarouselState extends State<HeroCarousel>
   late final AnimationController _timer =
       AnimationController(vsync: this, duration: _interval)
         ..addStatusListener((s) {
-          if (s == AnimationStatus.completed) _go(_slide + 1);
+          if (s == AnimationStatus.completed) _advance();
         });
 
   int _slide = 0;
-  final Map<int, int> _picked = {}; // slide -> título escolhido nas miniaturas
+  final Map<int, int> _picked = {}; // slide -> título mostrado no banner grande
   int _count = 0;
+  int _titleCount = 1; // títulos do slide atual
   bool _hover = false;
   bool _prefetched = false;
 
@@ -51,10 +61,28 @@ class _HeroCarouselState extends State<HeroCarousel>
     super.dispose();
   }
 
+  /// Vai para o slide [i] (começando pelo primeiro título dele).
   void _go(int i) {
     if (_count == 0) return;
-    setState(() => _slide = ((i % _count) + _count) % _count);
+    final target = ((i % _count) + _count) % _count;
+    setState(() {
+      _slide = target;
+      _picked.remove(target);
+    });
     _timer.forward(from: 0);
+  }
+
+  /// Passo automático: próximo título do banner e, depois do último, o
+  /// próximo banner.
+  void _advance() {
+    if (_count == 0) return;
+    final pick = _picked[_slide] ?? 0;
+    if (pick + 1 < _titleCount) {
+      setState(() => _picked[_slide] = pick + 1);
+      _timer.forward(from: 0);
+    } else {
+      _go(_slide + 1);
+    }
   }
 
   /// Busca os detalhes (imagem de fundo) de todos os slides de uma vez, para a
@@ -63,9 +91,15 @@ class _HeroCarouselState extends State<HeroCarousel>
     if (_prefetched) return;
     _prefetched = true;
     final catalog = AppScope.read(context).catalog;
-    // O controller limita a 3 pedidos simultâneos; a ordem é a do carrossel.
+    // O controller limita a 3 pedidos simultâneos; primeiro o título de capa de
+    // cada slide, depois os demais títulos (a troca automática passa por todos).
     for (final s in slides) {
       catalog.detailsOrNull(s.titles.first.kind, s.titles.first.id);
+    }
+    for (final s in slides) {
+      for (final t in s.titles.skip(1)) {
+        catalog.detailsOrNull(t.kind, t.id);
+      }
     }
   }
 
@@ -75,8 +109,9 @@ class _HeroCarouselState extends State<HeroCarousel>
       future: widget.future,
       builder: (context, snap) {
         final slides = snap.data;
+        final height = HeroCarousel.heightFor(context);
         if (slides == null || slides.isEmpty) {
-          return const SizedBox(height: HeroCarousel.height);
+          return SizedBox(height: height);
         }
         _prefetch(slides);
         _count = slides.length;
@@ -84,6 +119,7 @@ class _HeroCarouselState extends State<HeroCarousel>
         if (!_timer.isAnimating && !_hover) _timer.forward();
 
         final slide = slides[_slide];
+        _titleCount = slide.titles.length;
         final pick = (_picked[_slide] ?? 0).clamp(0, slide.titles.length - 1);
         final title = slide.titles[pick];
 
@@ -97,18 +133,24 @@ class _HeroCarouselState extends State<HeroCarousel>
             _timer.forward();
           },
           child: SizedBox(
-            height: HeroCarousel.height,
+            height: height,
             child: LayoutBuilder(
               builder: (context, box) {
                 final side = slides.length > 1 && box.maxWidth >= 900;
-                final sideWidth = (box.maxWidth * 0.27).clamp(240.0, 420.0);
+                final sideWidth =
+                    (box.maxWidth * 0.30).clamp(240.0, HeroMetrics.sideMax(height));
                 // Banner menor de cima: o slide atual + 2 (com só 2 slides, o
                 // outro). O "próximo" é alcançado pela seta do banner grande.
                 final topSlide = slides.length >= 3
                     ? slides[(_slide + 2) % slides.length]
                     : slides[(_slide + 1) % slides.length];
                 final topIndex = slides.indexOf(topSlide);
-                return Row(
+                // Com largura fixa (coluna centralizada) os cantos externos do
+                // banner também arredondam; de borda a borda ficam retos.
+                final framed = ContentFrameScope.framedOf(context);
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(framed ? 22 : 0),
+                  child: Row(
                   children: [
                     Expanded(
                       child: ClipRRect(
@@ -138,33 +180,37 @@ class _HeroCarouselState extends State<HeroCarousel>
                                 slide: slide,
                                 title: title,
                                 pick: pick,
-                                onPick: (i) =>
-                                    setState(() => _picked[_slide] = i),
+                                onPick: (i) {
+                                  setState(() => _picked[_slide] = i);
+                                  _timer.forward(from: 0);
+                                },
                                 onOpenCatalog: widget.onOpenCatalog,
                               ),
                             ),
-                            Positioned(
-                              left: 16,
-                              top: 0,
-                              bottom: 0,
-                              child: Center(
-                                child: _Arrow(
-                                  icon: Icons.chevron_left_rounded,
-                                  onTap: () => _go(_slide - 1),
+                            if (slides.length > 1) ...[
+                              Positioned(
+                                left: 16,
+                                top: 0,
+                                bottom: 0,
+                                child: Center(
+                                  child: _Arrow(
+                                    icon: Icons.chevron_left_rounded,
+                                    onTap: () => _go(_slide - 1),
+                                  ),
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              right: 16,
-                              top: 0,
-                              bottom: 0,
-                              child: Center(
-                                child: _Arrow(
-                                  icon: Icons.chevron_right_rounded,
-                                  onTap: () => _go(_slide + 1),
+                              Positioned(
+                                right: 16,
+                                top: 0,
+                                bottom: 0,
+                                child: Center(
+                                  child: _Arrow(
+                                    icon: Icons.chevron_right_rounded,
+                                    onTap: () => _go(_slide + 1),
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                             Positioned(
                               left: 0,
                               right: 0,
@@ -173,6 +219,8 @@ class _HeroCarouselState extends State<HeroCarousel>
                                 child: _Dots(
                                   count: slides.length,
                                   index: _slide,
+                                  step: pick,
+                                  steps: slide.titles.length,
                                   progress: _timer,
                                   onTap: _go,
                                 ),
@@ -204,6 +252,7 @@ class _HeroCarouselState extends State<HeroCarousel>
                       ),
                     ],
                   ],
+                  ),
                 );
               },
             ),
@@ -663,7 +712,7 @@ class _SideBanner extends StatefulWidget {
   final int slot;
   final VoidCallback onTap;
 
-  /// Texto pequeno embaixo do nome (no lugar de "+ N títulos").
+  /// Texto pequeno embaixo do nome (no lugar dos nomes dos outros títulos).
   final String? hint;
 
   @override
@@ -783,11 +832,13 @@ class _SideBannerState extends State<_SideBanner> {
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              '+ ${slide.titles.length - 1} '
-                              '${slide.titles.length - 1 == 1 ? 'título' : 'títulos'}',
+                              slide.titles.skip(1).map((e) => e.name).join('  ·  '),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Color(0xCCFFFFFF),
                                 fontSize: 11,
+                                height: 1.3,
                               ),
                             ),
                           ),
@@ -922,17 +973,22 @@ class _ThumbState extends State<_Thumb> {
   }
 }
 
-/// Indicadores do carrossel: o atual é uma pílula que vai enchendo em 12 s.
+/// Indicadores do carrossel: o atual é uma pílula que vai enchendo enquanto o
+/// banner passa pelos seus títulos ([step] de [steps], 12 s cada).
 class _Dots extends StatelessWidget {
   const _Dots({
     required this.count,
     required this.index,
+    required this.step,
+    required this.steps,
     required this.progress,
     required this.onTap,
   });
 
   final int count;
   final int index;
+  final int step;
+  final int steps;
   final Animation<double> progress;
   final ValueChanged<int> onTap;
 
@@ -964,7 +1020,8 @@ class _Dots extends StatelessWidget {
                       ? AnimatedBuilder(
                           animation: progress,
                           builder: (context, _) => FractionallySizedBox(
-                            widthFactor: progress.value.clamp(0.0, 1.0),
+                            widthFactor:
+                                ((step + progress.value) / steps).clamp(0.0, 1.0),
                             child: ColoredBox(color: AppColors.accent),
                           ),
                         )

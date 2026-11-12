@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../core/format.dart';
-import '../data/catalog_models.dart';
 import '../data/live_highlight.dart';
+import '../core/layout_metrics.dart';
 import '../core/theme.dart';
 import '../profiles/profiles_scope.dart';
 import '../state/app_scope.dart';
+import '../catalog/home_banners.dart' show BannerConfig;
 import 'home/banner_manager_dialog.dart';
 import 'downloads/downloads_settings_card.dart';
 import 'account_xtream_card.dart';
 import 'diagnostics_card.dart';
-import 'logs_settings_card.dart';
+import 'catalog_settings_card.dart';
 import 'epg_settings_card.dart';
 import 'update/update_settings_card.dart';
 import 'profiles/profile_avatar.dart';
@@ -124,128 +124,7 @@ class _AccountPageState extends State<AccountPage> {
             ),
 
             ] else if (_tab == 1) ...[
-            SectionCard(
-              title: 'Catálogo de TV ao vivo',
-              children: [
-                KeyValueRow(label: 'Canais', value: '${c.totalChannels}'),
-                if (c.hiddenChannelCount > 0)
-                  KeyValueRow(
-                    label: 'Canais ocultos',
-                    value: '${c.hiddenChannelCount}',
-                  ),
-                KeyValueRow(
-                  label: 'Canal selecionado',
-                  value: c.selected?.name ?? 'Nenhum',
-                ),
-                KeyValueRow(
-                  label: 'Categorias',
-                  value:
-                      '${c.categories.length} visíveis (com ao menos um canal)',
-                ),
-                KeyValueRow(
-                  label: 'Atualizado em',
-                  value: c.catalogUpdatedLabel,
-                ),
-                if (c.syncError != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      c.syncError!,
-                      style: TextStyle(
-                        color: AppColors.danger,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    FilledButton(
-                      onPressed: () => c.setShellIndex(1),
-                      child: const Text('Abrir TV ao vivo'),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: c.syncing ? null : c.refreshCatalog,
-                      child: Text(c.syncing ? 'Atualizando…' : 'Atualizar agora'),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: c.syncing
-                          ? null
-                          : () async {
-                              final ok = await confirmDialog(
-                                context,
-                                title: 'Limpar cache do catálogo?',
-                                message:
-                                    'Remove apenas os canais e categorias salvos neste computador. '
-                                    'A conta é mantida e o catálogo pode ser baixado de novo.',
-                                action: 'Limpar',
-                              );
-                              if (ok) await c.clearCatalogCache();
-                            },
-                      child: const Text('Limpar cache'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SectionCard(
-              title: 'Filmes e séries',
-              children: [
-                for (final kind in CatalogKind.values) ...[
-                  KeyValueRow(
-                    label: kind.label,
-                    value: c.catalog.section(kind).total == 0
-                        ? 'Ainda não baixados'
-                        : '${c.catalog.section(kind).total} títulos (atualizado em '
-                            '${c.catalog.section(kind).updatedAt == null ? '—' : formatDateTime(c.catalog.section(kind).updatedAt!)})',
-                  ),
-                  if (c.catalog.section(kind).error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        c.catalog.section(kind).error!,
-                        style: TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    FilledButton(
-                      onPressed: c.catalog.section(CatalogKind.movies).syncing ||
-                              c.catalog.section(CatalogKind.series).syncing
-                          ? null
-                          : () async {
-                              await c.catalog.refresh(CatalogKind.movies);
-                              await c.catalog.refresh(CatalogKind.series);
-                            },
-                      child: const Text('Atualizar agora'),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: () async {
-                        final ok = await confirmDialog(
-                          context,
-                          title: 'Limpar filmes e séries salvos?',
-                          message:
-                              'Remove só as listas de filmes e séries guardadas neste '
-                              'computador. O progresso de reprodução é mantido e as '
-                              'listas podem ser baixadas de novo.',
-                          action: 'Limpar',
-                        );
-                        if (ok) await c.catalog.clearCache();
-                      },
-                      child: const Text('Limpar cache'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            const UpdateSettingsCard(),
             SectionCard(
               title: 'Reprodução',
               children: [
@@ -267,27 +146,6 @@ class _AccountPageState extends State<AccountPage> {
                 const SizedBox(height: 4),
                 Text(
                   'Vale a partir do próximo canal aberto. Se os canais não abrirem, teste o outro formato.',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Ao clicar num título baixado na Minha biblioteca',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'player', label: Text('Reproduzir')),
-                    ButtonSegment(value: 'panel', label: Text('Card')),
-                    ButtonSegment(value: 'expanded', label: Text('Card expandido')),
-                  ],
-                  selected: {c.libraryOpenMode},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (s) => c.setLibraryOpenMode(s.first),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Arquivos importados e gravações sempre abrem direto no player.',
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
@@ -316,36 +174,46 @@ class _AccountPageState extends State<AccountPage> {
                 ),
               ],
             ),
-            const EpgSettingsCard(),
-            const UpdateSettingsCard(),
             const DownloadsSettingsCard(),
-            const LogsSettingsCard(),
+            const EpgSettingsCard(),
             const DiagnosticsCard(),
+            const CatalogSettingsCard(),
             ] else ...[
             SectionCard(
               title: 'Aparência',
               children: [
-                SegmentedButton<ThemeMode>(
+                SegmentedButton<ThemePref>(
                   showSelectedIcon: false,
                   segments: const [
                     ButtonSegment(
-                      value: ThemeMode.light,
+                      value: ThemePref.light,
                       icon: Icon(Icons.light_mode_outlined, size: 18),
                       label: Text('Claro'),
                     ),
                     ButtonSegment(
-                      value: ThemeMode.dark,
+                      value: ThemePref.dark,
                       icon: Icon(Icons.dark_mode_outlined, size: 18),
                       label: Text('Escuro'),
                     ),
                     ButtonSegment(
-                      value: ThemeMode.system,
-                      icon: Icon(Icons.brightness_auto_outlined, size: 18),
+                      value: ThemePref.system,
+                      icon: Icon(Icons.desktop_windows_outlined, size: 18),
+                      label: Text('Sistema'),
+                    ),
+                    ButtonSegment(
+                      value: ThemePref.auto,
+                      icon: Icon(Icons.schedule_outlined, size: 18),
                       label: Text('Automático'),
                     ),
                   ],
-                  selected: {c.themeMode},
-                  onSelectionChanged: (v) => c.setThemeMode(v.first),
+                  selected: {c.themePref},
+                  onSelectionChanged: (v) => c.setThemePref(v.first),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Sistema segue o claro/escuro do Windows. Automático usa o '
+                  'horário do computador: claro das 9h às 17h, escuro das 17h às 9h.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ],
             ),
@@ -377,11 +245,89 @@ class _AccountPageState extends State<AccountPage> {
               ],
             ),
             SectionCard(
+              title: 'Tamanho da interface',
+              children: [
+                SegmentedButton<int>(
+                  showSelectedIcon: false,
+                  segments: [
+                    for (final p in UiSizes.percents)
+                      ButtonSegment(value: p, label: Text('$p %')),
+                  ],
+                  selected: {c.uiScalePercent},
+                  onSelectionChanged: (v) => c.setUiScalePercent(v.first),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Amplia o programa inteiro (menus, botões, janelas). 100 % é o '
+                  'tamanho de antes; o padrão é ${UiSizes.defaultPercent} %. '
+                  'Também define quantos pôsteres cabem por linha.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ],
+            ),
+            SectionCard(
+              title: 'Largura do catálogo',
+              children: [
+                SegmentedButton<int>(
+                  showSelectedIcon: false,
+                  segments: [
+                    for (final px in CatalogWidth.options)
+                      ButtonSegment(
+                        value: px,
+                        label: Text(
+                          px == CatalogWidth.fill ? 'Preenchido' : '$px px',
+                        ),
+                      ),
+                  ],
+                  selected: {c.catalogWidth},
+                  onSelectionChanged: (v) => c.setCatalogWidth(v.first),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Largura máxima do conteúdo das telas, centralizado. '
+                  'Preenchido usa a janela inteira (padrão). Os pixels contam '
+                  'já com o tamanho da interface: a ${UiSizes.defaultPercent} %, '
+                  '1440 ocupa cerca de ${(1440 * UiSizes.defaultPercent / 100).round()} px na tela.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ],
+            ),
+            SectionCard(
+              title: 'Minha biblioteca',
+              children: [
+                Text(
+                  'Ao clicar num título baixado',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'panel', label: Text('Card')),
+                    ButtonSegment(value: 'expanded', label: Text('Card expandido')),
+                    ButtonSegment(value: 'player', label: Text('Reproduzir')),
+                  ],
+                  selected: {c.libraryOpenMode},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (s) => c.setLibraryOpenMode(s.first),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Arquivos importados e gravações sempre abrem direto no player.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ],
+            ),
+            SectionCard(
               title: 'Banners do Início',
               children: [
                 KeyValueRow(
                   label: 'Banners',
-                  value: '${1 + c.catalog.banners.length} de 5',
+                  value: '${c.catalog.banners.length} de ${BannerConfig.maxExtra}',
+                ),
+                Text(
+                  '"Continue de onde parou" aparece sozinho quando há algo em '
+                  'andamento e não conta nesse limite.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
                 Align(

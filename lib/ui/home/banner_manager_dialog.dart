@@ -9,8 +9,9 @@ import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/animation_categories_dialog.dart';
 
-/// Gerenciador dos banners do Início: o 1º ("Continue de onde parou") é fixo;
-/// dá para ter até 4 outros (5 no total), com nome, fonte e ordem à escolha.
+/// Gerenciador dos banners do Início: "Continue de onde parou" é fixo (só
+/// aparece quando há algo em andamento); dá para ter de 1 a 4 banners, com
+/// nome, fonte e ordem à escolha.
 Future<void> showBannerManager(BuildContext context) {
   return showDialog<void>(
     context: context,
@@ -113,8 +114,9 @@ class _ManagerDialogState extends State<_ManagerDialog> {
               Text('Banners do Início', style: AppFonts.title(24)),
               const SizedBox(height: 6),
               Text(
-                'O primeiro banner não pode ser removido. Até 5 banners no '
-                'total. Os dois banners menores à direita acompanham os slides.',
+                'Mantenha de 1 a 4 banners. "Continue de onde parou" aparece '
+                'sozinho quando há algo em andamento e não conta nesse limite. '
+                'Cada banner passa pelos seus títulos antes do próximo.',
                 style: muted,
               ),
               const SizedBox(height: 12),
@@ -131,7 +133,7 @@ class _ManagerDialogState extends State<_ManagerDialog> {
                             const SizedBox(width: 10),
                             const Expanded(
                               child: Text(
-                                'Continue de onde parou  ·  principal (fixo)',
+                                'Continue de onde parou  ·  fixo (só com algo em andamento)',
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
@@ -174,7 +176,8 @@ class _ManagerDialogState extends State<_ManagerDialog> {
                                   ),
                                   IconButton(
                                     tooltip: 'Remover',
-                                    onPressed: () => _remove(i),
+                                    onPressed:
+                                        _list.length <= 1 ? null : () => _remove(i),
                                     icon: const Icon(Icons.delete_outline, size: 18),
                                   ),
                                 ],
@@ -231,7 +234,7 @@ class _ManagerDialogState extends State<_ManagerDialog> {
                   OutlinedButton.icon(
                     onPressed: _list.length >= BannerConfig.maxExtra ? null : _add,
                     icon: const Icon(Icons.add, size: 18),
-                    label: Text('Adicionar (${1 + _list.length} de 5)'),
+                    label: Text('Adicionar (${_list.length} de ${BannerConfig.maxExtra})'),
                   ),
                   const SizedBox(width: 8),
                   TextButton(

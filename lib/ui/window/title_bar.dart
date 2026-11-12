@@ -68,27 +68,120 @@ class _TitleBarState extends State<TitleBar> with WindowListener {
           ),
           Align(
             alignment: Alignment.topCenter,
-            child: Row(children: [
-          _WindowButton(
-            icon: Icons.remove,
-            tooltip: 'Minimizar',
-            onTap: () => windowManager.minimize(),
-          ),
-          _WindowButton(
-            icon: _maximized ? Icons.filter_none : Icons.crop_square,
-            iconSize: _maximized ? 13 : 14,
-            tooltip: _maximized ? 'Restaurar' : 'Maximizar',
-            onTap: _toggleMaximize,
-          ),
-          _WindowButton(
-            icon: Icons.close,
-            tooltip: 'Fechar',
-            danger: true,
-            onTap: () => windowManager.close(),
-          ),
-            ]),
+            child: WindowButtons(maximized: _maximized, onToggleMaximize: _toggleMaximize),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Minimizar / maximizar / fechar. [tooltips] = false quando não há Overlay
+/// acima (a cópia flutuante fica fora do Navigator).
+class WindowButtons extends StatelessWidget {
+  const WindowButtons({
+    super.key,
+    required this.maximized,
+    required this.onToggleMaximize,
+    this.tooltips = true,
+  });
+
+  final bool maximized;
+  final VoidCallback onToggleMaximize;
+  final bool tooltips;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      _WindowButton(
+        icon: Icons.remove,
+        tooltip: 'Minimizar',
+        tooltips: tooltips,
+        onTap: () => windowManager.minimize(),
+      ),
+      _WindowButton(
+        icon: maximized ? Icons.filter_none : Icons.crop_square,
+        iconSize: maximized ? 13 : 14,
+        tooltip: maximized ? 'Restaurar' : 'Maximizar',
+        tooltips: tooltips,
+        onTap: onToggleMaximize,
+      ),
+      _WindowButton(
+        icon: Icons.close,
+        tooltip: 'Fechar',
+        tooltips: tooltips,
+        danger: true,
+        onTap: () => windowManager.close(),
+      ),
+    ]);
+  }
+}
+
+/// Cópia dos botões da janela por cima de tudo (inclusive de caixas de diálogo
+/// e painéis modais), para a janela continuar controlável com um diálogo
+/// aberto. Some em tela cheia (quando a barra de título também some).
+class WindowButtonsOverlay extends StatefulWidget {
+  const WindowButtonsOverlay({super.key});
+
+  @override
+  State<WindowButtonsOverlay> createState() => _WindowButtonsOverlayState();
+}
+
+class _WindowButtonsOverlayState extends State<WindowButtonsOverlay>
+    with WindowListener {
+  bool _maximized = false;
+  bool _full = false;
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    _sync();
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  Future<void> _sync() async {
+    final m = await windowManager.isMaximized();
+    final f = await windowManager.isFullScreen();
+    if (mounted) {
+      setState(() {
+        _maximized = m;
+        _full = f;
+      });
+    }
+  }
+
+  @override
+  void onWindowMaximize() => _sync();
+  @override
+  void onWindowUnmaximize() => _sync();
+  @override
+  void onWindowEnterFullScreen() => _sync();
+  @override
+  void onWindowLeaveFullScreen() => _sync();
+
+  Future<void> _toggle() async {
+    if (await windowManager.isMaximized()) {
+      await windowManager.unmaximize();
+    } else {
+      await windowManager.maximize();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_full) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.topRight,
+      child: WindowButtons(
+        maximized: _maximized,
+        onToggleMaximize: _toggle,
+        tooltips: false,
       ),
     );
   }
@@ -101,7 +194,10 @@ class _WindowButton extends StatefulWidget {
     required this.onTap,
     this.iconSize = 15,
     this.danger = false,
+    this.tooltips = true,
   });
+
+  final bool tooltips;
 
   final IconData icon;
   final String tooltip;
@@ -123,9 +219,7 @@ class _WindowButtonState extends State<_WindowButton> {
         : Colors.transparent;
     final Color foreground =
         _hover && widget.danger ? Colors.white : AppColors.text;
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
+    final button = MouseRegion(
         onEnter: (_) => setState(() => _hover = true),
         onExit: (_) => setState(() => _hover = false),
         child: GestureDetector(
@@ -139,8 +233,10 @@ class _WindowButtonState extends State<_WindowButton> {
             child: Icon(widget.icon, size: widget.iconSize, color: foreground),
           ),
         ),
-      ),
-    );
+      );
+    return widget.tooltips
+        ? Tooltip(message: widget.tooltip, child: button)
+        : button;
   }
 }
 

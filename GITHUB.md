@@ -1,4 +1,6 @@
-# Publicar o MIP no GitHub (para seus amigos instalarem e atualizarem)
+# Publicar o MIP no GitHub
+
+> **Atualizado (build 6H):** usamos **um só repositório** (`gbrlinsk3/MyIptvPLayer`) e o instalador é o do Inno Setup. O comando de publicar é `powershell -ExecutionPolicy Bypass -File .\installer\montar_instalador.ps1 -Versao X -Repo gbrlinsk3/MyIptvPLayer -Notas "..." -Publicar` (e o arquivo na Release é `MIP-Setup-X.exe`). Trechos abaixo sobre `installer_app` / `mip-releases` estão desatualizados. (para seus amigos instalarem e atualizarem)
 
 > Passo a passo escrito sem testar (o assistente não acessa o seu GitHub). Os nomes de menus do GitHub podem variar um pouco.
 

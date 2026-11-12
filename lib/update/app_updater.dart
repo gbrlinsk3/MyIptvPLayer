@@ -15,8 +15,9 @@ import 'update_info.dart';
 enum UpdateState { idle, checking, available, downloading, ready, error }
 
 /// Atualizador próprio. Consulta um manifesto JSON por HTTPS (endereço em
-/// [manifestUrl]), baixa o .zip da nova versão, confere o SHA-256 do manifesto
-/// e, ao confirmar, troca os arquivos do programa e reabre.
+/// [manifestUrl]), baixa o instalador (.exe do Inno Setup) da nova versão,
+/// confere o SHA-256 do manifesto e, ao confirmar, roda o instalador em modo
+/// silencioso, que troca os arquivos e reabre o programa.
 ///
 /// Não há servidor definido: o endereço fica vazio até você publicar o
 /// manifesto em algum lugar e informá-lo em Conta e ajustes → Configurações →
@@ -124,7 +125,7 @@ class AppUpdater extends ChangeNotifier {
       final dir = Directory(p.join(tmp.path, 'mip_update'));
       if (await dir.exists()) await dir.delete(recursive: true);
       await dir.create(recursive: true);
-      final file = File(p.join(dir.path, 'update.zip'));
+      final file = File(p.join(dir.path, 'MIP-Setup.exe'));
 
       final req = http.Request('GET', Uri.parse(info.url));
       final res = await client.send(req).timeout(const Duration(seconds: 30));
@@ -162,55 +163,30 @@ class AppUpdater extends ChangeNotifier {
     }
   }
 
-  /// Extrai o zip por cima da pasta do programa e reabre. Encerra o app.
-  /// Usa o PowerShell do Windows (Expand-Archive); um script espera o app
-  /// fechar antes de copiar, porque o .exe em uso não pode ser trocado.
+  /// Roda o instalador baixado (Inno Setup) em modo silencioso e encerra o app.
+  /// O instalador fecha o programa se ainda estiver aberto, apaga os arquivos
+  /// da versão antiga, copia os novos e reabre o MIP sozinho (veja
+  /// `installer/iptv_player.iss`). Perfis e banco ficam em %APPDATA%.
   Future<void> installAndRestart() async {
-    final zip = _zip;
-    if (zip == null || !Platform.isWindows) return;
+    final setup = _zip;
+    if (setup == null || !Platform.isWindows) return;
     try {
-      final exe = Platform.resolvedExecutable;
-      final appDir = p.dirname(exe);
-      final work = p.dirname(zip.path);
-      final stage = p.join(work, 'novo');
-      final script = File(p.join(work, 'atualizar.ps1'));
-      String q(String s) => "'${s.replaceAll("'", "''")}'";
-      await script.writeAsString('''
-\$ErrorActionPreference = 'Stop'
-Start-Sleep -Seconds 2
-for (\$i = 0; \$i -lt 30; \$i++) {
-  if (-not (Get-Process -Id $pid -ErrorAction SilentlyContinue)) { break }
-  Start-Sleep -Seconds 1
-}
-if (Test-Path ${q(stage)}) { Remove-Item ${q(stage)} -Recurse -Force }
-Expand-Archive -LiteralPath ${q(zip.path)} -DestinationPath ${q(stage)} -Force
-# Espelha a versão nova na pasta do programa: copia o que mudou e APAGA o que
-# não existe mais na versão nova (arquivos inúteis). O desinstalador é mantido.
-robocopy ${q(stage)} ${q(appDir)} /MIR /XF desinstalar.ps1 /R:3 /W:1 /NFL /NDL /NJH /NJS | Out-Null
-if (\$LASTEXITCODE -ge 8) { exit 1 }
-Start-Process -FilePath ${q(exe)}
-# Limpeza dos arquivos temporários da atualização.
-Remove-Item ${q(stage)} -Recurse -Force
-Remove-Item ${q(zip.path)} -Force
-''');
+      AppLog.info('atualizador', 'Executando instalador ${available?.version}');
       await Process.start(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-WindowStyle',
-          'Hidden',
-          '-File',
-          script.path,
+        setup.path,
+        const [
+          '/SILENT',
+          '/SUPPRESSMSGBOXES',
+          '/NORESTART',
+          '/CLOSEAPPLICATIONS',
         ],
         mode: ProcessStartMode.detached,
       );
-      AppLog.info('atualizador', 'Instalando ${available?.version}; reiniciando');
+      await Future<void>.delayed(const Duration(seconds: 1));
       exit(0);
     } catch (e) {
       AppLog.error('atualizador.instalar', e);
-      error = 'Falha ao instalar a atualização: $e';
+      error = 'Falha ao iniciar o instalador: $e';
       state = UpdateState.error;
       notifyListeners();
     }

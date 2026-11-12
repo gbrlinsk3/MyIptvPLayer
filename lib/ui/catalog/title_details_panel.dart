@@ -60,6 +60,15 @@ class _DetailsPanelState extends State<_DetailsPanel> {
     final app = AppScope.read(context);
     _details = app.catalog.details(widget.title.kind, widget.title.id);
     _loadProgress(app);
+    _openLastSeason(app);
+  }
+
+  /// Séries abrem na temporada do último episódio assistido.
+  void _openLastSeason(AppController app) {
+    if (_isMovie) return;
+    app.catalog.lastWatchedSeason(widget.title.id).then((s) {
+      if (mounted && s != null && _season == -1) setState(() => _season = s);
+    });
   }
 
   void _loadProgress(AppController app) {

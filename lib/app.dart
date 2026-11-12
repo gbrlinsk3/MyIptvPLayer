@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'core/app_info.dart';
@@ -11,6 +13,7 @@ import 'ui/login_page.dart';
 import 'ui/profiles/profile_picker_page.dart';
 import 'ui/shell.dart';
 import 'ui/update/update_toast.dart';
+import 'ui/widgets/ui_scale.dart';
 import 'ui/window/title_bar.dart';
 import 'update/app_updater.dart';
 
@@ -31,8 +34,23 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
     _playback = PlaybackController();
     _profiles = ProfilesController(_playback)..load();
     WidgetsBinding.instance.addObserver(this);
+    // Tema "Automático" (por horário): confere a hora de tempos em tempos e só
+    // reconstrói a interface quando o claro/escuro muda de fato.
+    _themeTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      final pref = _profiles.session?.app.themePref;
+      if (pref != ThemePref.auto || !mounted) return;
+      if (resolveDark(pref!, platformDark: _platformDark) != AppColors.isDark) {
+        setState(() {});
+      }
+    });
     _startupUpdateCheck();
   }
+
+  Timer? _themeTimer;
+
+  bool get _platformDark =>
+      WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+      Brightness.dark;
 
   /// Procura atualização a cada abertura (tela de carregamento por até ~6 s).
   bool _checkingUpdate = true;
@@ -48,7 +66,7 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
     if (mounted) setState(() => _checkingUpdate = false);
   }
 
-  /// Tema "Automático": acompanha o claro/escuro do Windows.
+  /// Tema "Sistema": acompanha o claro/escuro do Windows.
   @override
   void didChangePlatformBrightness() {
     if (mounted) setState(() {});
@@ -69,6 +87,7 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _themeTimer?.cancel();
     _profiles.dispose();
     _playback.dispose();
     super.dispose();
@@ -91,7 +110,11 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
             // troca de perfil, então sempre escuta o notificador do perfil atual.
             child: ListenableBuilder(
               listenable: Listenable.merge(
-                [session.app.themeNotifier, session.app.shapeRevision],
+                [
+                  session.app.themeNotifier,
+                  session.app.shapeRevision,
+                  session.app.scaleNotifier,
+                ],
               ),
               builder: (context, _) => _themed(session),
             ),
@@ -102,12 +125,10 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
   }
 
   Widget _themed(ProfileSession? session) {
-    final mode = session?.app.themeMode ?? ThemeMode.dark;
-    final platformDark =
-        WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-            Brightness.dark;
-    final dark =
-        mode == ThemeMode.dark || (mode == ThemeMode.system && platformDark);
+    final dark = resolveDark(
+      session?.app.themePref ?? ThemePref.dark,
+      platformDark: _platformDark,
+    );
     // As cores são estáticas: atualiza a paleta e recria a árvore (key).
     AppColors.applyBrightness(dark);
     return MaterialApp(
@@ -115,11 +136,18 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
       title: AppInfo.name,
       debugShowCheckedModeBanner: false,
       theme: _themeFor(dark),
-      builder: (context, child) => Stack(
-        children: [
-          if (child != null) Positioned.fill(child: child),
-          const UpdateToast(),
-        ],
+      // "Tamanho da interface": tudo (telas, diálogos, botões da janela e
+      // aviso de atualização) fica dentro da mesma ampliação. Antes de entrar
+      // num perfil não há ajuste salvo: tamanho 100 %.
+      builder: (context, child) => UiScale(
+        scale: session?.app.uiScale ?? 1.0,
+        child: Stack(
+          children: [
+            if (child != null) Positioned.fill(child: child),
+            const WindowButtonsOverlay(),
+            const UpdateToast(),
+          ],
+        ),
       ),
       home: AnimatedSwitcher(
         duration: const Duration(milliseconds: 380),

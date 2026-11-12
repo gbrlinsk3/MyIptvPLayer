@@ -13,6 +13,7 @@ import 'favorites/favorites_page.dart';
 import 'shell/lazy_pages.dart';
 import 'shell/search_overlay.dart';
 import 'shell/top_bar.dart';
+import 'widgets/content_frame.dart';
 import 'window/title_bar.dart';
 import 'widgets/cubos_logo.dart';
 
@@ -78,6 +79,8 @@ class _ShellState extends State<Shell> {
                   ),
                 ),
                 Expanded(
+                  // "Largura do catálogo": coluna centralizada (ou preenchida).
+                  child: ContentFrame(
                   child: Stack(
                     children: [
                       // Só a página aberta é construída; as visitadas ficam vivas
@@ -109,6 +112,7 @@ class _ShellState extends State<Shell> {
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ),
               ],

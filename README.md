@@ -538,3 +538,80 @@ Duas formas (ambas *não testadas*):
 
 ### Um só repositório (build 6F)
 Decisão do usuário: **um único repositório público** (`gbrlinsk3/MyIptvPLayer`) com código e Releases. `defaultManifestUrl` aponta para ele e o script é chamado com `-Repo gbrlinsk3/MyIptvPLayer`. Consequência: o código-fonte fica visível para qualquer pessoa. Não coloque senhas, links de provedores ou dados pessoais nos arquivos do repositório.
+
+### Correções após o primeiro teste real (build 6G)
+Relatado por você: (1) instalador falhava ao criar o atalho da área de trabalho; (2) "Instalar e reiniciar" fechava o app, não reabria e não aplicava a atualização; (3) na tela de criar perfil os botões da janela ficavam inutilizáveis.
+- **Atalho:** o instalador usava `%USERPROFILE%\Desktop`, que não existe quando a área de trabalho está no OneDrive. Agora pergunta ao Windows o caminho real (`GetFolderPath`) para Desktop e Menu Iniciar. *Causa inferida* pela mensagem de erro (DirectoryNotFound); não confirmei se a sua Desktop está no OneDrive.
+- **Atualizador:** **a causa da falha não foi identificada** (não tenho como executar). Reescrevi o script: escreve `logs/atualizacao.log` e `update_result.txt`, só passa a copiar depois de conferir o zip, **reabre o programa mesmo se der erro**, e mostra "A última atualização falhou: …" no aviso e em Configurações → Atualizações. Se falhar de novo, mande o conteúdo de `%APPDATA%\...\logs\atualizacao.log` (botão "Abrir pasta de logs" em Configurações).
+- **Botões da janela:** uma cópia de minimizar/maximizar/fechar fica por cima de tudo (inclusive diálogos); some em tela cheia. *Não verificado visualmente.*
+
+### Volta ao Inno Setup, como instalador e atualizador (build 6H)
+Após o teste do build 6G: o instalador em Flutter ainda falhava no atalho e o atualizador por PowerShell fechava o app sem aplicar a atualização (nem reabrir). Por pedido do usuário, **voltamos ao Inno Setup**.
+- **Causa do erro do atalho (identificada pela captura de tela):** o caminho "Área de Trabalho" chegou corrompido ("Ç?rea de Trabalho") ao passar texto entre o instalador e o PowerShell. O Inno não usa esse caminho.
+- **A pasta `installer_app/` foi removida** (e o `analysis_options` não precisa mais excluí-la). Apague-a do seu projeto também.
+- **Novo fluxo:** `installer/montar_instalador.ps1` compila o MIP, roda o Inno (`ISCC`), gera `release\MIP-Setup-<versão>.exe` + `latest.json` (com SHA-256 do `.exe`) e, com `-Publicar`, cria a Release no GitHub. Confere se `AppInfo.version` bate com `-Versao` antes de publicar.
+  `powershell -ExecutionPolicy Bypass -File .\installer\montar_instalador.ps1 -Versao 1.0.3 -Repo gbrlinsk3/MyIptvPLayer -Notas "O que mudou" -Publicar`
+- **Atualizador:** baixa o `MIP-Setup-<versão>.exe`, confere o SHA-256, e ao clicar *Instalar e reiniciar* roda o instalador em modo silencioso (`/SILENT /CLOSEAPPLICATIONS`) e fecha o app. O instalador apaga os arquivos antigos da pasta do programa (`[InstallDelete]`), copia os novos e reabre o MIP (`[Run]` com `Check: WizardSilent`). *Não verificado em execução.*
+- **Instalação nova:** seus amigos baixam o `MIP-Setup-<versão>.exe` na Release e executam (um único arquivo). O visual é o do assistente do Inno com o ícone do MIP; um assistente 100% com o visual do programa não está mais no projeto.
+- A instalação feita antes pelo instalador em Flutter fica em `%LOCALAPPDATA%\Programs\MIP`, a mesma pasta padrão do Inno; instale o novo por cima ou desinstale o antigo em "Aplicativos instalados" antes.
+
+### Build 7A — bugs, Início, Conta e ajustes
+Feito pelo Claude Code **com compilação**: `flutter analyze` sem avisos e `flutter test` passando (2 testes novos em `test/theme_pref_test.dart`, só do cálculo do tema). **Nada disso foi visto rodando no app** (não há conta Xtream no ambiente do Claude Code); confira na tela.
+
+**Já existia no código e foi só ajustado** (identificado ao ler o código, não reescrevi): o gerenciador de banners (`ui/home/banner_manager_dialog.dart`), os padrões *Filmes novos / Séries novas / Adicionados recentemente* (`BannerConfig.defaults`, que usa a fonte `newMix` "Novos (filmes e séries)" — continua uma suposição minha que é isso que você chamou de "Adicionados recentemente") e o slide "Continue de onde parou" só entrando quando há algo em andamento.
+
+**Início — banners**
+- Sempre há ao menos 1 banner: "Remover" fica desativado no último e, se a lista salva vier vazia/inválida, valem os padrões. "Continue de onde parou" não conta no limite (agora de 1 a 4 banners; antes o texto falava em "5 de 5").
+- Setas do banner grande só aparecem com mais de um banner.
+- Banner menor de cima: saiu o "+ N títulos"; mostra os nomes dos outros títulos do banner, separados por " · " (até 2 linhas).
+- Troca automática: a cada 12 s passa ao **próximo título do banner** e, depois do último, ao próximo banner. Interpretei "intervalo atual 12 s" como 12 s **por título** (um banner de 3 títulos leva 36 s; para mudar, `_interval` em `hero_carousel.dart`). A pílula do indicador agora enche ao longo dos títulos do banner; clicar numa miniatura reinicia a contagem; trocar de banner volta ao 1º título. Os detalhes de todos os títulos dos banners são pré-carregados para a troca não esperar.
+
+**Início — Continuar assistindo**
+- Bug do cartão que "voltava a ficar pequeno": ao abrir o card/player por cima, o mouse "saía" da fileira e o primeiro cartão reabria expandido. Agora o cartão clicado fica expandido enquanto o card/player está aberto (`_pinned` em `continue_strip.dart`). *Causa inferida do comportamento do `MouseRegion`; não vi o bug rodando.*
+- Clicar no cartão (filme ou série) abre o **card expandido** (`showTitleDetailsPage`); clicar na chamada abre o **player** (`resumeTitle` em `play_actions.dart`). A chamada passou de "CLIQUE AQUI PARA ASSISTIR" para "CLIQUE AQUI PARA CONTINUAR ASSISTINDO", como você escreveu (reduz a fonte se não couber).
+- Série cujo último episódio terminou mostra o **próximo episódio** (ex.: T1 · E8) em vez de sumir; só some quando não há próximo. Para achar o próximo é preciso baixar os detalhes da série (cache por título, espera de até 8 s; sem rede, a série fica de fora naquele carregamento). Série com episódio em andamento continua voltando nele. Se o último episódio terminado tem outro mais antigo em andamento, vale o **mais recente** dos dois. Consulta nova: `CatalogStore.seriesActivity` (SQL conferido à parte no SQLite). O banner grande "Continue de onde parou" usa a mesma lista.
+- O botão "Continuar" do banner grande não mudou (série ainda abre o card lateral).
+- Card de série (lateral e expandido) abre na **temporada do último episódio assistido ou começado** (`lastEpisodeSeason`). Se o último foi o final de uma temporada, abre nela mesma (não na seguinte).
+
+**Tema** (`core/theme.dart`: `ThemePref`, `resolveDark`)
+- Claro, Escuro, **Sistema** (segue o Windows; era o antigo "Automático", o valor salvo `system` continua valendo) e **Automático** (claro das 9h às 17h, escuro das 17h às 9h, hora do computador; confere a cada 30 s e só reconstrói se mudar). O botão do menu do perfil continua alternando claro/escuro.
+
+**Conta e ajustes**
+- Configurações na ordem: Atualizações, Reprodução, Downloads, EPG, Diagnóstico, **Catálogo**.
+- **Catálogo** (`ui/catalog_settings_card.dart`) une "Catálogo de TV ao vivo" e "Filmes e séries": resumo dos três e chips *TV ao vivo / Filmes / Séries* + **Atualizar selecionados**. Decisão minha: "Limpar cache" ficou em dois botões (TV; filmes e séries juntos, porque o código só limpa os dois de uma vez).
+- Removido o botão "Abrir TV ao vivo".
+- "Ao clicar num título baixado" foi para **Personalização → Minha biblioteca**; o padrão agora é **Card** (`panel`). Quem nunca mexeu passa a ver o Card; quem já tinha salvo outro valor mantém.
+- **Registro de erros** saiu da interface (apaguei `ui/logs_settings_card.dart`); o arquivo de log continua sendo gravado por `AppLog`.
+
+**Não feito nesta rodada:** 7B (tamanho da interface, largura do catálogo, proporções) e 7C (botão "Detalhes" do aviso de atualização, animação de abertura do perfil). Não subi versão (`AppInfo.version` e `pubspec.yaml` intactos) nem gerei instalador.
+
+
+### Build 7B — tamanho da interface, largura do catálogo e proporções
+Feito pelo Claude Code **com compilação**: `flutter analyze` sem avisos e `flutter test` com 14 testes passando (6 de tamanho/colunas em `test/layout_metrics_test.dart`, 6 da ampliação em `test/ui_scale_test.dart`, 2 do tema). **Nada disso foi visto rodando no app** (sem conta Xtream no ambiente do Claude Code, e não consigo capturar a tela): confira visualmente, principalmente os tamanhos dos cartões do "Continuar assistindo".
+
+**Decisões suas (perguntei antes de implementar)**
+- Os "horizontais" são os cartões do **Continuar assistindo**; mantém **1 cartão expandido + os demais recolhidos** e o número conta todos (expandido incluído).
+- Com largura fixa, o **banner do Início também** fica na coluna centralizada (em "Preenchido" continua de borda a borda).
+- **Mesma quantidade por linha em qualquer janela**: o pôster se ajusta à largura (em 1080p a 100 % os pôsteres ficam menores que os de 1440p).
+- Os px da largura (1200/1440/1600) são **pixels lógicos**: crescem com o tamanho da interface (a 115 %, 1440 ocupa ~1656 px na tela).
+
+**Tamanho da interface — 100/115/130/150 % (padrão 115 %)** (`ui/widgets/ui_scale.dart`, `app.dart`)
+- **Validação da ideia do plano:** `Transform.scale` solto com um tamanho lógico menor **não serve** como está: o `RenderTransform` só aceita toque dentro do próprio tamanho (reduzido), então só o canto superior esquerdo responderia — *raciocínio meu, não testei essa variante*. Usei `FittedBox(fit: fill)` com um `SizedBox` do tamanho lógico (janela ÷ escala): o `RenderFittedBox` ocupa a janela toda e converte as coordenadas no teste de acerto. **Testado em widget** (`ui_scale_test.dart`, 1,5×): toque acerta só na posição ampliada (inclusive longe do canto), hover (`MouseRegion`) acompanha, campo de texto recebe foco e texto, diálogo abre ampliado e centralizado, `MediaQuery` do filho informa o tamanho lógico, e **trocar a escala em execução não recria o app** (estado preservado: a árvore não muda nem em 100 %).
+- Fica por fora do `MaterialApp.builder`: telas, diálogos, menus, **barra de título, botões da janela e aviso de atualização** ampliam juntos. Nada no código usa tamanho físico da janela (conferido por busca).
+- Ajuste **por perfil** (`ui_scale` no banco do perfil), em Conta e ajustes → Personalização → "Tamanho da interface". **O padrão 115 % vale para todos os perfis**, também os que nunca mexeram (é a mudança visível ao atualizar). A tela "Quem está assistindo?" e o login ficam em 100 % (ainda não há perfil/ajuste). Valor salvo inválido volta para 115 %.
+- **Não verificado em execução:** nitidez de imagens ampliadas (elas são decodificadas no tamanho lógico, então a 150 % ficam um pouco menos nítidas), vídeo (textura do `media_kit`) e janela de sugestões do teclado/IME sob ampliação; custo de desempenho (é uma única camada de transformação, sem `saveLayer`, mas não medi).
+
+**Largura do catálogo — 1200 / 1440 / 1600 px ou Preenchido (padrão)** (`ui/widgets/content_frame.dart`, `ui/shell.dart`)
+- Uma coluna centralizada envolve toda a área abaixo da barra do topo: Início, TV ao vivo, Catálogo, Favoritos, Minha biblioteca, Conta e ajustes e a busca. Em "Preenchido" nada é limitado (a margem de 24 px das fileiras é a de sempre — não criei margem maior).
+- Efeitos colaterais da coluna: a barra de rolagem e a rolagem do mouse ficam dentro da coluna (não na borda da janela); o banner do Início arredonda os cantos externos (22 px) quando está na coluna estreita, e fica reto de borda a borda em "Preenchido". Ajuste em Personalização → "Largura do catálogo". Se a janela for mais estreita que a largura escolhida, vale a janela.
+
+**Pôsteres por linha** (`core/layout_metrics.dart`: `RowMetrics`)
+- Verticais (fileiras e grades "Ver tudo"/favoritos): **12 / 11 / 11 / 9** para 100 / 115 / 130 / 150 %. Horizontais (Continuar assistindo, 1 expandido incluído): **6 / 6 / 5 / 4**. Os números são seus (2560×1440, Windows a 100 %); o teste confere que no monitor de referência cabem exatamente essa quantidade e o seguinte começa fora da fileira (sem "fatia" aparecendo).
+- Resultado no monitor de referência (largura lógica = 2560 ÷ escala − 68 do trilho): pôster vertical ≈ 192 / 207 / 204 / 248 px **na tela** (lógico 192 / 180 / 157 / 165); cartão do Continuar assistindo recolhido ≈ 330×440 / 327×435 / 377×503 / 446×594 px na tela (expandido 2,27× mais largo). **Esses cartões ficam bem maiores que os de hoje (150×200) e maiores que os pôsteres verticais**: é o que "6 horizontais, 1 expandido incluído" resulta; se estiver grande demais, ajuste `expandedRatio`/`heightRatio` em `RowMetrics` ou me diga o que prefere.
+- Piso: pôster vertical ≥ 110 px e cartão recolhido ≥ 150 px (em janela muito estreita a fileira volta a rolar em vez de encolher mais). A grade ("Ver tudo") reduz as colunas pelo mesmo piso.
+- **Não alterado:** os cartões 16:9 dos resultados da busca (`search_overlay.dart`) e as grades de canais seguem a lógica própria deles; as fileiras de pôsteres dentro da busca já usam a nova regra.
+
+**Banner do Início em telas altas** (`HeroMetrics` + `hero_carousel.dart`)
+- Altura = 40 % da altura útil (janela − 64 da barra do topo), entre 440 e 640. Em 1080p dá 440 (**igual a antes**); em 1440p maximizado a 100 % ≈ 530 px. A largura máxima dos banners da direita sobe de 420 para `420 + 1,2 × (altura − 440)` (≈ 530 px em 1440p/100 %) e passou a 30 % da largura (antes 27 %): o banner grande fica mais alto e mais estreito (≈ 1950×530 contra 2060×440). Valores escolhidos por mim a partir de "mais alto e menos comprido"; sem ver o resultado, ajuste os fatores em `HeroMetrics` se precisar.
+
+**Não feito:** 7C (botão "Detalhes" do aviso de atualização e animação de abertura do perfil). Versão (`AppInfo.version`/`pubspec.yaml`) intacta; nenhum instalador gerado.

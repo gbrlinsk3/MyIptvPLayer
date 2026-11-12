@@ -81,6 +81,7 @@ class CatalogTitle {
     this.durationMs,
     this.subtitle,
     this.updatedAt,
+    this.resumeEpisodeId,
   }) : searchKey = foldText(name);
 
   final CatalogKind kind;
@@ -110,6 +111,10 @@ class CatalogTitle {
   /// Só em "continuar assistindo": quando foi assistido (ms desde 1970).
   final int? updatedAt;
 
+  /// Só em séries do "continuar assistindo": o episódio a retomar (o que está
+  /// em andamento ou, se o último terminou, o próximo).
+  final int? resumeEpisodeId;
+
   final String searchKey;
 
   double? get progress {
@@ -118,6 +123,38 @@ class CatalogTitle {
     if (p == null || d == null || d <= 0) return null;
     return (p / d).clamp(0.0, 1.0).toDouble();
   }
+}
+
+/// O último episódio mexido de uma série (assistido ou em andamento): base do
+/// "Continuar assistindo" das séries.
+class SeriesActivity {
+  const SeriesActivity({
+    required this.seriesId,
+    required this.episodeId,
+    required this.season,
+    required this.episode,
+    required this.watched,
+    required this.positionMs,
+    required this.durationMs,
+    required this.updatedAt,
+    required this.title,
+    this.subtitle,
+    this.image,
+  });
+
+  final int seriesId;
+  final int episodeId;
+  final int? season;
+  final int? episode;
+
+  /// Terminado (ou marcado como assistido): o que vem a seguir é o próximo.
+  final bool watched;
+  final int positionMs;
+  final int durationMs;
+  final int updatedAt;
+  final String title;
+  final String? subtitle;
+  final String? image;
 }
 
 /// Detalhes de um filme ou de uma série (get_vod_info / get_series_info).

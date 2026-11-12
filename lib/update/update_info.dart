@@ -3,8 +3,8 @@
 /// Formato do manifesto (arquivo `latest.json` no seu host, por HTTPS):
 /// ```json
 /// { "version": "1.0.1",
-///   "url": "https://.../MIP-1.0.1.zip",
-///   "sha256": "<hash hexadecimal do zip>",
+///   "url": "https://.../MIP-Setup-1.0.1.exe",
+///   "sha256": "<hash SHA-256 do instalador .exe>",
 ///   "notes": "O que mudou" }
 /// ```
 class UpdateInfo {

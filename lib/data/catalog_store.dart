@@ -325,52 +325,71 @@ class CatalogStore {
     );
   }
 
-  /// "Continuar assistindo": filmes começados e não terminados, ou séries com
-  /// algum episódio começado e não terminado (o mais recente de cada série).
-  Future<List<CatalogTitle>> continueWatching(CatalogKind kind, {int limit = 30}) async {
-    if (kind == CatalogKind.movies) {
-      final rows = await _db.query(
-        'watch_progress',
-        // item_id > 0: arquivos importados pelo usuário (id negativo) ficam só
-        // na Minha biblioteca, fora do "Continuar assistindo".
-        where: "kind = 'vod' AND item_id > 0 AND watched = 0 AND position_ms > 5000",
-        orderBy: 'updated_at DESC',
-        limit: limit,
-      );
-      return [
-        for (final r in rows)
-          CatalogTitle(
-            kind: kind,
-            id: r['item_id'] as int,
-            name: (r['title'] as String?) ?? 'Filme',
-            categoryId: '',
-            image: r['image'] as String?,
-            positionMs: r['position_ms'] as int?,
-            durationMs: r['duration_ms'] as int?,
-            updatedAt: r['updated_at'] as int?,
-          ),
-      ];
-    }
-    final rows = await _db.rawQuery(
-      "SELECT *, MAX(updated_at) AS last FROM watch_progress "
-      "WHERE kind = 'episode' AND watched = 0 AND position_ms > 5000 "
-      'AND series_id IS NOT NULL GROUP BY series_id '
-      'ORDER BY last DESC LIMIT $limit',
+  /// "Continuar assistindo" dos filmes: começados e não terminados.
+  Future<List<CatalogTitle>> continueMovies({int limit = 30}) async {
+    final rows = await _db.query(
+      'watch_progress',
+      // item_id > 0: arquivos importados pelo usuário (id negativo) ficam só
+      // na Minha biblioteca, fora do "Continuar assistindo".
+      where: "kind = 'vod' AND item_id > 0 AND watched = 0 AND position_ms > 5000",
+      orderBy: 'updated_at DESC',
+      limit: limit,
     );
     return [
       for (final r in rows)
         CatalogTitle(
-          kind: kind,
-          id: r['series_id'] as int,
-          name: (r['title'] as String?) ?? 'Série',
+          kind: CatalogKind.movies,
+          id: r['item_id'] as int,
+          name: (r['title'] as String?) ?? 'Filme',
           categoryId: '',
           image: r['image'] as String?,
           positionMs: r['position_ms'] as int?,
           durationMs: r['duration_ms'] as int?,
-          subtitle: r['subtitle'] as String?,
-          updatedAt: r['last'] as int?,
+          updatedAt: r['updated_at'] as int?,
         ),
     ];
+  }
+
+  /// Para cada série, o episódio mexido por último (assistido até o fim ou em
+  /// andamento), da mais recente para a mais antiga. Episódios apenas abertos
+  /// (até 5 s) não contam.
+  Future<List<SeriesActivity>> seriesActivity({int limit = 30}) async {
+    final rows = await _db.rawQuery(
+      "SELECT *, MAX(updated_at) AS last FROM watch_progress "
+      "WHERE kind = 'episode' AND series_id IS NOT NULL "
+      'AND (watched = 1 OR position_ms > 5000) GROUP BY series_id '
+      'ORDER BY last DESC LIMIT $limit',
+    );
+    return [
+      for (final r in rows)
+        SeriesActivity(
+          seriesId: r['series_id'] as int,
+          episodeId: r['item_id'] as int,
+          season: r['season'] as int?,
+          episode: r['episode'] as int?,
+          watched: ((r['watched'] as int?) ?? 0) == 1,
+          positionMs: (r['position_ms'] as int?) ?? 0,
+          durationMs: (r['duration_ms'] as int?) ?? 0,
+          updatedAt: (r['last'] as int?) ?? 0,
+          title: (r['title'] as String?) ?? 'Série',
+          subtitle: r['subtitle'] as String?,
+          image: r['image'] as String?,
+        ),
+    ];
+  }
+
+  /// Temporada do último episódio assistido (ou começado) da série.
+  Future<int?> lastEpisodeSeason(int seriesId) async {
+    final rows = await _db.query(
+      'watch_progress',
+      columns: ['season'],
+      where: "kind = 'episode' AND series_id = ? AND season IS NOT NULL "
+          'AND (watched = 1 OR position_ms > 0)',
+      whereArgs: [seriesId],
+      orderBy: 'updated_at DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['season'] as int?;
   }
 
   Future<void> clearProgress() => _db.delete('watch_progress');
