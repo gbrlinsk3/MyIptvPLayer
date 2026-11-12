@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'core/app_info.dart';
+import 'core/navigation.dart';
 import 'core/theme.dart';
 import 'playback/playback_controller.dart';
 import 'profiles/profiles_controller.dart';
@@ -13,6 +14,7 @@ import 'ui/login_page.dart';
 import 'ui/profiles/profile_picker_page.dart';
 import 'ui/shell.dart';
 import 'ui/update/update_toast.dart';
+import 'ui/widgets/profile_intro.dart';
 import 'ui/widgets/ui_scale.dart';
 import 'ui/window/title_bar.dart';
 import 'update/app_updater.dart';
@@ -133,6 +135,7 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
     AppColors.applyBrightness(dark);
     return MaterialApp(
       key: ValueKey(dark),
+      navigatorKey: appNavigatorKey,
       title: AppInfo.name,
       debugShowCheckedModeBanner: false,
       theme: _themeFor(dark),
@@ -179,20 +182,39 @@ class _Entry extends StatelessWidget {
   }
 }
 
-class _Root extends StatelessWidget {
+class _Root extends StatefulWidget {
   const _Root({super.key});
+
+  @override
+  State<_Root> createState() => _RootState();
+}
+
+class _RootState extends State<_Root> {
+  // Animação da marca ao entrar no perfil (2,5 s, cobre o carregamento).
+  bool _intro = true;
 
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final Widget page;
     switch (controller.phase) {
       case AppPhase.booting:
-        return const PlainFrame(child: _Splash());
+        page = const PlainFrame(child: _Splash());
       case AppPhase.loggedOut:
-        return const PlainFrame(child: LoginPage());
+        page = const PlainFrame(child: LoginPage());
       case AppPhase.ready:
-        return const Shell();
+        page = const Shell();
     }
+    // A árvore não muda quando a animação termina (o app não é recriado).
+    return Stack(
+      children: [
+        Positioned.fill(child: page),
+        if (_intro)
+          Positioned.fill(
+            child: ProfileIntro(onDone: () => setState(() => _intro = false)),
+          ),
+      ],
+    );
   }
 }
 

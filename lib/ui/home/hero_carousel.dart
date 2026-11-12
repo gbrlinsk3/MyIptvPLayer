@@ -46,7 +46,7 @@ class HeroCarousel extends StatefulWidget {
 
 class _HeroCarouselState extends State<HeroCarousel>
     with SingleTickerProviderStateMixin {
-  static const _interval = Duration(seconds: 12);
+  static const _interval = Duration(seconds: 6);
 
   late final AnimationController _timer =
       AnimationController(vsync: this, duration: _interval)

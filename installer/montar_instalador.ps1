@@ -42,7 +42,34 @@ $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
 
 Write-Host '3/3 Escrevendo latest.json...'
 $url = "https://github.com/$Repo/releases/download/v$Versao/MIP-Setup-$Versao.exe"
-$json = @{ version = $Versao; url = $url; sha256 = $hash; notes = $Notas } | ConvertTo-Json
+
+# Detalhes (botao "Detalhes" do aviso de atualizacao): notas\<versao>.md com
+# as secoes "## Novos recursos", "## Melhorias de design" e "## Correcoes",
+# cada uma com itens "- texto". Sem o arquivo, o aviso mostra so o -Notas.
+$detalhes = [ordered]@{}
+$arqNotas = Join-Path $raiz "notas\$Versao.md"
+if (Test-Path $arqNotas) {
+  $chave = $null
+  foreach ($linha in (Get-Content $arqNotas -Encoding UTF8)) {
+    if ($linha -match '^\s*##\s+(.+?)\s*$') {
+      $titulo = $Matches[1].ToLower()
+      if ($titulo -like 'novo*') { $chave = 'novos' }
+      elseif ($titulo -like 'melhoria*' -or $titulo -like 'design*') { $chave = 'design' }
+      elseif ($titulo -like 'corre*') { $chave = 'correcoes' }
+      else { $chave = $null }
+      if ($chave -and -not $detalhes.Contains($chave)) { $detalhes[$chave] = @() }
+    } elseif ($chave -and $linha -match '^\s*[-*]\s+(.+?)\s*$') {
+      $detalhes[$chave] += $Matches[1]
+    }
+  }
+  Write-Host "Detalhes lidos de notas\$Versao.md"
+} else {
+  Write-Host "Sem notas\$Versao.md: o aviso de atualizacao nao tera o botao Detalhes."
+}
+if (-not $Notas -and $detalhes.Count -gt 0) { $Notas = "Novidades da versao $Versao." }
+$manifesto = [ordered]@{ version = $Versao; url = $url; sha256 = $hash; notes = $Notas }
+if ($detalhes.Count -gt 0) { $manifesto['details'] = $detalhes }
+$json = $manifesto | ConvertTo-Json -Depth 5
 Set-Content -Path (Join-Path $saida 'latest.json') -Value $json -Encoding UTF8
 Write-Host "Pronto: $setup"
 

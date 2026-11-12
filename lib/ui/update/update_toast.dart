@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_info.dart';
+import '../../core/navigation.dart';
 import '../../core/theme.dart';
 import '../../update/app_updater.dart';
+import '../../update/update_info.dart';
 import '../widgets/cubos_logo.dart';
 
 /// Tela de abertura enquanto o app procura atualização (no máximo ~6 s).
@@ -43,7 +45,7 @@ class StartupSplash extends StatelessWidget {
   }
 }
 
-/// Aviso no canto inferior esquerdo quando há atualização disponível.
+/// Aviso no canto inferior direito quando há atualização disponível.
 class UpdateToast extends StatelessWidget {
   const UpdateToast({super.key});
 
@@ -62,7 +64,7 @@ class UpdateToast extends StatelessWidget {
         final busy = u.state == UpdateState.downloading;
         final ready = u.state == UpdateState.ready;
         return Align(
-          alignment: Alignment.bottomLeft,
+          alignment: Alignment.bottomRight,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Material(
@@ -131,6 +133,11 @@ class UpdateToast extends StatelessWidget {
                           onPressed: busy ? null : u.dismiss,
                           child: const Text('Depois'),
                         ),
+                        if (info.hasDetails || info.notes.isNotEmpty)
+                          TextButton(
+                            onPressed: () => showUpdateDetails(context, info),
+                            child: const Text('Detalhes'),
+                          ),
                       ],
                     ),
                   ],
@@ -143,4 +150,64 @@ class UpdateToast extends StatelessWidget {
       },
     );
   }
+}
+
+/// "Detalhes" do aviso de atualização: novos recursos, melhorias de design e
+/// correções da versão (ou o texto curto das notas, se a versão não trouxe
+/// o detalhamento).
+Future<void> showUpdateDetails(BuildContext context, UpdateInfo info) {
+  // O aviso fica fora do Navigator (no builder do app): usa o do app.
+  final nav = appNavigatorKey.currentContext;
+  if (nav == null) return Future.value();
+  return showDialog<void>(
+    context: nav,
+    builder: (context) => AlertDialog(
+      title: Text('Novidades da versão ${info.version}'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 420),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (info.hasDetails)
+                for (final e in UpdateInfo.sectionTitles.entries)
+                  if (info.details[e.key]?.isNotEmpty ?? false) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, bottom: 6),
+                      child: Text(
+                        e.value,
+                        style: TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    for (final item in info.details[e.key]!)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('•  '),
+                            Expanded(child: Text(item)),
+                          ],
+                        ),
+                      ),
+                  ]
+              else
+                Text(info.notes),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fechar'),
+        ),
+      ],
+    ),
+  );
 }
