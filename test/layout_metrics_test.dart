@@ -35,7 +35,7 @@ void main() {
     const expected = {100: 6, 115: 6, 130: 5, 150: 4};
     for (final e in expected.entries) {
       // Largura sem o teto: a fileira inteira é usada (6/6/5/4 cabem).
-      final w = e.value * 100.0 + 400;
+      final w = RowMetrics.pad + RowMetrics.landscapeGap * e.value + 180 * (e.value - 1 + RowMetrics.expandedRatio);
       final s = RowMetrics.landscapeSizes(w, e.value);
       // margem + (n-1) recolhidos + 1 expandido + n espaços = fileira inteira.
       final total = RowMetrics.pad +
