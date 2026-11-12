@@ -623,3 +623,5 @@ Feito pelo Claude Code **com compilação**: `flutter analyze` sem avisos e `flu
 - **Botões centralizados com o perfil:** ficam no centro vertical da barra do topo (64 px no Início); a cópia flutuante acompanha a altura da barra aberta.
 - **Continuar assistindo em "Preenchido":** cartão recolhido limitado a 200 px de largura (`RowMetrics.maxCollapsed`); em janela larga sobra espaço à direita. Larguras fixas não mudam.
 - **Banner em "Preenchido":** altura passa a considerar também a largura (28 %, até 640) e os banners da direita crescem mais com a altura (fator 1,6). Larguras fixas ficam iguais. Valores escolhidos por mim; **não vi o resultado**, ajuste `HeroMetrics` se precisar.
+
+**Versão 1.0.4:** publicada como Release com os ajustes acima.

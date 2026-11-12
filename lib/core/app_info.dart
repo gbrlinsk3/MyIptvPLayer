@@ -8,7 +8,7 @@ class AppInfo {
 
   /// Versão atual. Precisa acompanhar a `version:` do pubspec.yaml
   /// (o atualizador compara este valor com o publicado).
-  static const version = '1.0.3';
+  static const version = '1.0.4';
 
   /// Endereço (https) do manifesto de atualização. Vazio = sem atualizador até
   /// ser informado em Conta e ajustes → Configurações → Atualizações.
