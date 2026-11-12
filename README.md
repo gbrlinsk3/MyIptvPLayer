@@ -615,3 +615,5 @@ Feito pelo Claude Code **com compilação**: `flutter analyze` sem avisos e `flu
 - Altura = 40 % da altura útil (janela − 64 da barra do topo), entre 440 e 640. Em 1080p dá 440 (**igual a antes**); em 1440p maximizado a 100 % ≈ 530 px. A largura máxima dos banners da direita sobe de 420 para `420 + 1,2 × (altura − 440)` (≈ 530 px em 1440p/100 %) e passou a 30 % da largura (antes 27 %): o banner grande fica mais alto e mais estreito (≈ 1950×530 contra 2060×440). Valores escolhidos por mim a partir de "mais alto e menos comprido"; sem ver o resultado, ajuste os fatores em `HeroMetrics` se precisar.
 
 **Não feito:** 7C (botão "Detalhes" do aviso de atualização e animação de abertura do perfil). Versão (`AppInfo.version`/`pubspec.yaml`) intacta; nenhum instalador gerado.
+
+**Versão 1.0.3:** publicada como Release com os builds 7A e 7B.
