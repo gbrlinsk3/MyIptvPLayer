@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:iptv_player/ui/widgets/profile_intro.dart';
 
 void main() {
-  testWidgets('a animação dura 2,5 s, cobre a tela e chama onDone no fim',
+  testWidgets('a animação dura 3 s, cobre a tela e chama onDone no fim',
       (t) async {
     t.view.physicalSize = const Size(1200, 700);
     t.view.devicePixelRatio = 1;
@@ -15,10 +15,10 @@ void main() {
         Positioned.fill(
           child: GestureDetector(onTap: () => taps++, child: const ColoredBox(color: Colors.red)),
         ),
-        Positioned.fill(child: ProfileIntro(onDone: () => done++)),
+        Positioned.fill(child: ProfileIntro(duration: const Duration(milliseconds: 3000), onDone: () => done++)),
       ]),
     ));
-    await t.pump(const Duration(milliseconds: 2400));
+    await t.pump(const Duration(milliseconds: 2900));
     await t.tapAt(const Offset(600, 350));
     expect(taps, 0, reason: 'não deixa clicar por baixo');
     expect(done, 0);

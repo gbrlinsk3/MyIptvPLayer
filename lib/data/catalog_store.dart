@@ -204,6 +204,27 @@ class CatalogStore {
     ];
   }
 
+  /// Títulos cujo nome contém todas as palavras de [query] (sem acento), para
+  /// escolher um título à mão (tela "Dados anteriores").
+  Future<List<CatalogTitle>> searchByName(
+    CatalogKind kind,
+    String query, {
+    int limit = 40,
+  }) async {
+    final words = [
+      for (final w in foldText(query).split(RegExp(r'\s+')))
+        if (w.isNotEmpty) w.replaceAll('%', '').replaceAll('_', ''),
+    ].where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) return const [];
+    final rows = await _db.rawQuery(
+      'SELECT * FROM ${kind.itemsTable} WHERE '
+      '${List.filled(words.length, 'search_key LIKE ?').join(' AND ')} '
+      'ORDER BY LENGTH(name) ASC, position ASC LIMIT $limit',
+      [for (final w in words) '%$w%'],
+    );
+    return [for (final r in rows) _title(kind, r)];
+  }
+
   // ---- imagens horizontais em cache ------------------------------------------
 
   /// Chaves `<tipo>:<id>` -> endereço da imagem horizontal já descoberta.

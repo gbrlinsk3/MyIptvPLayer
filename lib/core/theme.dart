@@ -139,6 +139,33 @@ ThemeData buildTheme() {
       thickness: 1,
       space: 1,
     ),
+    // Caixas de dica ("Adicionar aos favoritos"...): cartão escuro com borda
+    // fina e cantos arredondados, sempre legível (também no tema claro).
+    tooltipTheme: TooltipThemeData(
+      waitDuration: const Duration(milliseconds: 450),
+      showDuration: const Duration(seconds: 3),
+      verticalOffset: 22,
+      preferBelow: true,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xF2202024),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0x33FFFFFF)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      textStyle: const TextStyle(
+        color: Colors.white,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ),
+    ),
   );
 }
 

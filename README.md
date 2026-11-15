@@ -3,7 +3,7 @@
 Player IPTV (Xtream Codes) para Windows, feito em Flutter. Reproduz TV ao vivo, filmes e séries da sua conta Xtream, com perfis, downloads, biblioteca própria e atualização automática.
 
 - **Repositório:** https://github.com/gbrlinsk3/MyIptvPLayer (código e Releases)
-- **Versão atual:** 1.0.5 (Release publicada).
+- **Versão atual:** 1.0.6 (Release publicada).
 - O programa **não traz conteúdo nem contas**: cada pessoa usa a própria conta Xtream.
 
 ## Instalar e atualizar
@@ -16,8 +16,9 @@ Player IPTV (Xtream Codes) para Windows, feito em Flutter. Reproduz TV ao vivo, 
 ## O que o programa faz
 
 **Perfis e conta**
-- Vários perfis, cada um com o próprio banco, cor de destaque, ajustes e senha Xtream. Ao abrir um perfil toca uma animação de 2,5 s com os cubos da marca.
+- Vários perfis, cada um com o próprio banco, cor de destaque, ajustes e senha Xtream. Ao abrir um perfil toca uma animação de 3 s com os cubos da marca.
 - Conta Xtream: status, expiração e conexões; edição de servidor, usuário e senha ("Salvar e testar" autentica antes de gravar).
+- **Trocar o Xtream:** ao mudar servidor ou usuário, o app pergunta se é do mesmo provedor. *Sim:* histórico (Continuar assistindo), favoritos de filmes/séries/canais e categorias ocultas são guardados pelo nome e religados ao catálogo novo quando ele chega (mesmo nome e ano; episódios por temporada e número). O que não tiver par seguro continua guardado (`account_carryover` nos ajustes) e aparece na aba temporária **Dados anteriores** (seção "TEMPORÁRIO" no fim da barra lateral, com contador na cor de destaque): abas Histórico, Favoritos, Canais e Categorias ocultas; cada item pode ser **religado** (janela com busca no catálogo atual; episódio: escolhe a série e o episódio é achado por temporada/número) ou **descartado**, e "Excluir aba" descarta tudo. A aba some quando não sobra nada. *Não:* avisa que esses dados serão apagados e pede confirmação. Código em `lib/catalog/title_matcher.dart` e `lib/data/carryover_store.dart`.
 
 **Início**
 - Banner grande com banners menores à direita, configurável em *Conta e ajustes → Personalização → Banners do Início* (mínimo 1 banner; fontes: Filmes novos, Séries novas, Novos, Categorias, Títulos escolhidos). "Continue de onde parou" aparece só quando há algo em andamento. Troca automática a cada 12 s por título.
@@ -29,6 +30,7 @@ Player IPTV (Xtream Codes) para Windows, feito em Flutter. Reproduz TV ao vivo, 
 **Filmes e séries**
 - Fileiras por categoria, "Ver tudo" em grade, painel lateral e **tela expandida** com sinopse, elenco, temporadas e episódios.
 - Player com áudio/legenda (inclui legenda externa), retomar de onde parou, marcar como assistido, próximo episódio automático, painel de episódios e prévia na barra de tempo.
+- Painel "Próximo episódio" (faltando 2 min): fica 12 s aberto (pausa com o mouse em cima) e vira uma aba na cor de destaque; passar o mouse na aba reabre o painel.
 - **Favoritos** de filmes, séries e canais.
 
 **Busca global** (barra do topo): canais, filmes e séries, com tradução PT/EN; roda em isolate.
@@ -72,7 +74,7 @@ O script confere a versão, compila, gera `release\MIP-Setup-X.Y.Z.exe` e `lates
 
 ## O que foi verificado e o que não
 
-- **Compilação e testes:** `flutter analyze` sem avisos e testes passando (tema, métricas de layout, ampliação da interface, animação de abertura, manifesto de atualização).
+- **Compilação e testes:** `flutter analyze` sem avisos e testes passando (tema, métricas de layout, ampliação da interface, animação de abertura, manifesto de atualização, banners do Início, troca de Xtream).
 - **Confirmado em uso por você:** o atualizador (fecha, instala, reabre) e o atalho criado pelo instalador.
 - **Nunca confirmado em uso real:** gravação de TV, capa aleatória das gravações (`Player.screenshot`), migração do banco 8→9, DPAPI, prévia de quadro na barra de tempo, compatibilidade de downloads/`Range` com o seu provedor.
 - **Layout e animação:** os ajustes de tamanho, largura, banner e a animação de abertura foram validados por testes, mas não por uso prolongado. Nitidez de imagens a 150 %, vídeo ampliado e desempenho não foram medidos.
@@ -82,6 +84,7 @@ O script confere a versão, compila, gera `release\MIP-Setup-X.Y.Z.exe` e `lates
 
 | Versão | Principais mudanças |
 |---|---|
+| 1.0.6 | Troca de Xtream mantendo dados (mesmo provedor) e aba temporária "Dados anteriores"; painel Próximo episódio (12 s, aba na cor de destaque); botões do card embaixo da imagem; dicas e hover dos botões da janela redesenhados; animação de abertura sem onda |
 | 1.0.5 | Animação de abertura do perfil, botão "Detalhes" no aviso de atualização e aviso no canto inferior direito |
 | 1.0.4 | Botões da janela corrigidos (cópia duplicada à esquerda) e centralizados com o perfil; Continuar assistindo e banner ajustados em "Preenchido" |
 | 1.0.3 | Builds 7A e 7B: banners do Início, Continuar assistindo corrigido, tema Automático, tamanho da interface, largura do catálogo, pôsteres por linha |
@@ -89,5 +92,4 @@ O script confere a versão, compila, gera `release\MIP-Setup-X.Y.Z.exe` e `lates
 
 ## Pendências
 
-- Cartões do Continuar assistindo e altura do banner: aguardam conferência visual sua (ajuste em `layout_metrics.dart`).
-- `GITHUB.md` descreve o fluxo antigo de dois repositórios e está desatualizado.
+- Troca de Xtream e aba "Dados anteriores" não testadas com um provedor real: só testes automáticos do banco e do casamento e uma simulação com catálogo fictício (telas renderizadas em teste, não no app aberto).

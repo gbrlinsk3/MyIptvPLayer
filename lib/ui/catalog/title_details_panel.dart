@@ -210,7 +210,9 @@ class _DetailsPanelState extends State<_DetailsPanel> {
     return Align(
       alignment: Alignment.centerRight,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        // 40 em cima: deixa livres os botões da janela (minimizar/fechar, 36 px),
+        // que ficam por cima de tudo e cobriam os botões do cartão.
+        padding: const EdgeInsets.fromLTRB(12, 40, 12, 12),
         child: SizedBox(
           width: 520,
           child: Material(
@@ -285,7 +287,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
                 ),
               ),
               Positioned(
-                top: 8,
+                bottom: 8,
                 right: 8,
                 child: Row(
                   children: [

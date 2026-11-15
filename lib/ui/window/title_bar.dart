@@ -249,7 +249,10 @@ class _WindowButtonState extends State<_WindowButton> {
   @override
   Widget build(BuildContext context) {
     final Color background = _hover
-        ? (widget.danger ? const Color(0xFFE81123) : AppColors.hover)
+        // Fundo claro e translúcido ao passar o mouse (antes ficava escuro).
+        ? (widget.danger
+            ? const Color(0xFFE81123)
+            : AppColors.text.withValues(alpha: 0.14))
         : Colors.transparent;
     final Color foreground =
         _hover && widget.danger ? Colors.white : AppColors.text;

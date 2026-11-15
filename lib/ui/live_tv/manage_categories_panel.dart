@@ -129,7 +129,7 @@ class _ManagePanelState extends State<_ManagePanel> {
     return Align(
       alignment: Alignment.centerRight,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(12, 40, 12, 12),
         child: SizedBox(
           width: 400,
           child: Material(

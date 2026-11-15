@@ -13,8 +13,10 @@ class ProfileIntro extends StatefulWidget {
   const ProfileIntro({
     super.key,
     required this.onDone,
-    this.duration = const Duration(milliseconds: 2500),
+    this.duration = defaultDuration,
   });
+
+  static const defaultDuration = Duration(milliseconds: 3000);
 
   final VoidCallback onDone;
   final Duration duration;
@@ -52,8 +54,8 @@ class _ProfileIntroState extends State<ProfileIntro>
         builder: (context, _) {
           final t = _c.value;
           // Some no fim (últimos 8 %), revelando o programa.
-          final fade = 1 - Curves.easeIn.transform(((t - 0.92) / 0.08).clamp(0.0, 1.0));
-          final nameIn = Curves.easeOut.transform(((t - 0.76) / 0.14).clamp(0.0, 1.0));
+          final fade = 1 - Curves.easeIn.transform(((t - 0.94) / 0.06).clamp(0.0, 1.0));
+          final nameIn = Curves.easeOut.transform(((t - 0.84) / 0.10).clamp(0.0, 1.0));
           return Opacity(
             opacity: fade,
             child: ColoredBox(
@@ -71,14 +73,19 @@ class _ProfileIntroState extends State<ProfileIntro>
                     ),
                   ),
                   Align(
-                    alignment: const Alignment(0, 0.42),
+                    alignment: const Alignment(0, 0.62),
                     child: Opacity(
                       opacity: nameIn,
                       child: Transform.translate(
                         offset: Offset(0, 10 * (1 - nameIn)),
-                        child: Text(
-                          AppInfo.name.toUpperCase(),
-                          style: AppFonts.title(34, spacing: 6),
+                        // Material transparente: sem ele o Text fora de um
+                        // Scaffold sai com o sublinhado amarelo de depuração.
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: Text(
+                            AppInfo.fullName,
+                            style: AppFonts.title(32, spacing: 3),
+                          ),
                         ),
                       ),
                     ),
@@ -150,7 +157,7 @@ class IntroPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final u = (size.shortestSide * 0.11).clamp(36.0, 90.0);
-    final mid = Offset(size.width / 2, size.height / 2 - u * 0.5);
+    final mid = Offset(size.width / 2, size.height / 2 + u * 0.4);
     final logoOrigin = mid - _logoCenter * u;
     final spacing = u * 2.3;
 
@@ -185,18 +192,16 @@ class IntroPainter extends CustomPainter {
       _cube(canvas, at(t), u * pop * shrink(t), 1);
     }
 
-    // Brilho curto quando o logo se forma.
-    final glow = math.sin(math.pi * _seg(t, 0.70, 0.86));
-    if (glow > 0) {
-      canvas.drawCircle(
-        mid,
-        u * 2.6,
-        Paint()
-          ..shader = RadialGradient(colors: [
-            left.withValues(alpha: 0.30 * glow),
-            left.withValues(alpha: 0),
-          ]).createShader(Rect.fromCircle(center: mid, radius: u * 2.6)),
-      );
+    // Quando o logo se forma (t ≈ 0,76): uma cópia semitransparente do logo
+    // nasce sobre ele e cresce em 0,16 da animação, sumindo. O nome vem depois.
+    const echoStart = 0.76;
+    final echo = _seg(t, echoStart, echoStart + 0.16);
+    if (echo > 0 && echo < 1) {
+      final k = 1 + 0.55 * Curves.easeOut.transform(echo);
+      final a = 0.5 * (1 - echo);
+      for (final i in const [2, 1, 0]) {
+        _cube(canvas, mid + (logoPos(i) - mid) * k, u * k, a);
+      }
     }
   }
 

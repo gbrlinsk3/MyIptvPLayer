@@ -319,6 +319,7 @@ class CatalogController extends ChangeNotifier {
       s.categories = cats;
       s.counts = await _db.catalog.counts(kind);
       s.updatedAt = now;
+      await _applyCarryover(kind, client);
       _invalidate();
     } on XtreamException catch (e) {
       s.error = e.message;
@@ -330,6 +331,32 @@ class CatalogController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Religa histórico, favoritos e categorias ocultas guardados na troca de
+  /// Xtream do mesmo provedor (se houver algo guardado) ao catálogo novo.
+  Future<void> _applyCarryover(CatalogKind kind, XtreamClient client) async {
+    try {
+      final changed = await _db.carryover.applyKind(
+        kind,
+        seriesInfo: (id) =>
+            client.fetchSeriesInfo(id).timeout(const Duration(seconds: 20)),
+      );
+      if (!changed) return;
+      await _loadFavorites();
+      section(kind).hidden = await _db.loadHiddenCategories(kind.key);
+      progressRevision++;
+      onCarryoverChanged?.call();
+    } catch (e, st) {
+      AppLog.error('conta.troca.${kind.key}', e, st);
+    }
+  }
+
+  /// Avisado quando dados guardados na troca de Xtream são religados.
+  VoidCallback? onCarryoverChanged;
+
+  /// Busca títulos pelo nome no catálogo salvo (religar à mão).
+  Future<List<CatalogTitle>> searchByName(CatalogKind kind, String query) =>
+      _db.catalog.searchByName(kind, query);
 
   /// Apaga filmes e séries salvos (o progresso é mantido).
   Future<void> clearCache() async {

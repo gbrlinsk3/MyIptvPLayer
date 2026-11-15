@@ -51,16 +51,24 @@ class _XtreamCardState extends State<XtreamCard> {
       });
       return;
     }
+    var keepData = false;
     if (app.changesAccountIdentity(server, user)) {
-      final go = await confirmDialog(
-        context,
-        title: 'Trocar de conta?',
-        message: 'Mudar o servidor ou o usuário apaga o catálogo, favoritos de '
-            'canais e progresso salvos desta conta neste computador, e baixa '
-            'tudo de novo. Os downloads e as gravações em arquivo são mantidos.',
-        action: 'Trocar',
-      );
-      if (!go || !mounted) return;
+      final same = await _askSameProvider();
+      if (same == null || !mounted) return;
+      if (same) {
+        keepData = true;
+      } else {
+        final go = await confirmDialog(
+          context,
+          title: 'Apagar os dados desta conta?',
+          message: 'Com outro provedor, o histórico (Continuar assistindo), os '
+              'favoritos de filmes, séries e canais e as categorias ocultas '
+              'desta conta serão apagados, e o catálogo será baixado de novo. '
+              'Os downloads e as gravações em arquivo são mantidos.',
+          action: 'Apagar e trocar',
+        );
+        if (!go || !mounted) return;
+      }
     }
     setState(() {
       _busy = true;
@@ -71,13 +79,58 @@ class _XtreamCardState extends State<XtreamCard> {
       server: server,
       username: user,
       password: pass,
+      keepData: keepData,
     );
     if (!mounted) return;
     setState(() {
       _busy = false;
       _error = err;
-      _ok = err == null ? 'Credenciais validadas e salvas.' : null;
+      _ok = err == null
+          ? (keepData
+              ? 'Credenciais salvas. Seus dados serão religados assim que o '
+                  'catálogo novo for baixado.'
+              : 'Credenciais validadas e salvas.')
+          : null;
     });
+  }
+
+  /// true = mesmo provedor (mantém os dados), false = outro provedor,
+  /// null = cancelou.
+  Future<bool?> _askSameProvider() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'O Xtream novo é do mesmo provedor?',
+          style: TextStyle(fontSize: 16),
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: const Text(
+            'Se for, o histórico (Continuar assistindo), os favoritos de '
+            'filmes, séries e canais e as categorias ocultas são mantidos: '
+            'quando o catálogo novo chegar, cada item é ligado de novo ao mesmo '
+            'título pelo nome (e ano). O que não for encontrado fica guardado.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Não, outro provedor'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Sim, manter meus dados'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

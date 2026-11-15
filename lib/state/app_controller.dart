@@ -8,7 +8,8 @@ import '../core/format.dart' show formatDateTime;
 import '../data/db.dart';
 import '../data/live_highlight.dart';
 import '../data/models.dart';
-import '../data/catalog_models.dart' show CatalogKind;
+import '../data/carryover_store.dart';
+import '../data/catalog_models.dart' show CatalogKind, CatalogTitle, Episode;
 import '../data/xtream_client.dart';
 import '../downloads/downloads_controller.dart';
 import '../library/library_import.dart';
@@ -36,7 +37,8 @@ class AppController extends ChangeNotifier {
   /// As mudanças do catálogo também avisam quem escuta o AppController.
   late final CatalogController catalog =
       CatalogController(_db, accountOf: () => account)
-        ..addListener(notifyListeners);
+        ..addListener(notifyListeners)
+        ..onCarryoverChanged = () => unawaited(reloadCarryover());
 
   AppPhase phase = AppPhase.booting;
   SavedAccount? account;
@@ -364,6 +366,7 @@ class AppController extends ChangeNotifier {
       return;
     }
     _hiddenLive = await _db.loadHiddenCategories('live');
+    carryover = await _db.carryover.load();
     _allCategories = await _db.loadCategories();
     _catalog = await _db.loadChannels();
     await catalog.load();
@@ -384,10 +387,17 @@ class AppController extends ChangeNotifier {
   // ---- conta -------------------------------------------------------------
 
   /// Devolve null em caso de sucesso, ou a mensagem de erro para exibir.
+  ///
+  /// [keepData] (troca de Xtream do mesmo provedor): antes de apagar o
+  /// catálogo antigo, guarda histórico, favoritos, canais favoritos e
+  /// categorias ocultas pelo nome; eles são religados aos títulos do catálogo
+  /// novo quando ele chega (ver `CarryoverStore`). Sem [keepData] tudo isso é
+  /// apagado.
   Future<String?> login({
     required String server,
     required String username,
     required String password,
+    bool keepData = false,
   }) async {
     XtreamClient? client;
     try {
@@ -402,11 +412,19 @@ class AppController extends ChangeNotifier {
         username: username,
         password: password,
       );
+      if (keepData) {
+        await _db.carryover.snapshot();
+      } else {
+        await _db.carryover.clear();
+      }
+      carryover = await _db.carryover.load();
       await _db.saveAccount(saved);
       await _db.clearCatalog();
       await _db.clearHiddenCategories();
       await _db.clearVodAndProgress();
+      await _db.clearFavoriteTitles();
       catalog.reset();
+      await catalog.load();
       await playback.stop();
 
       account = saved;
@@ -426,6 +444,11 @@ class AppController extends ChangeNotifier {
       notifyListeners();
 
       unawaited(refreshCatalog());
+      if (keepData) {
+        // Filmes e séries já agora, para religar o histórico e os favoritos.
+        unawaited(catalog.refresh(CatalogKind.movies));
+        unawaited(catalog.refresh(CatalogKind.series));
+      }
       return null;
     } on XtreamException catch (e) {
       return e.message;
@@ -445,13 +468,19 @@ class AppController extends ChangeNotifier {
     required String server,
     required String username,
     required String password,
+    bool keepData = false,
   }) async {
     final acc = account;
     if (acc == null) return 'Sem conta salva.';
     final normalized = XtreamClient.normalizeServer(server);
     final same = normalized == acc.server && username == acc.username;
     if (!same) {
-      return login(server: server, username: username, password: password);
+      return login(
+        server: server,
+        username: username,
+        password: password,
+        keepData: keepData,
+      );
     }
     XtreamClient? client;
     try {
@@ -525,6 +554,121 @@ class AppController extends ChangeNotifier {
 
   // ---- catálogo ----------------------------------------------------------
 
+  /// Depois de baixar a TV ao vivo: religa canais favoritos e categorias
+  /// ocultas guardados na troca de Xtream (se houver algo guardado).
+  Future<void> _applyCarryover() async {
+    try {
+      if (!await _db.carryover.applyLive()) return;
+      favoriteChannels = {
+        for (final part in (await _db.getSetting('favorite_channels') ?? '').split(','))
+          if (int.tryParse(part) != null) int.parse(part),
+      };
+      _hiddenLive = await _db.loadHiddenCategories('live');
+      carryover = await _db.carryover.load();
+    } catch (e, st) {
+      AppLog.error('conta.troca.ao_vivo', e, st);
+    }
+  }
+
+  // ---- dados anteriores (troca de Xtream) -----------------------------------
+
+  /// Página "Dados anteriores" na barra lateral.
+  static const carryoverPage = 6;
+
+  /// O que ficou guardado da conta anterior sem par no catálogo novo; null ou
+  /// vazio = a aba "Dados anteriores" não aparece.
+  Carryover? carryover;
+  int get carryoverCount => carryover?.total ?? 0;
+
+  /// Todos os canais (inclusive de categorias ocultas).
+  List<LiveChannel> get allChannels => _catalog;
+
+  /// Todas as categorias de TV ao vivo.
+  List<LiveCategory> get allLiveCategories => _allCategories;
+
+  Future<void> reloadCarryover() async {
+    carryover = await _db.carryover.load();
+    if (carryoverCount == 0 && shellIndex == carryoverPage) shellIndex = 0;
+    notifyListeners();
+  }
+
+  Future<void> discardCarryover(CarryGroup group, Map<String, dynamic> entry) async {
+    await _db.carryover.remove(group, entry);
+    await reloadCarryover();
+  }
+
+  Future<void> clearCarryover() async {
+    await _db.carryover.clear();
+    await reloadCarryover();
+  }
+
+  /// Religa um item do histórico ou dos favoritos a [target]. Para episódio,
+  /// [target] é a série e o episódio é achado por temporada e número.
+  /// Devolve null se deu certo, ou a mensagem de erro.
+  Future<String?> relinkCarryoverTitle(
+    CarryGroup group,
+    Map<String, dynamic> entry,
+    CatalogTitle target,
+  ) async {
+    try {
+      if (group == CarryGroup.favorites) {
+        if (!catalog.isFavorite(target.kind, target.id)) {
+          await catalog.toggleFavorite(target);
+        }
+        await _db.carryover.remove(group, entry);
+      } else if (entry['kind'] == 'episode') {
+        final d = await catalog.details(CatalogKind.series, target.id);
+        final s = entry['season'], n = entry['episode'];
+        Episode? ep;
+        for (final list in d.seasons.values) {
+          for (final e in list) {
+            if (e.season == s && e.number == n) ep = e;
+          }
+        }
+        if (ep == null) {
+          return '"${target.name}" não tem o episódio T$s E$n.';
+        }
+        await _db.carryover.relinkProgress(entry, itemId: ep.id, seriesId: target.id);
+        catalog.bumpProgress();
+      } else {
+        await _db.carryover.relinkProgress(entry, itemId: target.id);
+        catalog.bumpProgress();
+      }
+      await reloadCarryover();
+      return null;
+    } on XtreamException catch (e) {
+      return e.message;
+    } catch (e, st) {
+      AppLog.error('dados_anteriores.religar', e, st);
+      return 'Não foi possível religar: $e';
+    }
+  }
+
+  Future<void> relinkCarryoverChannel(
+    Map<String, dynamic> entry,
+    LiveChannel channel,
+  ) async {
+    if (!isFavorite(channel.streamId)) await toggleFavorite(channel);
+    await _db.carryover.remove(CarryGroup.channels, entry);
+    await reloadCarryover();
+  }
+
+  /// Oculta de novo a categoria escolhida ([kindKey] = live, vod ou series).
+  Future<void> relinkCarryoverCategory(
+    Map<String, dynamic> entry,
+    String kindKey,
+    String categoryId,
+  ) async {
+    if (kindKey == 'live') {
+      await setCategoriesVisible([categoryId], false);
+    } else {
+      final kind = kindKey == 'vod' ? CatalogKind.movies : CatalogKind.series;
+      await catalog.setCategoriesVisible(kind, [categoryId], false);
+    }
+    await _db.carryover.remove(CarryGroup.hidden, entry);
+    await reloadCarryover();
+  }
+
   Future<void> refreshCatalog() async {
     final acc = account;
     if (acc == null || syncing) return;
@@ -544,6 +688,7 @@ class AppController extends ChangeNotifier {
       await _db.replaceCatalog(cats, chans);
       final now = DateTime.now();
       await _db.setSetting('catalog_updated_at', now.toIso8601String());
+      await _applyCarryover();
 
       _allCategories = cats;
       _catalog = chans;

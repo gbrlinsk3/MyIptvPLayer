@@ -122,11 +122,11 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   Timer? _nextTimer;
 
   /// Painel "Próximo episódio": aparece quando faltam 2 min (episódios), fica
-  /// aberto 13 s sem interação e vira uma aba com seta; ao terminar o episódio
-  /// reabre com contagem de 8 s.
+  /// aberto 12 s sem interação e vira uma aba com seta; com o mouse em cima do
+  /// painel a contagem para. Ao terminar o episódio reabre com contagem de 8 s.
   _NextPanel _nextPanel = _NextPanel.hidden;
   Timer? _nextPanelTimer;
-  bool _nextTabHover = false;
+  bool _nextPanelHover = false;
 
   /// Já marcado como assistido nesta reprodução (faltando 2 min no episódio,
   /// 10 min no filme).
@@ -195,6 +195,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
       _finished = false;
       _autoWatched = false;
       _nextPanel = _NextPanel.hidden;
+      _nextPanelHover = false;
       _nextCountdown = null;
       _position = Duration.zero;
       _duration = Duration.zero;
@@ -251,7 +252,8 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   void _armNextPanelTimer() {
     _nextPanelTimer?.cancel();
     if (_nextPanel != _NextPanel.expanded || _nextCountdown != null) return;
-    _nextPanelTimer = Timer(const Duration(seconds: 13), () {
+    if (_nextPanelHover) return; // com o mouse em cima do painel, a contagem para
+    _nextPanelTimer = Timer(const Duration(seconds: 12), () {
       if (mounted && _nextCountdown == null && _nextPanel == _NextPanel.expanded) {
         setState(() => _nextPanel = _NextPanel.minimized);
       }
@@ -383,6 +385,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     // Mexer o mouse conta como interação: o painel "Próximo episódio" aberto
     // espera mais 13 s antes de minimizar.
     if (_nextPanel == _NextPanel.expanded) _armNextPanelTimer();
+    // (_armNextPanelTimer não arma se o mouse estiver em cima do painel)
     _hideTimer?.cancel();
     if (!_controlsVisible && mounted) setState(() => _controlsVisible = true);
     _hideTimer = Timer(const Duration(seconds: 3), () {
@@ -774,55 +777,95 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   }
 
   Widget _buildNextCard() {
-    final next = widget.items[_index + 1];
     final counting = _nextCountdown != null;
-
-    if (_nextPanel == _NextPanel.minimized && !counting) {
-      // Aba com seta; com o mouse em cima ganha o texto e continua com o ícone.
-      // Fica no canto inferior direito durante o resto do episódio; quando a
-      // interface aparece, sobe para não ficar por cima dos controles.
-      return AnimatedPositioned(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        right: 0,
-        bottom: _controlsVisible ? 110 : 28,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _nextTabHover = true),
-          onExit: (_) => setState(() => _nextTabHover = false),
-          child: GestureDetector(
-            onTap: _goNext,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: const BoxDecoration(
-                color: Color(0xE6181817),
-                borderRadius: BorderRadius.horizontal(left: Radius.circular(12)),
-                border: Border.fromBorderSide(BorderSide(color: Colors.white24)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_nextTabHover) ...[
-                    const Text(
-                      'Próximo episódio',
-                      style: TextStyle(color: Colors.white, fontSize: 13),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-                ],
-              ),
-            ),
+    final minimized = _nextPanel == _NextPanel.minimized && !counting;
+    // Aba e cartão trocam com escala + fade pelo canto inferior direito. Quando
+    // a interface aparece, a aba sobe para não ficar por cima dos controles.
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      right: minimized ? 0 : 24,
+      bottom: minimized ? (_controlsVisible ? 110 : 28) : 96,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 240),
+        switchInCurve: Curves.easeOutBack,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, anim) => FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: anim,
+            alignment: Alignment.bottomRight,
+            child: child,
           ),
         ),
-      );
-    }
+        child: minimized ? _buildNextTab() : _buildNextPanelBody(counting),
+      ),
+    );
+  }
 
-    return Positioned(
-      right: 24,
-      bottom: 96,
+  /// Aba recolhida: seta. Com o mouse em cima, o painel volta.
+  Widget _buildNextTab() {
+    return MouseRegion(
+      key: const ValueKey('next-tab'),
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() {
+        _nextPanelHover = true;
+        _nextPanelTimer?.cancel();
+        _nextPanel = _NextPanel.expanded;
+      }),
+      child: GestureDetector(
+        onTap: _goNext,
+        // Pílula na cor de destaque do perfil, encostada na borda direita, com
+        // brilho suave e o ícone de "próximo".
+        child: Container(
+          width: 52,
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.lerp(AppColors.accent, Colors.white, 0.18)!,
+                AppColors.accent,
+              ],
+            ),
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(26)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: 0.45),
+                blurRadius: 18,
+                offset: const Offset(-2, 4),
+              ),
+              const BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: const Padding(
+            padding: EdgeInsets.only(left: 4),
+            child: Icon(Icons.skip_next_rounded, color: Colors.white, size: 28),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Cartão "Próximo episódio". Com o mouse em cima, a contagem para.
+  Widget _buildNextPanelBody(bool counting) {
+    final next = widget.items[_index + 1];
+    return MouseRegion(
+      key: const ValueKey('next-card'),
+      onEnter: (_) {
+        _nextPanelHover = true;
+        _nextPanelTimer?.cancel();
+      },
+      onExit: (_) {
+        _nextPanelHover = false;
+        _armNextPanelTimer();
+      },
       child: Container(
         width: 320,
         padding: const EdgeInsets.all(16),

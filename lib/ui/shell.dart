@@ -3,8 +3,10 @@ import 'package:window_manager/window_manager.dart';
 
 import '../core/app_info.dart';
 import '../core/theme.dart';
+import '../state/app_controller.dart';
 import '../state/app_scope.dart';
 import 'account_page.dart';
+import 'carryover/carryover_page.dart';
 import 'catalog/catalog_page.dart';
 import 'dashboard_page.dart';
 import 'library/library_page.dart';
@@ -97,6 +99,7 @@ class _ShellState extends State<Shell> {
                           (_) => const FavoritesPage(),
                           (_) => const LibraryPage(),
                           (_) => const AccountPage(),
+                          (_) => const CarryoverPage(),
                         ],
                       ),
                       Positioned.fill(
@@ -141,6 +144,7 @@ class _ShellState extends State<Shell> {
             child: _Sidebar(
               index: index,
               collapsed: c.sidebarCollapsed,
+              carryoverCount: c.carryoverCount,
               onSelect: (i) {
                 if (_query.isNotEmpty) _clearSearch();
                 c.setShellIndex(i);
@@ -161,10 +165,14 @@ class _Sidebar extends StatelessWidget {
     required this.collapsed,
     required this.onSelect,
     required this.onToggle,
+    required this.carryoverCount,
   });
 
   final int index;
   final bool collapsed;
+
+  /// Itens em "Dados anteriores"; 0 = a aba temporária não aparece.
+  final int carryoverCount;
   final ValueChanged<int> onSelect;
   final VoidCallback onToggle;
 
@@ -294,6 +302,21 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelect(5),
           ),
           const Spacer(),
+          // Aba temporária: só existe enquanto há dados da conta anterior
+          // (troca de Xtream) para revisar.
+          if (carryoverCount > 0) ...[
+            _section('TEMPORÁRIO', compact),
+            _NavItem(
+              icon: Icons.history_toggle_off_rounded,
+              activeIcon: Icons.history_rounded,
+              label: 'Dados anteriores',
+              selected: index == AppController.carryoverPage,
+              collapsed: compact,
+              badge: carryoverCount,
+              onTap: () => onSelect(AppController.carryoverPage),
+            ),
+            const SizedBox(height: 8),
+          ],
           Align(
             alignment: collapsed ? Alignment.center : Alignment.centerLeft,
             child: IconButton(
@@ -321,6 +344,7 @@ class _NavItem extends StatefulWidget {
     required this.selected,
     required this.collapsed,
     required this.onTap,
+    this.badge = 0,
   });
 
   final IconData icon;
@@ -329,6 +353,9 @@ class _NavItem extends StatefulWidget {
   final bool selected;
   final bool collapsed;
   final VoidCallback onTap;
+
+  /// Contador na cor de destaque (0 = sem contador).
+  final int badge;
 
   @override
   State<_NavItem> createState() => _NavItemState();
@@ -351,7 +378,11 @@ class _NavItemState extends State<_NavItem> {
         AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          // Com contador, a margem direita encolhe para o rótulo caber inteiro.
+          padding: EdgeInsets.only(
+            left: 12,
+            right: !widget.collapsed && widget.badge > 0 ? 6 : 12,
+          ),
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(10),
@@ -381,10 +412,18 @@ class _NavItemState extends State<_NavItem> {
                     ),
                   ),
                 ),
+                if (widget.badge > 0) _Badge(count: widget.badge),
               ],
             ],
           ),
         ),
+        // Menu recolhido: o contador fica no canto do ícone.
+        if (widget.collapsed && widget.badge > 0)
+          Positioned(
+            right: 2,
+            top: 2,
+            child: _Badge(count: widget.badge, small: true),
+          ),
         // Indicador lateral na cor de destaque do perfil.
         Positioned(
           left: -8,
@@ -414,6 +453,39 @@ class _NavItemState extends State<_NavItem> {
         child: widget.collapsed
             ? Tooltip(message: widget.label, child: content)
             : content,
+      ),
+    );
+  }
+}
+
+/// Contador na cor de destaque do perfil.
+class _Badge extends StatelessWidget {
+  const _Badge({required this.count, this.small = false});
+
+  final int count;
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = count > 99 ? '99+' : '$count';
+    return Container(
+      constraints: BoxConstraints(minWidth: small ? 17 : 20),
+      height: small ? 17 : 20,
+      padding: EdgeInsets.symmetric(horizontal: small ? 4 : 6),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(11),
+        border: small ? Border.all(color: AppColors.sidebar, width: 2) : null,
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: small ? 9.5 : 10.5,
+          fontWeight: FontWeight.w700,
+          height: 1,
+        ),
       ),
     );
   }

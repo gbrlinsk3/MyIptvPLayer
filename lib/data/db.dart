@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../core/app_log.dart';
 import '../core/secret_store.dart';
+import 'carryover_store.dart';
 import 'catalog_models.dart';
 import '../downloads/download_store.dart';
 import '../library/library_import.dart';
@@ -77,6 +78,9 @@ class AppDatabase {
   /// Downloads (esquema versão 4).
   late final DownloadStore downloads = DownloadStore(_db);
   late final ImportStore imports = ImportStore(_db);
+
+  /// Dados guardados pelo nome ao trocar o Xtream do mesmo provedor.
+  late final CarryoverStore carryover = CarryoverStore(_db);
 
   /// Pasta onde ficam todos os bancos do app (índice de perfis e um banco por perfil).
   static Future<Directory> supportDirectory() async {
@@ -644,6 +648,11 @@ class AppDatabase {
 
   Future<void> clearHiddenCategories() async {
     await _db.delete('hidden_categories');
+  }
+
+  /// Favoritos de filmes e séries (ligados aos ids da conta atual).
+  Future<void> clearFavoriteTitles() async {
+    await _db.delete('favorite_titles');
   }
 
   // ---- EPG: fontes por URL ----------------------------------------------
