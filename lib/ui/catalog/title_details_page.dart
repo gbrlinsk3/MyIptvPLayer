@@ -10,9 +10,9 @@ import '../downloads/download_button.dart';
 import '../home/hero_buttons.dart';
 import '../window/title_bar.dart';
 import 'favorite_button.dart';
+import 'manage_watched_dialog.dart';
 import 'poster_image.dart';
 import 'vod_player_page.dart';
-import '../widgets/common.dart';
 
 /// Tela expandida com as informações de um filme ou série: imagem de fundo
 /// grande, sinopse completa, elenco, ações e, nas séries, temporadas à direita
@@ -225,23 +225,17 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
     if (mounted) _reload();
   }
 
-  /// Marca (ou desmarca) todos os episódios da série como assistidos.
-  Future<void> _setAllWatched(TitleDetails d, bool watched) async {
-    final ok = await confirmDialog(
-      context,
-      title: watched ? 'Marcar tudo como assistido?' : 'Desmarcar tudo?',
-      message: watched
-          ? 'Todos os episódios desta série serão marcados como assistidos.'
-          : 'Todos os episódios deixam de constar como assistidos. A posição '
-              'em que você parou em cada um é mantida.',
-      action: watched ? 'Marcar todos' : 'Desmarcar todos',
+  /// Abre o painel "Gerenciar assistidos" (temporada, ações em massa e episódios).
+  Future<void> _manageWatched(TitleDetails d, int season) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => ManageWatchedDialog(
+        seriesId: widget.title.id,
+        seasons: d.seasons,
+        initialSeason: season,
+        itemOf: (e) => _episodeItem(AppScope.read(ctx), e),
+      ),
     );
-    if (!ok || !mounted) return;
-    final app = AppScope.read(context);
-    for (final e in _allEpisodes(d)) {
-      final item = _episodeItem(app, e);
-      if (item != null) await app.catalog.setWatched(item, watched);
-    }
     if (mounted) _reload();
   }
 
@@ -635,22 +629,11 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
           ],
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 4,
-          children: [
-            TextButton.icon(
-              style: link(),
-              onPressed: () => _setAllWatched(d, true),
-              icon: const Icon(Icons.done_all, size: 16),
-              label: const Text('Marcar todos como assistidos', style: linkStyle),
-            ),
-            TextButton.icon(
-              style: link(),
-              onPressed: () => _setAllWatched(d, false),
-              icon: const Icon(Icons.remove_done, size: 16),
-              label: const Text('Desmarcar todos como assistidos', style: linkStyle),
-            ),
-          ],
+        TextButton.icon(
+          style: link(),
+          onPressed: () => _manageWatched(d, target.season),
+          icon: const Icon(Icons.checklist_rounded, size: 16),
+          label: const Text('Gerenciar assistidos', style: linkStyle),
         ),
       ],
     );

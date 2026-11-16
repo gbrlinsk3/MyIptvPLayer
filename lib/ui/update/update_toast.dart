@@ -83,7 +83,7 @@ class _UpdateToastState extends State<UpdateToast> {
               side: BorderSide(color: AppColors.accent),
             ),
             child: SizedBox(
-              width: 320,
+              width: 360,
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
@@ -120,7 +120,10 @@ class _UpdateToastState extends State<UpdateToast> {
                       ),
                     ],
                     const SizedBox(height: 10),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         FilledButton(
                           onPressed: busy
@@ -136,7 +139,6 @@ class _UpdateToastState extends State<UpdateToast> {
                                     : 'Atualizar agora',
                           ),
                         ),
-                        const SizedBox(width: 8),
                         TextButton(
                           onPressed: busy ? null : u.dismiss,
                           child: const Text('Depois'),

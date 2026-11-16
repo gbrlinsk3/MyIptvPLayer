@@ -3,7 +3,7 @@
 Player IPTV (Xtream Codes) para Windows, feito em Flutter. Reproduz TV ao vivo, filmes e séries da sua conta Xtream, com perfis, downloads, biblioteca própria e atualização automática.
 
 - **Repositório:** https://github.com/gbrlinsk3/MyIptvPLayer (código e Releases)
-- **Versão atual:** 1.0.6 (Release publicada).
+- **Versão atual:** 1.0.7 (Release publicada).
 - O programa **não traz conteúdo nem contas**: cada pessoa usa a própria conta Xtream.
 
 ## Instalar e atualizar
@@ -31,6 +31,7 @@ Player IPTV (Xtream Codes) para Windows, feito em Flutter. Reproduz TV ao vivo, 
 - Fileiras por categoria, "Ver tudo" em grade, painel lateral e **tela expandida** com sinopse, elenco, temporadas e episódios.
 - Player com áudio/legenda (inclui legenda externa), retomar de onde parou, marcar como assistido, próximo episódio automático, painel de episódios e prévia na barra de tempo.
 - Painel "Próximo episódio" (faltando 2 min): fica 12 s aberto (pausa com o mouse em cima) e vira uma aba na cor de destaque; passar o mouse na aba reabre o painel.
+- Na tela expandida da série, **Gerenciar assistidos** abre um painel com menu de temporada, "Marcar todos desta temporada" / "Remover todos desta temporada" (fixos no alto, acima de um divisor) e a lista de episódios para marcar um a um.
 - **Favoritos** de filmes, séries e canais.
 
 **Busca global** (barra do topo): canais, filmes e séries, com tradução PT/EN; roda em isolate.
@@ -84,6 +85,7 @@ O script confere a versão, compila, gera `release\MIP-Setup-X.Y.Z.exe` e `lates
 
 | Versão | Principais mudanças |
 |---|---|
+| 1.0.7 | Tela expandida da série: "Gerenciar assistidos" (painel por temporada); aviso de atualização com botões que quebram de linha |
 | 1.0.6 | Troca de Xtream mantendo dados (mesmo provedor) e aba temporária "Dados anteriores"; painel Próximo episódio (12 s, aba na cor de destaque); botões do card embaixo da imagem; dicas e hover dos botões da janela redesenhados; animação de abertura sem onda |
 | 1.0.5 | Animação de abertura do perfil, botão "Detalhes" no aviso de atualização e aviso no canto inferior direito |
 | 1.0.4 | Botões da janela corrigidos (cópia duplicada à esquerda) e centralizados com o perfil; Continuar assistindo e banner ajustados em "Preenchido" |
@@ -92,4 +94,4 @@ O script confere a versão, compila, gera `release\MIP-Setup-X.Y.Z.exe` e `lates
 
 ## Pendências
 
-- Troca de Xtream e aba "Dados anteriores" não testadas com um provedor real: só testes automáticos do banco e do casamento e uma simulação com catálogo fictício (telas renderizadas em teste, não no app aberto).
+- Troca de Xtream e aba "Dados anteriores" não testadas com um provedor real: só testes automáticos do banco e do casamento e uma simulação com catálogo fictício (telas renderizadas em teste, não no app aberto). O painel "Gerenciar assistidos" passou no `flutter analyze`, mas não foi aberto nem visto na tela.
