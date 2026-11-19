@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../state/app_scope.dart';
+import '../widgets/shimmer.dart';
 
 /// Guia de programação do canal selecionado, embaixo de toda a área da TV ao
 /// vivo. Pode ser minimizada (a escolha é salva).
@@ -117,6 +118,10 @@ class _EpgPanelState extends State<EpgPanel> {
                       nowEpoch: nowEpoch,
                       loading: epg.loadingView,
                       error: epg.viewError,
+                      // Tentar de novo refaz a busca do canal atual.
+                      onRetry: channel == null
+                          ? null
+                          : () => unawaited(epg.showChannel(channel, c.account)),
                     ),
                   ),
                 ),
@@ -134,28 +139,22 @@ class _EpgPanelState extends State<EpgPanel> {
     required int nowEpoch,
     required bool loading,
     required String? error,
+    required VoidCallback? onRetry,
   }) {
     if (channel == null) {
       return const _Note('Selecione um canal para ver a programação.');
     }
     if (!matches || loading) {
-      return const Center(
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      );
+      return const _EpgSkeleton();
     }
     if (programs.isEmpty) {
+      if (error != null) {
+        return EpgErrorView(error: error, onRetry: onRetry);
+      }
       final hint = channel.epgKey == null
           ? 'O provedor não informa um código de EPG para este canal.'
           : 'Nenhuma fonte tem programação para este canal.';
-      return _Note(
-        error == null
-            ? 'Sem programação disponível. $hint'
-            : 'Sem programação disponível. $error',
-      );
+      return _Note('Sem programação disponível. $hint');
     }
     return ListView.builder(
       controller: _scroll,
@@ -330,6 +329,136 @@ class _ProgramCard extends StatelessWidget {
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Esqueleto do guia enquanto carrega: cartões com barras no lugar do horário e
+/// do título (mesmas medidas dos cartões reais). Sem rolagem.
+class _EpgSkeleton extends StatelessWidget {
+  const _EpgSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        itemExtent: _EpgPanelState._cardExtent,
+        children: [
+          for (var i = 0; i < 4; i++)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBox(width: 120, height: 12),
+                    SizedBox(height: 8),
+                    SkeletonBox(height: 14),
+                    SizedBox(height: 6),
+                    SkeletonBox(width: 150, height: 14),
+                    Spacer(),
+                    SkeletonBox(height: 3),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Erro do guia em versão compacta, para o painel baixo e estreito: ícone de
+/// aviso, o que houve, o [error] técnico em texto pequeno (para suporte) e
+/// "Tentar de novo" à direita, só se [onRetry] for informado. Cada texto tem
+/// uma linha e é cortado com reticências, para caber em ~90 px de altura.
+@visibleForTesting
+class EpgErrorView extends StatelessWidget {
+  const EpgErrorView({super.key, required this.error, this.onRetry});
+
+  final String error;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.hover,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.warning_amber_rounded,
+                size: 22,
+                color: AppColors.danger,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Não foi possível carregar o guia de programação',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Verifique a conexão e tente de novo.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    error,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: onRetry,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  minimumSize: const Size(0, 34),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Tentar de novo'),
+              ),
+            ],
+          ],
         ),
       ),
     );

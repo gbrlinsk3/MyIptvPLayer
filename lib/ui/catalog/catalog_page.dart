@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/layout_metrics.dart';
 import '../../core/theme.dart';
 import '../../data/catalog_models.dart';
 import '../../data/models.dart';
@@ -8,6 +9,7 @@ import '../../state/app_scope.dart';
 import '../shell/lazy_pages.dart';
 import '../live_tv/manage_categories_panel.dart';
 import '../widgets/manage_categories_button.dart';
+import '../widgets/shimmer.dart';
 import 'title_details_panel.dart';
 import 'title_widgets.dart';
 
@@ -188,24 +190,19 @@ class _KindViewState extends State<_KindView> {
 
     if (section.total == 0) {
       if (section.syncing) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(height: 16),
-              Text('Baixando a lista de $label…'),
-              const SizedBox(height: 4),
-              Text(
-                'Listas grandes podem levar alguns instantes na primeira vez.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-              ),
-            ],
-          ),
+        // Primeira carga: o texto fica em cima e o esqueleto das fileiras embaixo.
+        return Column(
+          children: [
+            const SizedBox(height: 24),
+            Text('Baixando a lista de $label…'),
+            const SizedBox(height: 4),
+            Text(
+              'Listas grandes podem levar alguns instantes na primeira vez.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+            const Expanded(child: _CatalogSkeleton()),
+          ],
         );
       }
       return Center(
@@ -325,6 +322,66 @@ class _KindViewState extends State<_KindView> {
   }
 }
 
+/// Primeira carga de uma seção: três fileiras em esqueleto com brilho, na mesma
+/// forma das fileiras reais (título + pôsteres 2:3, mesmas medidas do TitleRow).
+class _CatalogSkeleton extends StatelessWidget {
+  const _CatalogSkeleton();
+
+  static const _titleWidths = [220.0, 170.0, 200.0];
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final perRow = AppScope.of(context).portraitPerRow;
+          final posterWidth = RowMetrics.portraitWidth(box.maxWidth, perRow);
+          final itemWidth = posterWidth + TitleRow.gap;
+          final rowHeight = posterWidth * 1.5 + 56 + 24;
+          return SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final titleWidth in _titleWidths) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+                    child: SkeletonBox(width: titleWidth, height: 18, radius: 4),
+                  ),
+                  SizedBox(
+                    height: rowHeight,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemExtent: itemWidth,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      itemCount: 10,
+                      itemBuilder: (context, i) => Padding(
+                        padding: const EdgeInsets.only(right: TitleRow.gap),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: AspectRatio(
+                            aspectRatio: 2 / 3,
+                            child: SkeletonBox(radius: 10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _CategoryGrid extends StatefulWidget {
   const _CategoryGrid({
     super.key,
@@ -379,13 +436,7 @@ class _CategoryGridState extends State<_CategoryGrid> {
             future: _future,
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {
-                return const Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                );
+                return const TitleGridSkeleton();
               }
               return TitleGrid(
                 titles: snap.data ?? const [],

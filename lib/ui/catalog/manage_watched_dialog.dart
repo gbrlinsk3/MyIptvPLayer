@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
+import '../widgets/animated_counter.dart';
 
 /// Painel "Gerenciar assistidos" de uma série: temporada (menu), ações para a
 /// temporada inteira fixas no alto e, abaixo do divisor, a lista de episódios
@@ -119,9 +120,18 @@ class _ManageWatchedDialogState extends State<ManageWatchedDialog> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    '$done de ${episodes.length} assistidos',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                  // Largura mínima fixa: o menu de temporada não muda de tamanho quando o número muda.
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 150),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: AnimatedCounter(
+                        value: done,
+                        suffix: ' de ${episodes.length} assistidos',
+                        semanticsLabel: '$done de ${episodes.length} assistidos',
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                      ),
+                    ),
                   ),
                 ],
               ),

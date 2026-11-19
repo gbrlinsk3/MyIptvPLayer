@@ -14,6 +14,8 @@ import '../catalog/title_details_page.dart';
 import '../catalog/title_details_panel.dart';
 import '../catalog/vod_player_page.dart';
 import '../widgets/common.dart';
+import '../widgets/sliding_tabs.dart';
+import '../widgets/state_views.dart';
 import 'history_view.dart';
 import 'import_editor.dart';
 
@@ -122,16 +124,10 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
-  Widget _tabs() => Wrap(
-        spacing: 8,
-        children: [
-          for (final (i, label) in [(0, 'Arquivos'), (1, 'Histórico')])
-            ChoiceChip(
-              label: Text(label),
-              selected: _tab == i,
-              onSelected: (_) => setState(() => _tab = i),
-            ),
-        ],
+  Widget _tabs() => SlidingTabs(
+        labels: const ['Arquivos', 'Histórico'],
+        selected: _tab,
+        onChanged: (i) => setState(() => _tab = i),
       );
 }
 
@@ -152,28 +148,22 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.download_for_offline_outlined,
-              size: 36, color: AppColors.textMuted),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              'Nada baixado ainda. Abra um filme ou série e toque em "Baixar". '
-              'O arquivo é salvo exatamente como o provedor entrega, sem '
-              'recompressão, e toca aqui mesmo sem internet.',
-              style: TextStyle(color: AppColors.textMuted, height: 1.45),
-            ),
-          ),
-        ],
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const EmptyState(
+          icon: Icons.download_for_offline_outlined,
+          title: 'Nenhum download ainda',
+          text: 'Abra um filme ou série e toque em Baixar.',
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'O arquivo é salvo exatamente como o provedor entrega, sem '
+          'recompressão, e toca aqui mesmo sem internet.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+        ),
+      ],
     );
   }
 }

@@ -8,6 +8,8 @@ import '../catalog/title_details_panel.dart';
 import '../catalog/title_widgets.dart';
 import '../live_tv/channel_card.dart';
 import '../live_tv/live_player_page.dart';
+import '../widgets/sliding_tabs.dart';
+import '../widgets/state_views.dart';
 
 /// Favoritos: filmes, séries e canais. Abas Todos / Filmes / Séries / Canais;
 /// dentro de "Todos", primeiro filmes e séries (do mais recente para o mais
@@ -117,37 +119,28 @@ class _FavoritesPageState extends State<FavoritesPage> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-          child: Wrap(
-            spacing: 8,
-            children: [
-              for (final (i, label, n) in [
-                (0, 'Todos', total),
-                (1, 'Filmes', _movies.length),
-                (2, 'Séries', _series.length),
-                (3, 'Canais', channels.length),
-              ])
-                ChoiceChip(
-                  label: Text('$label · $n'),
-                  selected: _tab == i,
-                  onSelected: (_) => setState(() => _tab = i),
-                ),
+          child: SlidingTabs(
+            labels: [
+              'Todos · $total',
+              'Filmes · ${_movies.length}',
+              'Séries · ${_series.length}',
+              'Canais · ${channels.length}',
             ],
+            selected: _tab,
+            onChanged: (i) => setState(() => _tab = i),
           ),
         ),
         Expanded(
           child: !_loaded
-              ? const SizedBox.shrink()
+              ? const TitleGridSkeleton()
               : titles.isEmpty && shownChannels.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'Nada por aqui ainda. Passe o mouse sobre um filme, '
-                          'série ou canal e toque no coração para favoritar.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textMuted),
-                        ),
-                      ),
+                  ? EmptyState(
+                      icon: Icons.favorite_border,
+                      title: 'Nenhum favorito ainda',
+                      text: 'Toque no coração em um título ou canal para salvar aqui.',
+                      actionLabel: 'Explorar filmes e séries',
+                      // Índice 2 do menu = "Filmes e séries" (ordem em shell.dart).
+                      onAction: () => AppScope.read(context).setShellIndex(2),
                     )
                   : CustomScrollView(
                       slivers: [

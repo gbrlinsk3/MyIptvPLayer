@@ -4,6 +4,7 @@ import '../../core/layout_metrics.dart';
 import '../../core/theme.dart';
 import '../../state/app_scope.dart';
 import '../../data/catalog_models.dart';
+import '../widgets/shimmer.dart';
 import 'favorite_button.dart';
 import 'poster_image.dart';
 
@@ -282,22 +283,24 @@ class _TitleRowState extends State<TitleRow> {
   }
 
   Widget _skeleton(double itemWidth) {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      physics: const NeverScrollableScrollPhysics(),
-      itemExtent: itemWidth,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      itemCount: 10,
-      itemBuilder: (context, i) => Padding(
-        padding: const EdgeInsets.only(right: TitleRow.gap),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: AspectRatio(
-            aspectRatio: 2 / 3,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.hover,
-                borderRadius: BorderRadius.circular(10),
+    return Shimmer(
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        itemExtent: itemWidth,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        itemCount: 10,
+        itemBuilder: (context, i) => Padding(
+          padding: const EdgeInsets.only(right: TitleRow.gap),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: AspectRatio(
+              aspectRatio: 2 / 3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.hover,
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),
@@ -338,6 +341,71 @@ class _Arrow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Esqueleto com brilho da grade de pôsteres: mesma forma e mesmas medidas de
+/// [TitleGrid] (colunas e altura), enquanto a lista ainda não chegou. Só as
+/// linhas visíveis são construídas (grade preguiçosa).
+class TitleGridSkeleton extends StatelessWidget {
+  const TitleGridSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: CustomScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) {
+                final perRow = AppScope.of(context).portraitPerRow;
+                final cols =
+                    RowMetrics.gridColumns(constraints.crossAxisExtent, perRow);
+                final w = (constraints.crossAxisExtent -
+                        RowMetrics.gridGap * (cols - 1)) /
+                    cols;
+                return SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: cols,
+                    crossAxisSpacing: RowMetrics.gridGap,
+                    mainAxisSpacing: RowMetrics.gridGap,
+                    mainAxisExtent: w * 1.5 + TitleGrid._textHeight,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => const _PosterSkeleton(),
+                    childCount: cols * 6,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PosterSkeleton extends StatelessWidget {
+  const _PosterSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AspectRatio(
+          aspectRatio: 2 / 3,
+          child: SkeletonBox(radius: 10),
+        ),
+        const SizedBox(height: 8),
+        FractionallySizedBox(
+          widthFactor: 0.7,
+          child: SkeletonBox(height: 10, radius: 4),
+        ),
+      ],
     );
   }
 }

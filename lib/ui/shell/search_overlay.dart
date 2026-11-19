@@ -11,6 +11,7 @@ import '../catalog/title_details_panel.dart';
 import '../catalog/title_widgets.dart';
 import '../live_tv/channel_card.dart';
 import '../live_tv/live_player_page.dart';
+import '../widgets/sliding_tabs.dart';
 import 'search_result_card.dart';
 
 /// Resultados da busca do topo (filmes, séries e canais), por cima da página atual.
@@ -340,27 +341,22 @@ class _SearchOverlayState extends State<SearchOverlay> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: Wrap(
-                spacing: 8,
-                children: [
+              child: SlidingTabs(
+                labels: [
                   for (final (i, label) in const [
                     (0, 'Todos'),
                     (1, 'Filmes'),
                     (2, 'Séries'),
                     (3, 'Canais'),
                   ])
-                    ChoiceChip(
-                      label: Text(
-                        '$label · ${switch (i) {
-                          0 => views[0].shown.length + views[0].channels.length,
-                          3 => views[0].channels.length,
-                          _ => views[i].shown.length,
-                        }}',
-                      ),
-                      selected: _tab == i,
-                      onSelected: (_) => setState(() => _tab = i),
-                    ),
+                    '$label · ${switch (i) {
+                      0 => views[0].shown.length + views[0].channels.length,
+                      3 => views[0].channels.length,
+                      _ => views[i].shown.length,
+                    }}',
                 ],
+                selected: _tab,
+                onChanged: (i) => setState(() => _tab = i),
               ),
             ),
           ),

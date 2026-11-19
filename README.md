@@ -3,7 +3,7 @@
 Player IPTV (Xtream Codes) para Windows, feito em Flutter. Reproduz TV ao vivo, filmes e séries da sua conta Xtream, com perfis, downloads, biblioteca própria e atualização automática.
 
 - **Repositório:** https://github.com/gbrlinsk3/MyIptvPLayer (código e Releases)
-- **Versão atual:** 1.0.7 (Release publicada).
+- **Versão atual:** 1.0.8 (Release publicada).
 - O programa **não traz conteúdo nem contas**: cada pessoa usa a própria conta Xtream.
 
 ## Instalar e atualizar
@@ -46,6 +46,12 @@ Player IPTV (Xtream Codes) para Windows, feito em Flutter. Reproduz TV ao vivo, 
 - A ampliação cobre o programa todo (menus, diálogos, barra de título), por perfil. Pôsteres por linha em monitor 2560×1440: verticais 12/11/11/9 e horizontais 6/6/5/4 (100/115/130/150 %); em janelas menores o pôster encolhe até um mínimo. Em "Preenchido" o cartão do Continuar assistindo tem no máximo 200 px e o banner ganha altura.
 - Os valores ficam em `lib/core/layout_metrics.dart` (`RowMetrics`, `HeroMetrics`) e podem ser ajustados lá.
 
+**Visual e estados**
+- Esqueleto com brilho enquanto carregam as fileiras e grades de títulos (primeira carga do catálogo), Favoritos e o guia de programação.
+- Abas com indicador deslizante em Favoritos, Minha biblioteca, Dados anteriores e na busca global.
+- Contadores com dígitos que rolam no selo de Dados anteriores e em Gerenciar assistidos.
+- Estado vazio em Favoritos e em Minha biblioteca (downloads); carregando e erro desenhados no guia de programação.
+
 ## Dados e segurança
 
 - Banco SQLite por perfil, esquema **v9** (`lib/data/db.dart`); migrações só acrescentam tabelas e colunas. A tela de reparo faz cópia `.backup-<ms>` antes de mexer.
@@ -85,6 +91,7 @@ O script confere a versão, compila, gera `release\MIP-Setup-X.Y.Z.exe` e `lates
 
 | Versão | Principais mudanças |
 |---|---|
+| 1.0.8 | Esqueleto de carregamento com brilho, abas com indicador deslizante (Favoritos, Minha biblioteca, Dados anteriores e busca), contadores com dígitos que rolam (Dados anteriores e Gerenciar assistidos), estados vazio (Favoritos, Minha biblioteca), carregando (Favoritos, guia) e erro (guia) desenhados; aviso de atualização com botões que cabem no cartão |
 | 1.0.7 | Tela expandida da série: "Gerenciar assistidos" (painel por temporada); aviso de atualização com botões que quebram de linha |
 | 1.0.6 | Troca de Xtream mantendo dados (mesmo provedor) e aba temporária "Dados anteriores"; painel Próximo episódio (12 s, aba na cor de destaque); botões do card embaixo da imagem; dicas e hover dos botões da janela redesenhados; animação de abertura sem onda |
 | 1.0.5 | Animação de abertura do perfil, botão "Detalhes" no aviso de atualização e aviso no canto inferior direito |
@@ -95,3 +102,4 @@ O script confere a versão, compila, gera `release\MIP-Setup-X.Y.Z.exe` e `lates
 ## Pendências
 
 - Troca de Xtream e aba "Dados anteriores" não testadas com um provedor real: só testes automáticos do banco e do casamento e uma simulação com catálogo fictício (telas renderizadas em teste, não no app aberto). O painel "Gerenciar assistidos" passou no `flutter analyze`, mas não foi aberto nem visto na tela.
+- As telas novas da 1.0.8 (esqueleto com brilho, abas deslizantes, contadores e estados vazio/carregando/erro) foram conferidas no app aberto só em parte (abas deslizantes, contador de assistidos, guia de programação carregado); esqueleto com brilho, estados vazios e o erro do guia (coberto só por teste de layout) não foram vistos na tela.

@@ -71,6 +71,10 @@ class _UpdateToastState extends State<UpdateToast> {
         final info = u.available!;
         final busy = u.state == UpdateState.downloading;
         final ready = u.state == UpdateState.ready;
+        // Botões de texto mais justos: os três cabem numa linha.
+        final compact = TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+        );
         final toast = Align(
           alignment: Alignment.bottomRight,
           child: Padding(
@@ -83,7 +87,7 @@ class _UpdateToastState extends State<UpdateToast> {
               side: BorderSide(color: AppColors.accent),
             ),
             child: SizedBox(
-              width: 360,
+              width: 400,
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
@@ -140,11 +144,13 @@ class _UpdateToastState extends State<UpdateToast> {
                           ),
                         ),
                         TextButton(
+                          style: compact,
                           onPressed: busy ? null : u.dismiss,
                           child: const Text('Depois'),
                         ),
                         if (info.hasDetails || info.notes.isNotEmpty)
                           TextButton(
+                            style: compact,
                             onPressed: () => setState(() => _details = true),
                             child: const Text('Detalhes'),
                           ),

@@ -11,6 +11,7 @@ import '../../data/models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/poster_image.dart';
 import '../widgets/common.dart';
+import '../widgets/sliding_tabs.dart';
 
 /// "Dados anteriores" (aba temporária da barra lateral): o que foi guardado na
 /// troca de Xtream do mesmo provedor e não achou par seguro no catálogo novo.
@@ -97,16 +98,13 @@ class _CarryoverPageState extends State<CarryoverPage> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 10, 24, 8),
-          child: Wrap(
-            spacing: 8,
-            children: [
+          child: SlidingTabs(
+            labels: [
               for (final g in CarryGroup.values)
-                ChoiceChip(
-                  label: Text('${_labels[g]} · ${data.listOf(g).length}'),
-                  selected: tab == g,
-                  onSelected: (_) => setState(() => _tab = g),
-                ),
+                '${_labels[g]} · ${data.listOf(g).length}',
             ],
+            selected: CarryGroup.values.indexOf(tab),
+            onChanged: (i) => setState(() => _tab = CarryGroup.values[i]),
           ),
         ),
         Expanded(

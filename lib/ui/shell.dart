@@ -15,6 +15,7 @@ import 'favorites/favorites_page.dart';
 import 'shell/lazy_pages.dart';
 import 'shell/search_overlay.dart';
 import 'shell/top_bar.dart';
+import 'widgets/animated_counter.dart';
 import 'widgets/content_frame.dart';
 import 'window/title_bar.dart';
 import 'widgets/cubos_logo.dart';
@@ -467,7 +468,6 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = count > 99 ? '99+' : '$count';
     return Container(
       constraints: BoxConstraints(minWidth: small ? 17 : 20),
       height: small ? 17 : 20,
@@ -478,8 +478,9 @@ class _Badge extends StatelessWidget {
         borderRadius: BorderRadius.circular(11),
         border: small ? Border.all(color: AppColors.sidebar, width: 2) : null,
       ),
-      child: Text(
-        text,
+      child: AnimatedCounter(
+        value: count,
+        maxShown: 99,
         style: TextStyle(
           color: Colors.white,
           fontSize: small ? 9.5 : 10.5,
