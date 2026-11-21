@@ -15,6 +15,8 @@ import '../../core/theme.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
+import '../widgets/swipe_toast.dart';
+import '../widgets/wake_slider.dart';
 import '../window/title_bar.dart';
 import 'player_episodes_panel.dart';
 import 'player_scrub.dart';
@@ -121,12 +123,16 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   int? _nextCountdown;
   Timer? _nextTimer;
 
+  /// Pavio do cartão durante a contagem de 8 s (1 = cheio, 0 = acabou).
+  final ValueNotifier<double> _nextFuse = ValueNotifier(1);
+  double _nextLeft = 0;
+
   /// Painel "Próximo episódio": aparece quando faltam 2 min (episódios), fica
-  /// aberto 12 s sem interação e vira uma aba com seta; com o mouse em cima do
-  /// painel a contagem para. Ao terminar o episódio reabre com contagem de 8 s.
+  /// aberto 12 s (o pavio do `SwipeToast` mostra o tempo; ele para com o mouse
+  /// em cima) e vira uma aba com seta; arrastar o cartão para baixo também o
+  /// minimiza. Ao terminar o episódio reabre com contagem de 8 s.
   _NextPanel _nextPanel = _NextPanel.hidden;
   Timer? _nextPanelTimer;
-  bool _nextPanelHover = false;
 
   /// Já marcado como assistido nesta reprodução (faltando 2 min no episódio,
   /// 10 min no filme).
@@ -173,6 +179,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     _saveTimer?.cancel();
     _nextTimer?.cancel();
     _nextPanelTimer?.cancel();
+    _nextFuse.dispose();
     _tick?.cancel();
     for (final s in _subs) {
       s.cancel();
@@ -195,7 +202,6 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
       _finished = false;
       _autoWatched = false;
       _nextPanel = _NextPanel.hidden;
-      _nextPanelHover = false;
       _nextCountdown = null;
       _position = Duration.zero;
       _duration = Duration.zero;
@@ -249,14 +255,25 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     }
   }
 
+  /// Os 12 s do painel aberto agora são do pavio do `SwipeToast`
+  /// (`_buildNextPanelBody`), que já para com o mouse em cima.
   void _armNextPanelTimer() {
     _nextPanelTimer?.cancel();
-    if (_nextPanel != _NextPanel.expanded || _nextCountdown != null) return;
-    if (_nextPanelHover) return; // com o mouse em cima do painel, a contagem para
-    _nextPanelTimer = Timer(const Duration(seconds: 12), () {
-      if (mounted && _nextCountdown == null && _nextPanel == _NextPanel.expanded) {
-        setState(() => _nextPanel = _NextPanel.minimized);
-      }
+  }
+
+  void _minimizeNext() {
+    if (!mounted || _nextPanel != _NextPanel.expanded || _nextCountdown != null) {
+      return;
+    }
+    setState(() => _nextPanel = _NextPanel.minimized);
+  }
+
+  /// Cancela a contagem de 8 s (botão Cancelar ou arrastar o cartão).
+  void _cancelNextCountdown() {
+    _nextTimer?.cancel();
+    setState(() {
+      _nextCountdown = null;
+      _nextPanel = _NextPanel.minimized;
     });
   }
 
@@ -284,13 +301,20 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
         _nextCountdown = 8;
       });
       _nextTimer?.cancel();
-      _nextTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-        final left = (_nextCountdown ?? 0) - 1;
-        if (left <= 0) {
+      _nextLeft = 8;
+      _nextFuse.value = 1;
+      // A cada 100 ms para o pavio andar suave; o número só muda a cada 1 s.
+      _nextTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+        _nextLeft -= 0.1;
+        if (_nextLeft <= 0.05) {
           t.cancel();
           _goNext();
-        } else if (mounted) {
-          setState(() => _nextCountdown = left);
+          return;
+        }
+        _nextFuse.value = (_nextLeft / 8).clamp(0.0, 1.0);
+        final shown = _nextLeft.ceil();
+        if (mounted && shown != _nextCountdown) {
+          setState(() => _nextCountdown = shown);
         }
       });
     } else {
@@ -628,26 +652,15 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
               _volume > 0 ? 'Silenciar' : 'Ativar som',
               () => _setVolume(_volume > 0 ? 0 : _lastVolume),
             ),
-            SizedBox(
+            WakeSlider(
+              value: _volume,
               width: 100,
-              height: 36,
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 3,
-                  activeTrackColor: Colors.white,
-                  inactiveTrackColor: Colors.white30,
-                  thumbColor: Colors.white,
-                  overlayShape: SliderComponentShape.noOverlay,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                ),
-                child: Slider(
-                  value: _volume,
-                  min: 0,
-                  max: 100,
-                  onChanged: _setVolume,
-                  onChangeEnd: (v) => widget.app.saveVolume(v),
-                ),
-              ),
+              height: 28,
+              fillColor: Colors.white,
+              trackColor: Colors.white30,
+              restoreFocusOnRelease: true,
+              onChanged: _setVolume,
+              onChangeEnd: (v) => widget.app.saveVolume(v),
             ),
             const Spacer(),
             PopupMenuButton<Object>(
@@ -809,7 +822,6 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
       key: const ValueKey('next-tab'),
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() {
-        _nextPanelHover = true;
         _nextPanelTimer?.cancel();
         _nextPanel = _NextPanel.expanded;
       }),
@@ -856,17 +868,19 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   /// Cartão "Próximo episódio". Com o mouse em cima, a contagem para.
   Widget _buildNextPanelBody(bool counting) {
     final next = widget.items[_index + 1];
-    return MouseRegion(
+    return KeyedSubtree(
       key: const ValueKey('next-card'),
-      onEnter: (_) {
-        _nextPanelHover = true;
-        _nextPanelTimer?.cancel();
-      },
-      onExit: (_) {
-        _nextPanelHover = false;
-        _armNextPanelTimer();
-      },
-      child: Container(
+      // Pavio no rodapé: 12 s com o painel aberto, ou os 8 s da contagem.
+      // Arrastar para baixo minimiza (ou cancela a contagem).
+      child: SwipeToast(
+        key: ValueKey(counting ? 'next-swipe-count' : 'next-swipe-wait'),
+        lifetime: counting ? null : const Duration(seconds: 12),
+        progress: counting ? _nextFuse : null,
+        onTimeout: counting ? null : _minimizeNext,
+        onDismiss: counting ? _cancelNextCountdown : _minimizeNext,
+        child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
         width: 320,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -922,13 +936,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                 if (counting) ...[
                   const SizedBox(width: 8),
                   TextButton(
-                    onPressed: () {
-                      _nextTimer?.cancel();
-                      setState(() {
-                        _nextCountdown = null;
-                        _nextPanel = _NextPanel.minimized;
-                      });
-                    },
+                    onPressed: _cancelNextCountdown,
                     style: TextButton.styleFrom(foregroundColor: Colors.white),
                     child: const Text('Cancelar'),
                   ),
@@ -936,6 +944,8 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
               ],
             ),
           ],
+        ),
+        ),
         ),
       ),
     );

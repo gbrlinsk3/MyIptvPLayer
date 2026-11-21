@@ -11,6 +11,7 @@ import '../catalog/title_details_panel.dart';
 import '../catalog/title_widgets.dart';
 import '../live_tv/channel_card.dart';
 import '../live_tv/live_player_page.dart';
+import '../widgets/shimmer.dart';
 import '../widgets/sliding_tabs.dart';
 import 'search_result_card.dart';
 
@@ -21,12 +22,104 @@ import 'search_result_card.dart';
 /// digitar, os resultados anteriores continuam na tela até os novos chegarem
 /// (nada de piscar uma tela vazia).
 class SearchOverlay extends StatefulWidget {
-  const SearchOverlay({super.key, required this.query});
+  const SearchOverlay({super.key, required this.query, this.onClose});
 
   final String query;
 
+  /// Fecha a busca (limpa o campo). Chamado ao abrir um canal, que toca na aba
+  /// TV ao vivo e não pode ficar coberto pelos resultados.
+  final VoidCallback? onClose;
+
   @override
   State<SearchOverlay> createState() => _SearchOverlayState();
+}
+
+/// Esqueleto da busca até o primeiro resultado chegar: mesma forma da tela
+/// (título, abas e grade de cartões 16:9 com texto embaixo, como [TitleGrid]
+/// da busca). Mesmas colunas e medidas de [_SearchOverlayState.build].
+class _ResultsSkeleton extends StatelessWidget {
+  const _ResultsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: CustomScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        slivers: [
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(24, 16, 24, 4),
+              child: SkeletonBox(width: 260, height: 22, radius: 4),
+            ),
+          ),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: SkeletonBox(width: 380, height: 36, radius: 8),
+            ),
+          ),
+          SliverLayoutBuilder(
+            builder: (context, constraints) {
+              const pad = 24.0, gap = 16.0, target = 300.0;
+              final inner = constraints.crossAxisExtent - pad * 2;
+              final cols = ((inner + gap) / (target + gap)).floor().clamp(1, 8);
+              final w = (inner - gap * (cols - 1)) / cols;
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: pad),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: cols,
+                    crossAxisSpacing: gap,
+                    mainAxisSpacing: 12,
+                    mainAxisExtent: w * 9 / 16 + SearchResultCard.textHeight,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => const _ResultCardSkeleton(),
+                    childCount: cols * 2,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Um cartão do esqueleto da busca: imagem 16:9 e duas linhas de texto.
+class _ResultCardSkeleton extends StatelessWidget {
+  const _ResultCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Expanded(child: SkeletonBox(radius: 12)),
+        SizedBox(
+          height: SearchResultCard.textHeight,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(2, 8, 2, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FractionallySizedBox(
+                  widthFactor: 0.85,
+                  child: SkeletonBox(height: 13, radius: 4),
+                ),
+                const SizedBox(height: 6),
+                FractionallySizedBox(
+                  widthFactor: 0.4,
+                  child: SkeletonBox(height: 10, radius: 4),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Uma aba já pronta: resultados e relacionados (sem repetir os resultados).
@@ -185,17 +278,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
     if (views == null) {
       return ColoredBox(
         color: AppColors.bg,
-        child: const Padding(
-          padding: EdgeInsets.all(24),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        ),
+        child: const _ResultsSkeleton(),
       );
     }
     void open(CatalogTitle t) => showTitleDetails(context, t);
@@ -229,6 +312,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
     void openChannel(LiveChannel ch, List<LiveChannel> list) {
       AppScope.read(context).selectChannel(ch);
       openLivePlayer(context, list);
+      widget.onClose?.call();
     }
 
     // Aba Todos: até 12 canais com atalho para a aba Canais.

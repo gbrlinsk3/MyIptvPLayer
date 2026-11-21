@@ -11,6 +11,7 @@ import '../../data/models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/poster_image.dart';
 import '../widgets/common.dart';
+import '../widgets/shimmer.dart';
 import '../widgets/sliding_tabs.dart';
 
 /// "Dados anteriores" (aba temporária da barra lateral): o que foi guardado na
@@ -405,6 +406,50 @@ class _ResultTile extends StatelessWidget {
   }
 }
 
+/// Esqueleto da lista de resultados da janela Religar enquanto a busca responde:
+/// quatro linhas com as mesmas medidas de [_ResultTile] (miniatura 40×56 e
+/// duas linhas de texto), dentro do mesmo espaçamento da lista.
+class _ResultsSkeleton extends StatelessWidget {
+  const _ResultsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        children: [
+          for (var i = 0; i < 4; i++)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+              child: Row(
+                children: [
+                  SkeletonBox(width: 40, height: 56, radius: 6),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        FractionallySizedBox(
+                          widthFactor: 0.75,
+                          child: SkeletonBox(height: 13, radius: 4),
+                        ),
+                        SizedBox(height: 6),
+                        FractionallySizedBox(
+                          widthFactor: 0.45,
+                          child: SkeletonBox(height: 10, radius: 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Janela "Religar": campo de busca (já com o nome antigo) e a lista de
 /// resultados; um clique escolhe. Devolve null se cancelar.
 Future<T?> showRelinkDialog<T>(
@@ -519,13 +564,7 @@ class _RelinkDialogState<T> extends State<_RelinkDialog<T>> {
             const SizedBox(height: 10),
             Expanded(
               child: _loading && _results.isEmpty
-                  ? const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
+                  ? const _ResultsSkeleton()
                   : _results.isEmpty
                       ? Center(
                           child: Text(

@@ -1,9 +1,13 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import '../../data/live_highlight.dart';
 import '../../data/models.dart';
 import '../../state/app_scope.dart';
+import '../widgets/magnet.dart';
+import 'live_logo.dart';
 
 /// Cor do degradê do banner principal numa posição `t` (0 = canto azul, 1 =
 /// canto escuro). Os mini banners usam a mesma função para "continuar" o
@@ -105,7 +109,7 @@ class _LiveHighlightBannerState extends State<LiveHighlightBanner> {
                                   decoration: BoxDecoration(
                                     color: k == i
                                         ? AppColors.accent
-                                        : const Color(0x66FFFFFF),
+                                        : AppColors.text.withValues(alpha: 0.35),
                                     borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
@@ -195,9 +199,10 @@ class _Slide extends StatefulWidget {
 class _SlideState extends State<_Slide> {
   int _start = 0;
 
-  static final _outlined = OutlinedButton.styleFrom(
-    foregroundColor: Colors.white,
-    side: const BorderSide(color: Color(0x88FFFFFF)),
+  // Texto do banner segue o tema: escuro no claro, claro no escuro.
+  static ButtonStyle get _outlined => OutlinedButton.styleFrom(
+    foregroundColor: AppColors.text,
+    side: BorderSide(color: AppColors.text.withValues(alpha: 0.5)),
   );
 
   @override
@@ -221,10 +226,12 @@ class _SlideState extends State<_Slide> {
       child: LayoutBuilder(
         builder: (context, box) {
           // Quantos canais cabem no carrossel: 5 em janela larga, menos em estreita.
-          final visible = box.maxWidth >= 1000 ? 5 : (box.maxWidth >= 780 ? 4 : 3);
+          final visible = box.maxWidth >= 860 ? 5 : 3;
           final shown = channels.length < visible ? channels.length : visible;
-          const tile = 92.0, gap = 8.0;
-          final stripWidth = shown * tile + (shown - 1) * gap;
+          // O cartão do meio é o principal e fica maior.
+          const tile = 92.0, mainTile = 124.0, gap = 8.0;
+          final mainIndex = shown ~/ 2;
+          final stripWidth = (shown - 1) * tile + (shown > 0 ? mainTile : 0) + (shown - 1) * gap;
           final canScroll = channels.length > visible;
           return Stack(
             children: [
@@ -250,16 +257,16 @@ class _SlideState extends State<_Slide> {
                       h.keyword.toUpperCase(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppFonts.title(52, color: Colors.white, spacing: 1.5),
+                      style: AppFonts.title(52, color: AppColors.text, spacing: 1.5),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${channels.length} canais · $cats',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xCCFFFFFF),
+                        color: AppColors.textMuted,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -319,11 +326,10 @@ class _SlideState extends State<_Slide> {
                           maxLines: 1,
                           textAlign: TextAlign.center,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            shadows: [Shadow(blurRadius: 8, color: Color(0x99000000))],
+                            color: AppColors.text,
                           ),
                         ),
                       ),
@@ -340,20 +346,26 @@ class _SlideState extends State<_Slide> {
                       ),
                     SizedBox(
                       width: stripWidth,
-                      height: tile,
+                      height: mainTile,
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           for (var k = 0; k < shown; k++) ...[
                             if (k > 0) const SizedBox(width: gap),
                             Opacity(
                               // As duas pontas ficam mais translúcidas quando há mais canais.
                               opacity: canScroll && (k == 0 || k == shown - 1) ? 0.45 : 1,
-                              child: _Tile(
+                              child: Magnet(
+                                padding: 40,
+                                strength: 5,
+                                child: _Tile(
                                 channel: channels[(_start + k) % channels.length],
-                                size: tile,
+                                size: k == mainIndex ? mainTile : tile,
+                                main: k == mainIndex,
                                 onTap: () => widget.onOpen(
                                   channels[(_start + k) % channels.length],
                                   channels,
+                                ),
                                 ),
                               ),
                             ),
@@ -392,16 +404,22 @@ class _StripButton extends StatelessWidget {
     return IconButton(
       onPressed: onTap,
       visualDensity: VisualDensity.compact,
-      icon: Icon(icon, color: Colors.white),
+      icon: Icon(icon, color: AppColors.text),
     );
   }
 }
 
 class _Tile extends StatefulWidget {
-  const _Tile({required this.channel, required this.size, required this.onTap});
+  const _Tile({
+    required this.channel,
+    required this.size,
+    required this.onTap,
+    this.main = false,
+  });
 
   final LiveChannel channel;
   final double size;
+  final bool main;
   final VoidCallback onTap;
 
   @override
@@ -429,41 +447,63 @@ class _TileState extends State<_Tile> {
             height: widget.size,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: const Color(0xE61F1E1D),
+              color: const Color(0xFF1F1E1D),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _hover ? AppColors.accent : const Color(0x33FFFFFF),
-                width: _hover ? 2 : 1,
+                color: _hover || widget.main
+                    ? AppColors.accent
+                    : const Color(0x33FFFFFF),
+                width: _hover || widget.main ? 2 : 1,
               ),
             ),
-            child: Column(
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: (url == null || url.isEmpty)
-                        ? const Icon(Icons.tv, color: Color(0x99FFFFFF), size: 26)
-                        : Image.network(
-                            url,
-                            fit: BoxFit.contain,
-                            cacheWidth: 160,
-                            errorBuilder: (context, error, stack) =>
-                                const Icon(Icons.tv, color: Color(0x99FFFFFF), size: 26),
-                          ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 5),
-                  child: Text(
-                    ch.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                // Fundo: o próprio pôster do canal, ampliado e desfocado.
+                if (url != null && url.isNotEmpty)
+                  RepaintBoundary(
+                    child: ClipRect(
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                        child: LiveLogo(
+                          url: url,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 96,
+                          fallback: const SizedBox.shrink(),
+                        ),
+                      ),
                     ),
                   ),
+                const ColoredBox(color: Color(0x66000000)),
+                Column(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: (url == null || url.isEmpty)
+                            ? const Icon(Icons.tv, color: Color(0x99FFFFFF), size: 26)
+                            : LiveLogo(
+                                url: url,
+                                memCacheWidth: 200,
+                                fallback: const Icon(Icons.tv,
+                                    color: Color(0x99FFFFFF), size: 26),
+                              ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 5),
+                      child: Text(
+                        ch.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: widget.main ? 11 : 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -664,12 +704,10 @@ class _MiniCardState extends State<_MiniCard> {
                                 // Sem fundo: se a imagem do logo falhar, nada aparece
                                 // (antes ficava um quadrado vazio).
                                 padding: const EdgeInsets.all(3),
-                                child: Image.network(
-                                  url,
-                                  fit: BoxFit.contain,
-                                  cacheWidth: 80,
-                                  errorBuilder: (context, error, stack) =>
-                                      const SizedBox.shrink(),
+                                child: LiveLogo(
+                                  url: url,
+                                  memCacheWidth: 80,
+                                  fallback: const SizedBox.shrink(),
                                 ),
                               ),
                             ),

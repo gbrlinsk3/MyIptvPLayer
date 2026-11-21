@@ -136,6 +136,9 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
       key: ValueKey(dark),
       title: AppInfo.name,
       debugShowCheckedModeBanner: false,
+      // Sem a barra de rolagem padrão: a posição aparece na faixa de traços
+      // da borda direita (ver ContentFrame / EdgeScrollMarks).
+      scrollBehavior: MaterialScrollBehavior().copyWith(scrollbars: false),
       theme: _themeFor(dark),
       // "Tamanho da interface": tudo (telas, diálogos, botões da janela e
       // aviso de atualização) fica dentro da mesma ampliação. Antes de entrar

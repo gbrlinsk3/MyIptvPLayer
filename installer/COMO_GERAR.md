@@ -10,7 +10,8 @@ e embala tudo num único `Setup.exe` com assistente de instalação, atalhos e d
 ## Cada vez que quiser gerar um instalador
 1. No terminal, na raiz do projeto: `flutter build windows --release`
    (cria `build\windows\x64\runner\Release\` com o app e suas DLLs).
-2. Confira nessa pasta o nome do `.exe`. Se não for `iptv_player.exe`, edite a linha
+   O script `montar_instalador.ps1` apaga essa pasta antes de compilar, para não levar executáveis antigos para o instalador.
+2. Confira nessa pasta o nome do `.exe`. Se não for `MyIptvPlayer.exe`, edite a linha
    `#define MyAppExe` em `installer\iptv_player.iss`.
 3. (Opcional) Mude `#define MyAppVersion` para a versão nova.
 4. Abra `installer\iptv_player.iss` no Inno Setup e clique em **Build > Compile** (ou Ctrl+F9).

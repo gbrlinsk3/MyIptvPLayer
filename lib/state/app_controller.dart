@@ -191,6 +191,106 @@ class AppController extends ChangeNotifier {
   /// cada mudança, então a interface compara por identidade para saber se mudou.
   Set<int> favoriteChannels = <int>{};
 
+  static const int maxRecentChannels = 20;
+
+  /// Últimos canais assistidos (stream_id), do mais recente para o mais
+  /// antigo, no máximo [maxRecentChannels]. Salvo em `recent_live_channels`.
+  /// A lista é recriada a cada mudança (comparar por identidade).
+  List<int> recentChannels = const [];
+
+  Future<void> noteRecentChannel(LiveChannel ch) async {
+    final next = <int>[
+      ch.streamId,
+      for (final id in recentChannels)
+        if (id != ch.streamId) id,
+    ];
+    if (next.length > maxRecentChannels) {
+      next.removeRange(maxRecentChannels, next.length);
+    }
+    recentChannels = List.unmodifiable(next);
+    notifyListeners();
+    await _db.setSetting('recent_live_channels', next.join(','));
+  }
+
+  /// Tira um canal da lista de recentes (o X do cartão). Persiste e notifica.
+  Future<void> removeRecentChannel(int streamId) async {
+    final next = <int>[
+      for (final id in recentChannels)
+        if (id != streamId) id,
+    ];
+    recentChannels = List.unmodifiable(next);
+    notifyListeners();
+    await _db.setSetting('recent_live_channels', next.join(','));
+  }
+
+  /// Última versão escolhida em cada canal agrupado: {chave do grupo: stream_id}.
+  /// Salvo em `live_preferred_versions` (JSON).
+  Map<String, int> preferredVersions = const {};
+
+  int? preferredVersionFor(String key) => preferredVersions[key];
+
+  Future<void> setPreferredVersion(String key, int streamId) async {
+    if (preferredVersions[key] == streamId) return;
+    preferredVersions = Map.unmodifiable({...preferredVersions, key: streamId});
+    notifyListeners();
+    await _db.setSetting('live_preferred_versions', jsonEncode(preferredVersions));
+  }
+
+  static List<int> _parseIdList(String? raw) => List.unmodifiable([
+        for (final part in (raw ?? '').split(','))
+          if (int.tryParse(part.trim()) != null) int.parse(part.trim()),
+      ]);
+
+  static Map<String, int> _parsePreferredVersions(String? raw) {
+    if (raw == null || raw.isEmpty) return const {};
+    try {
+      final data = jsonDecode(raw);
+      if (data is! Map) return const {};
+      return Map.unmodifiable({
+        for (final e in data.entries)
+          if (e.key is String && e.value is int) e.key as String: e.value as int,
+      });
+    } catch (e) {
+      AppLog.warn('tv.versoes', e);
+      return const {};
+    }
+  }
+
+  List<LiveChannel>? _byIdFor;
+  Map<int, LiveChannel> _byId = const {};
+
+  /// Canal pelo stream_id, em todo o catálogo carregado (inclusive categorias
+  /// ocultas). O mapa só é refeito quando a lista de canais muda.
+  LiveChannel? liveChannelById(int id) {
+    if (!identical(_byIdFor, _catalog)) {
+      _byIdFor = _catalog;
+      _byId = {for (final ch in _catalog) ch.streamId: ch};
+    }
+    return _byId[id];
+  }
+
+  /// Fila (lista de onde o canal veio) do último pedido de reprodução, usada
+  /// pelos botões "canal anterior/próximo".
+  List<LiveChannel> liveQueue = const [];
+  bool _pendingLive = false;
+
+  /// Pede para tocar [ch] na aba TV ao vivo: seleciona o canal, guarda a fila
+  /// e troca para a aba. A página da TV consome o pedido com [takeLiveRequest].
+  void requestLive(LiveChannel ch, List<LiveChannel> queue) {
+    selected = ch;
+    liveQueue = List.unmodifiable(queue);
+    _pendingLive = true;
+    shellIndex = 1;
+    notifyListeners();
+  }
+
+  /// true uma única vez por pedido de [requestLive].
+  bool takeLiveRequest() {
+    final pending = _pendingLive;
+    _pendingLive = false;
+    return pending;
+  }
+
   /// Downloads do perfil (formato original). Não repassa avisos para este
   /// controller: o progresso muda várias vezes por segundo e só as telas de
   /// download escutam (ListenableBuilder).
@@ -245,10 +345,24 @@ class AppController extends ChangeNotifier {
     await _db.setSetting('catalog_width', '$catalogWidth');
   }
 
+  /// O texto da busca já foi "digitado" nesta abertura de perfil (a animação
+  /// toca uma vez; não é salvo). Fica aqui para não repetir ao trocar de tema.
+  bool searchHintTyped = false;
+
   /// Página aberta e estado da barra lateral; guardados aqui para sobreviver
   /// à reconstrução da interface ao trocar de tema.
   int shellIndex = 0;
   bool sidebarCollapsed = true;
+
+  /// A TV ao vivo está com vídeo tocando: o player ocupa a largura toda, sem a
+  /// "largura do catálogo" (ver `ContentFrame`).
+  bool liveFullBleed = false;
+
+  void setLiveFullBleed(bool value) {
+    if (liveFullBleed == value) return;
+    liveFullBleed = value;
+    notifyListeners();
+  }
 
   void setShellIndex(int value) {
     shellIndex = value;
@@ -332,6 +446,11 @@ class AppController extends ChangeNotifier {
       for (final part in (await _db.getSetting('favorite_channels') ?? '').split(','))
         if (int.tryParse(part) != null) int.parse(part),
     };
+    recentChannels = _parseIdList(await _db.getSetting('recent_live_channels'))
+        .take(maxRecentChannels)
+        .toList(growable: false);
+    preferredVersions =
+        _parsePreferredVersions(await _db.getSetting('live_preferred_versions'));
     final savedKeywords = await _db.getSetting('live_highlight_keywords');
     highlightKeywords = savedKeywords == null
         ? defaultHighlightKeywords
@@ -434,6 +553,12 @@ class AppController extends ChangeNotifier {
       _hiddenLive = <String>{};
       favoriteChannels = <int>{};
       unawaited(_db.setSetting('favorite_channels', ''));
+      // Os ids de canal são do provedor antigo: recentes e versões não valem.
+      recentChannels = const [];
+      preferredVersions = const {};
+      liveQueue = const [];
+      unawaited(_db.setSetting('recent_live_channels', ''));
+      unawaited(_db.setSetting('live_preferred_versions', '{}'));
       selectedCategoryId = null;
       query = '';
       selected = null;

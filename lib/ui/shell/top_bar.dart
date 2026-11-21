@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../profiles/profiles_scope.dart';
 import '../../state/app_scope.dart';
 import '../profiles/profile_avatar.dart';
+import '../widgets/text_type.dart';
 
 /// Conteúdo do topo: busca global à esquerda, área de arrastar a janela e o
 /// perfil ativo à direita (com menu). Os botões da janela ficam no TitleBar.
@@ -65,8 +66,22 @@ class _SearchField extends StatelessWidget {
   final FocusNode focus;
   final ValueChanged<String> onChanged;
 
+  static const _dica = 'Buscar filmes, séries e canais…';
+
   @override
   Widget build(BuildContext context) {
+    final app = AppScope.read(context);
+    final hintStyle = TextStyle(color: AppColors.textMuted, fontSize: 14);
+    // A dica é "digitada" uma vez por abertura de perfil; depois fica fixa.
+    final Widget dica = app.searchHintTyped
+        ? Text(_dica, style: hintStyle, maxLines: 1)
+        : TextType(
+            text: _dica,
+            style: hintStyle,
+            startDelay: const Duration(milliseconds: 600),
+            typingSpeed: const Duration(milliseconds: 40),
+            onComplete: () => app.searchHintTyped = true,
+          );
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
@@ -76,8 +91,7 @@ class _SearchField extends StatelessWidget {
           onChanged: onChanged,
           style: const TextStyle(fontSize: 14),
           decoration: InputDecoration(
-            hintText: 'Buscar filmes, séries e canais…',
-            hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
+            hint: dica,
             isDense: true,
             filled: true,
             fillColor: AppColors.surface,

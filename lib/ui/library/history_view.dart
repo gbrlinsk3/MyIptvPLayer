@@ -5,6 +5,7 @@ import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/poster_image.dart';
 import '../catalog/title_details_panel.dart';
+import '../widgets/shimmer.dart';
 
 /// Histórico: tudo que já foi assistido ou começado, agrupado por data.
 /// Mostra só a **última** vez de cada filme/episódio.
@@ -105,7 +106,7 @@ class _HistoryViewState extends State<HistoryView> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) return const SizedBox.shrink();
+    if (!_loaded) return const _HistorySkeleton();
     if (_items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
@@ -163,6 +164,86 @@ class _HistoryViewState extends State<HistoryView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Esqueleto do histórico enquanto ele carrega: barra de contagem e linhas com
+/// a mesma medida de [_HistoryTile] (pôster 56×84 e três linhas de texto).
+class _HistorySkeleton extends StatelessWidget {
+  const _HistorySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                SkeletonBox(width: 260, height: 12, radius: 4),
+                Spacer(),
+                SkeletonBox(width: 130, height: 14, radius: 4),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 7,
+              itemBuilder: (context, i) => i == 0
+                  ? const Padding(
+                      padding: EdgeInsets.only(top: 14, bottom: 8),
+                      child: SkeletonBox(width: 110, height: 18, radius: 4),
+                    )
+                  : const _HistoryTileSkeleton(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryTileSkeleton extends StatelessWidget {
+  const _HistoryTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: EdgeInsets.all(8),
+        child: Row(
+          children: [
+            SkeletonBox(width: 56, height: 84, radius: 8),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FractionallySizedBox(
+                    widthFactor: 0.45,
+                    child: SkeletonBox(height: 14, radius: 4),
+                  ),
+                  SizedBox(height: 8),
+                  FractionallySizedBox(
+                    widthFactor: 0.3,
+                    child: SkeletonBox(height: 10, radius: 4),
+                  ),
+                  SizedBox(height: 8),
+                  FractionallySizedBox(
+                    widthFactor: 0.6,
+                    child: SkeletonBox(height: 10, radius: 4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

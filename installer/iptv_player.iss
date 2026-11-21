@@ -9,7 +9,9 @@
 #endif
 ; Nome do executável gerado pelo Flutter (em build\windows\x64\runner\Release).
 ; Confira o nome real nessa pasta; se for outro, mude aqui.
-#define MyAppExe "iptv_player.exe"
+#define MyAppExe "MyIptvPlayer.exe"
+; Nome dos atalhos (Menu Iniciar e Área de Trabalho); o nome do app continua MIP.
+#define MyShortcutName "MyIptvPlayer"
 #define BuildDir "..\build\windows\x64\runner\Release"
 
 [Setup]
@@ -47,14 +49,18 @@ Name: "desktopicon"; Description: "Criar um atalho na Área de Trabalho"; GroupD
 Source: "{#BuildDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon
+Name: "{group}\{#MyShortcutName}"; Filename: "{app}\{#MyAppExe}"
+Name: "{autodesktop}\{#MyShortcutName}"; Filename: "{app}\{#MyAppExe}"; Tasks: desktopicon
 
 [InstallDelete]
 ; Apaga os arquivos da versão anterior antes de copiar os novos, assim nada
 ; "inútil" sobra na pasta do programa. Perfis, banco e ajustes ficam em
 ; %APPDATA% (fora desta pasta) e não são tocados.
 Type: filesandordirs; Name: "{app}\*"
+; Atalhos antigos "MIP" apontavam para iptv_player.exe (renomeado para MyIptvPlayer.exe);
+; remove-os para quem atualiza não ficar com atalho quebrado ao lado do novo.
+Type: files; Name: "{group}\MIP.lnk"
+Type: files; Name: "{autodesktop}\MIP.lnk"
 
 [Run]
 ; Instalação normal: caixa "Abrir o MIP" no fim do assistente.

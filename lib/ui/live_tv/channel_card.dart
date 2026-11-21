@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../state/app_scope.dart';
+import 'live_logo.dart';
 
 /// Fileira de canais de uma categoria: título como divisor e cartões
 /// horizontais (ícone + nome) rolando para o lado, como no catálogo.
@@ -270,11 +271,10 @@ class _Logo extends StatelessWidget {
       alignment: Alignment.center,
       child: (url == null || url!.isEmpty)
           ? placeholder
-          : Image.network(
-              url!,
-              fit: BoxFit.contain,
-              cacheWidth: 160,
-              errorBuilder: (context, error, stack) => placeholder,
+          : LiveLogo(
+              url: url!,
+              memCacheWidth: 160,
+              fallback: placeholder,
             ),
     );
   }

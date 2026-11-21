@@ -10,6 +10,7 @@ import '../shell/lazy_pages.dart';
 import '../live_tv/manage_categories_panel.dart';
 import '../widgets/manage_categories_button.dart';
 import '../widgets/shimmer.dart';
+import '../widgets/sliding_tabs.dart';
 import 'title_details_panel.dart';
 import 'title_widgets.dart';
 
@@ -60,24 +61,31 @@ class _CatalogPageState extends State<CatalogPage> {
     final catalog = AppScope.of(context).catalog;
     final section = catalog.section(_kind);
 
+    // Contagem só quando a seção já foi carregada (sem consulta nova: vem do
+    // CatalogSection, preenchido ao abrir o perfil).
+    String label(String nome, CatalogKind kind) {
+      final sec = catalog.section(kind);
+      if (sec.updatedAt == null && sec.total == 0) return nome;
+      return '$nome · ${sec.visibleTotal}';
+    }
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 4, 16, 8),
+          // Igual ao FAVORITOS, com 12 px a menos à direita: os botões têm esse
+          // respiro interno e o ícone fica na borda do conteúdo.
+          padding: const EdgeInsets.fromLTRB(24, 20, 12, 4),
           child: Row(
             children: [
-              _KindTab(
-                label: 'Filmes',
-                selected: _kind == CatalogKind.movies,
-                onTap: () => _selectKind(CatalogKind.movies),
+              Expanded(
+                child: Text(
+                  'FILMES E SÉRIES',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppFonts.title(34, spacing: 1.5),
+                ),
               ),
-              const SizedBox(width: 8),
-              _KindTab(
-                label: 'Séries',
-                selected: _kind == CatalogKind.series,
-                onTap: () => _selectKind(CatalogKind.series),
-              ),
-              const Spacer(),
               IconButton(
                 tooltip: section.syncing ? 'Atualizando…' : 'Atualizar lista',
                 onPressed: section.syncing ? null : () => catalog.refresh(_kind),
@@ -91,7 +99,17 @@ class _CatalogPageState extends State<CatalogPage> {
             ],
           ),
         ),
-        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+          child: SlidingTabs(
+            labels: [
+              label('Filmes', CatalogKind.movies),
+              label('Séries', CatalogKind.series),
+            ],
+            selected: _kind.index,
+            onChanged: (i) => _selectKind(CatalogKind.values[i]),
+          ),
+        ),
         Expanded(
           // Só a aba aberta existe; a outra é descartada 6 s depois de sair.
           child: LazyPages(
@@ -110,57 +128,6 @@ class _CatalogPageState extends State<CatalogPage> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _KindTab extends StatelessWidget {
-  const _KindTab({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 150),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? AppColors.text : AppColors.textMuted,
-                ),
-                child: Text(label),
-              ),
-              const SizedBox(height: 6),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                height: 3,
-                width: selected ? 28 : 0,
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

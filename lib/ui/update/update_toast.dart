@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../update/app_updater.dart';
 import '../../update/update_info.dart';
 import '../widgets/cubos_logo.dart';
+import '../widgets/swipe_toast.dart';
 
 /// Tela de abertura enquanto o app procura atualização (no máximo ~6 s).
 class StartupSplash extends StatelessWidget {
@@ -75,15 +76,28 @@ class _UpdateToastState extends State<UpdateToast> {
         final compact = TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 10),
         );
+        final radius = BorderRadius.circular(AppShape.rounded ? 12 : 2);
+        // Arrastar para baixo ou deixar o pavio de 25 s acabar equivale a
+        // "Depois": o aviso volta na próxima abertura do programa. O tempo para
+        // com o mouse em cima, baixando e com "Detalhes" aberto; mudar a etapa
+        // (por exemplo, baixado) recomeça a contagem.
         final toast = Align(
           alignment: Alignment.bottomRight,
           child: Padding(
             padding: const EdgeInsets.all(16),
+            child: SwipeToast(
+            lifetime: const Duration(seconds: 25),
+            paused: busy || _details,
+            dismissible: !busy,
+            restartKey: u.state,
+            onDismiss: u.dismiss,
+            child: ClipRRect(
+            borderRadius: radius,
             child: Material(
             color: AppColors.surface,
             elevation: 8,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppShape.rounded ? 12 : 2),
+              borderRadius: radius,
               side: BorderSide(color: AppColors.accent),
             ),
             child: SizedBox(
@@ -161,6 +175,8 @@ class _UpdateToastState extends State<UpdateToast> {
               ),
             ),
           ),
+            ),
+            ),
           ),
         );
         return Stack(

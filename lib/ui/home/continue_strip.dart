@@ -7,6 +7,8 @@ import '../../state/app_scope.dart';
 import '../catalog/play_actions.dart';
 import '../catalog/poster_image.dart';
 import '../catalog/title_details_page.dart';
+import '../widgets/carousel_arrows.dart';
+import '../widgets/shimmer.dart';
 
 /// "Continuar assistindo": cartões horizontais (capa do servidor) que se
 /// expandem ao passar o mouse e mostram "Clique aqui para continuar
@@ -49,6 +51,11 @@ class _ContinueStripState extends State<ContinueStrip> {
       future: widget.future,
       builder: (context, snap) {
         final list = snap.data;
+        if (list == null && snap.connectionState != ConnectionState.done) {
+          return _ContinueSkeleton(
+            perRow: AppScope.of(context).landscapePerRow,
+          );
+        }
         if (list == null || list.isEmpty) return const SizedBox.shrink();
         final open = _hover ?? 0;
         // Quantos cartões cabem por linha (contando o expandido) depende do
@@ -75,28 +82,30 @@ class _ContinueStripState extends State<ContinueStrip> {
                   onExit: (_) {
                     if (!_pinned) setState(() => _hover = null);
                   },
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: RowMetrics.pad,
-                      vertical: _vPad,
-                    ),
-                    itemCount: list.length,
-                    itemBuilder: (context, i) => Padding(
-                      padding: const EdgeInsets.only(right: RowMetrics.landscapeGap),
-                      child: _ContinueCard(
-                        title: list[i],
-                        width: i == open ? sizes.expanded : sizes.collapsed,
-                        expanded: i == open,
-                        onEnter: () {
-                          if (!_pinned) setState(() => _hover = i);
-                        },
-                        onOpenCard: () => _open(
-                          i,
-                          () => showTitleDetailsPage(context, list[i]),
+                  child: CarouselDragArea(
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: RowMetrics.pad,
+                        vertical: _vPad,
+                      ),
+                      itemCount: list.length,
+                      itemBuilder: (context, i) => Padding(
+                        padding: const EdgeInsets.only(right: RowMetrics.landscapeGap),
+                        child: _ContinueCard(
+                          title: list[i],
+                          width: i == open ? sizes.expanded : sizes.collapsed,
+                          expanded: i == open,
+                          onEnter: () {
+                            if (!_pinned) setState(() => _hover = i);
+                          },
+                          onOpenCard: () => _open(
+                            i,
+                            () => showTitleDetailsPage(context, list[i]),
+                          ),
+                          onResume: () =>
+                              _open(i, () => resumeTitle(context, list[i])),
                         ),
-                        onResume: () =>
-                            _open(i, () => resumeTitle(context, list[i])),
                       ),
                     ),
                   ),
@@ -107,6 +116,57 @@ class _ContinueStripState extends State<ContinueStrip> {
         );
         });
       },
+    );
+  }
+}
+
+/// Esqueleto da fileira enquanto a lista chega: título e uma fileira de cartões
+/// recolhidos (mesmas medidas de [RowMetrics] e da fileira real).
+class _ContinueSkeleton extends StatelessWidget {
+  const _ContinueSkeleton({required this.perRow});
+
+  final int perRow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 28),
+      child: Shimmer(
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final sizes = RowMetrics.landscapeSizes(box.maxWidth, perRow);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
+                  child: SkeletonBox(width: 260, height: 22, radius: 4),
+                ),
+                SizedBox(
+                  height: sizes.height + _ContinueStripState._vPad * 2,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: RowMetrics.pad,
+                      vertical: _ContinueStripState._vPad,
+                    ),
+                    itemCount: perRow,
+                    itemBuilder: (context, i) => Padding(
+                      padding: const EdgeInsets.only(right: RowMetrics.landscapeGap),
+                      child: SkeletonBox(
+                        width: sizes.collapsed,
+                        height: sizes.height,
+                        radius: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }

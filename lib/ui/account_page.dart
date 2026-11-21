@@ -16,6 +16,7 @@ import 'update/update_settings_card.dart';
 import 'profiles/profile_avatar.dart';
 import 'profiles/profile_editor_dialog.dart';
 import 'widgets/common.dart';
+import 'widgets/rubber_segment.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -64,27 +65,20 @@ class _AccountPageState extends State<AccountPage> {
             ),
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: SegmentedButton<int>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(
-                    value: 0,
-                    icon: Icon(Icons.person_outline, size: 18),
-                    label: Text('Conta'),
-                  ),
-                  ButtonSegment(
-                    value: 1,
-                    icon: Icon(Icons.settings_outlined, size: 18),
-                    label: Text('Configurações'),
-                  ),
-                  ButtonSegment(
-                    value: 2,
-                    icon: Icon(Icons.palette_outlined, size: 18),
-                    label: Text('Personalização'),
-                  ),
-                ],
-                selected: {_tab},
-                onSelectionChanged: (v) => setState(() => _tab = v.first),
+              // Pílula elástica que se estica até a aba escolhida.
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: RubberSegment<int>(
+                  values: const [0, 1, 2],
+                  labelOf: (v) => const ['Conta', 'Configurações', 'Personalização'][v],
+                  iconOf: (v) => const [
+                    Icons.person_outline,
+                    Icons.settings_outlined,
+                    Icons.palette_outlined,
+                  ][v],
+                  selected: _tab,
+                  onChanged: (v) => setState(() => _tab = v),
+                ),
               ),
             ),
             if (_tab == 0) ...[

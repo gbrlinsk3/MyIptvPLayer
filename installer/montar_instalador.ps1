@@ -28,6 +28,11 @@ $iscc = @(
 if (-not $iscc) { throw 'Inno Setup 6 não encontrado. Instale em https://jrsoftware.org/isinfo.php' }
 
 Write-Host '1/3 Compilando o MIP...'
+$pastaRelease = Join-Path $raiz 'build\windows\x64\runner\Release'
+if (Test-Path $pastaRelease) {
+    Write-Host 'Limpando a pasta de build para nao levar arquivos antigos...'
+    Remove-Item -Recurse -Force $pastaRelease
+}
 flutter build windows --release
 if ($LASTEXITCODE -ne 0) { throw 'flutter build falhou' }
 

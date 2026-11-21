@@ -7,6 +7,7 @@ import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../../downloads/download_models.dart';
 import '../downloads/download_button.dart';
+import '../widgets/shimmer.dart';
 import 'favorite_button.dart';
 import 'poster_image.dart';
 import 'title_details_page.dart';
@@ -36,6 +37,82 @@ Future<void> showTitleDetails(BuildContext context, CatalogTitle title) {
       );
     },
   );
+}
+
+/// Esqueleto do conteúdo do painel enquanto os detalhes carregam: botões e
+/// texto (filme) ou linhas de episódio com miniatura 16:9 (série).
+class _DetailsSkeleton extends StatelessWidget {
+  const _DetailsSkeleton({required this.movie});
+
+  final bool movie;
+
+  @override
+  Widget build(BuildContext context) {
+    if (movie) {
+      return Shimmer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SkeletonBox(width: 120, height: 36, radius: 6),
+                const SizedBox(width: 8),
+                SkeletonBox(width: 110, height: 36, radius: 6),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SkeletonBox(height: 12, radius: 4),
+            const SizedBox(height: 8),
+            FractionallySizedBox(
+              widthFactor: 0.9,
+              child: SkeletonBox(height: 12, radius: 4),
+            ),
+            const SizedBox(height: 8),
+            FractionallySizedBox(
+              widthFactor: 0.6,
+              child: SkeletonBox(height: 12, radius: 4),
+            ),
+          ],
+        ),
+      );
+    }
+    return Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < 3; i++) ...[
+            if (i > 0) const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: 112, height: 63, radius: 6),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        FractionallySizedBox(
+                          widthFactor: 0.8,
+                          child: SkeletonBox(height: 12, radius: 4),
+                        ),
+                        const SizedBox(height: 8),
+                        FractionallySizedBox(
+                          widthFactor: 0.4,
+                          child: SkeletonBox(height: 10, radius: 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _DetailsPanel extends StatefulWidget {
@@ -346,16 +423,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
               ],
               const SizedBox(height: 16),
               if (loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                )
+                _DetailsSkeleton(movie: _isMovie)
               else if (error != null)
                 _errorBox(error)
               else ...[

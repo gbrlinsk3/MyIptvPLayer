@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 
 import '../core/app_log.dart';
 import '../core/disk_space.dart';
+import 'playback_errors.dart';
 
 enum RecState { idle, recording, paused }
 
@@ -366,9 +367,18 @@ class PlaybackController extends ChangeNotifier {
 
   void _fail(String message) {
     if (!_active || _disposed) return;
+    if (isServerOffline(message)) {
+      // O servidor já disse que o canal está fora do ar: repetir não adianta.
+      _retryTimer?.cancel();
+      AppLog.info('Player', 'Servidor respondeu STREAM_OFFLINE; sem repetir.');
+      error = friendlyPlaybackError(message);
+      reconnecting = false;
+      _notify();
+      return;
+    }
     if (_retryTimer?.isActive ?? false) return; // já há uma tentativa agendada
     if (_attempts >= _maxAttempts) {
-      error = message;
+      error = friendlyPlaybackError(message);
       reconnecting = false;
       _notify();
       return;

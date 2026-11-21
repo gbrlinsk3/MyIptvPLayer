@@ -7,22 +7,47 @@ import '../../library/video_thumb.dart';
 import '../../state/app_controller.dart';
 import '../../playback/playback_controller.dart';
 import '../../state/app_scope.dart';
+import '../widgets/shiny_text.dart';
+import '../widgets/wake_slider.dart';
+
+/// Qual parte dos controles um [PlayerControls] desenha.
+enum PlayerControlsPart {
+  /// Tudo na mesma barra (tela cheia).
+  all,
+
+  /// Só volume e gravação, numa linha solta (quem usa posiciona e decide a
+  /// visibilidade).
+  audioRec,
+
+  /// Só o botão de tela cheia (canto inferior direito) e o selo REC.
+  fullscreen,
+}
 
 /// Controles do ao vivo: volume/mudo, gravação e tela cheia.
 /// Não há pause nem barra de progresso, de propósito (a "pausa" é só da
 /// gravação).
 /// Aparecem ao mover o mouse sobre o vídeo e somem depois de ~2,5 s parados.
+///
+/// Com [visible] nulo (tela cheia) o próprio widget cuida disso. Com [visible]
+/// definido, quem usa decide quando mostrar: não há timer, MouseRegion nem
+/// duplo clique aqui, só a barra com fade; o selo REC continua sempre visível.
 class PlayerControls extends StatefulWidget {
   const PlayerControls({
     super.key,
     required this.playback,
     required this.fullscreen,
     required this.onToggleFullscreen,
+    this.visible,
+    this.part = PlayerControlsPart.all,
   });
 
   final PlaybackController playback;
   final bool fullscreen;
   final VoidCallback onToggleFullscreen;
+
+  /// null = comportamento automático (mouse + timer). Não nulo = controlado.
+  final bool? visible;
+  final PlayerControlsPart part;
 
   @override
   State<PlayerControls> createState() => _PlayerControlsState();
@@ -35,7 +60,17 @@ class _PlayerControlsState extends State<PlayerControls> {
   @override
   void initState() {
     super.initState();
-    _poke();
+    if (widget.visible == null) _poke();
+  }
+
+  @override
+  void didUpdateWidget(PlayerControls old) {
+    super.didUpdateWidget(old);
+    if (old.visible == null && widget.visible != null) {
+      _hideTimer?.cancel();
+    } else if (old.visible != null && widget.visible == null) {
+      _poke();
+    }
   }
 
   @override
@@ -65,7 +100,8 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   void _snack(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> _startRec() async {
@@ -89,18 +125,24 @@ class _PlayerControlsState extends State<PlayerControls> {
     // Coloca os arquivos em Minha biblioteca (Arquivos).
     final now = DateTime.now();
     String two(int v) => v.toString().padLeft(2, '0');
-    final when = '${two(now.day)}/${two(now.month)} ${two(now.hour)}:${two(now.minute)}';
+    final when =
+        '${two(now.day)}/${two(now.month)} ${two(now.hour)}:${two(now.minute)}';
     for (var i = 0; i < files.length; i++) {
-      await app.imports.save(LibraryImport(
-        filePath: files[i],
-        title: '$name — gravação $when${files.length > 1 ? ' (${i + 1})' : ''}',
-        kind: 'recording',
-      ));
+      await app.imports.save(
+        LibraryImport(
+          filePath: files[i],
+          title:
+              '$name — gravação $when${files.length > 1 ? ' (${i + 1})' : ''}',
+          kind: 'recording',
+        ),
+      );
     }
     unawaited(_makeCovers(app, files));
-    _snack(files.length == 1
-        ? 'Gravação salva em Minha biblioteca: ${files.first}'
-        : 'Gravação salva em Minha biblioteca (${files.length} arquivos, pasta de downloads).');
+    _snack(
+      files.length == 1
+          ? 'Gravação salva em Minha biblioteca: ${files.first}'
+          : 'Gravação salva em Minha biblioteca (${files.length} arquivos, pasta de downloads).',
+    );
   }
 
   /// Capa de cada gravação: um quadro aleatório do próprio vídeo (em segundo
@@ -131,105 +173,118 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   @override
   Widget build(BuildContext context) {
-    final bar = ListenableBuilder(
+    final audioChildren = ListenableBuilder(
       listenable: widget.playback,
       builder: (context, _) {
         final p = widget.playback;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(12, 28, 12, 8),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0x00000000), Color(0xB3000000)],
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: p.muted ? 'Ativar som' : 'Silenciar',
+              onPressed: p.toggleMute,
+              icon: Icon(_volumeIcon(p.volume), color: Colors.white, size: 22),
             ),
-          ),
-          child: Row(
-            children: [
+            // Barras finas que acendem até o volume; a velocidade do arraste
+            // levanta uma onda em volta do ponteiro.
+            WakeSlider(
+              value: p.volume,
+              width: 120,
+              height: 28,
+              fillColor: Colors.white,
+              trackColor: Colors.white30,
+              restoreFocusOnRelease: true,
+              onChanged: p.setVolume,
+              onChangeEnd: (v) => AppScope.read(context).saveVolume(v),
+            ),
+            const SizedBox(width: 8),
+            if (p.recState == RecState.idle)
               IconButton(
-                tooltip: p.muted ? 'Ativar som' : 'Silenciar',
-                onPressed: p.toggleMute,
-                icon: Icon(_volumeIcon(p.volume), color: Colors.white, size: 22),
-              ),
-              SizedBox(
-                width: 120,
-                // Sem altura fixa o Slider ocupa toda a altura disponível,
-                // esticando a barra e deixando-a no meio do vídeo.
-                height: 40,
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 3,
-                    activeTrackColor: Colors.white,
-                    inactiveTrackColor: Colors.white30,
-                    thumbColor: Colors.white,
-                    overlayShape: SliderComponentShape.noOverlay,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 6),
-                  ),
-                  child: Slider(
-                    value: p.volume,
-                    min: 0,
-                    max: 100,
-                    onChanged: p.setVolume,
-                    onChangeEnd: (v) => AppScope.read(context).saveVolume(v),
-                  ),
+                tooltip: 'Gravar este canal',
+                onPressed: _startRec,
+                icon: const Icon(
+                  Icons.fiber_manual_record,
+                  color: Color(0xFFE5484D),
+                  size: 22,
                 ),
-              ),
-              const SizedBox(width: 8),
-              if (p.recState == RecState.idle)
-                IconButton(
-                  tooltip: 'Gravar este canal',
-                  onPressed: _startRec,
-                  icon: const Icon(Icons.fiber_manual_record,
-                      color: Color(0xFFE5484D), size: 22),
-                )
-              else ...[
-                IconButton(
-                  tooltip: p.recState == RecState.recording
-                      ? 'Pausar gravação'
-                      : 'Continuar gravação',
-                  onPressed: p.recState == RecState.recording
-                      ? p.pauseRecording
-                      : _resumeRec,
-                  icon: Icon(
-                    p.recState == RecState.recording
-                        ? Icons.pause
-                        : Icons.fiber_manual_record,
-                    color: p.recState == RecState.recording
-                        ? Colors.white
-                        : const Color(0xFFE5484D),
-                    size: 22,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Parar e salvar gravação',
-                  onPressed: _stopRec,
-                  icon: const Icon(Icons.stop, color: Colors.white, size: 22),
-                ),
-                Text(
-                  _fmt(p.recElapsed),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-              const Spacer(),
+              )
+            else ...[
               IconButton(
-                tooltip:
-                    widget.fullscreen ? 'Sair da tela cheia' : 'Tela cheia',
-                onPressed: widget.onToggleFullscreen,
+                tooltip: p.recState == RecState.recording
+                    ? 'Pausar gravação'
+                    : 'Continuar gravação',
+                onPressed: p.recState == RecState.recording
+                    ? p.pauseRecording
+                    : _resumeRec,
                 icon: Icon(
-                  widget.fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  p.recState == RecState.recording
+                      ? Icons.pause
+                      : Icons.fiber_manual_record,
+                  color: p.recState == RecState.recording
+                      ? Colors.white
+                      : const Color(0xFFE5484D),
+                  size: 22,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Parar e salvar gravação',
+                onPressed: _stopRec,
+                icon: const Icon(Icons.stop, color: Colors.white, size: 22),
+              ),
+              Text(
+                _fmt(p.recElapsed),
+                style: const TextStyle(
                   color: Colors.white,
-                  size: 24,
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),
             ],
-          ),
+          ],
         );
       },
     );
+
+    final fsActive = widget.visible ?? _visible;
+    final fsButton = IconButton(
+      tooltip: widget.fullscreen ? 'Sair da tela cheia' : 'Tela cheia',
+      onPressed: widget.onToggleFullscreen,
+      padding: const EdgeInsets.all(10),
+      iconSize: 36,
+      // O ícone é um glifo de fonte, então o brilho do ShinyText passa por ele.
+      icon: ShinyText(
+        text: String.fromCharCode(
+          (widget.fullscreen ? Icons.fullscreen_exit : Icons.fullscreen)
+              .codePoint,
+        ),
+        active: fsActive,
+        style: const TextStyle(
+          fontFamily: 'MaterialIcons',
+          fontSize: 36,
+          height: 1,
+          color: Colors.white,
+        ),
+      ),
+    );
+
+    final bar = Container(
+      padding: const EdgeInsets.fromLTRB(12, 28, 12, 8),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x00000000), Color(0xB3000000)],
+        ),
+      ),
+      child: Row(
+        children: [
+          if (widget.part == PlayerControlsPart.all) audioChildren,
+          const Spacer(),
+          fsButton,
+        ],
+      ),
+    );
+
+    if (widget.part == PlayerControlsPart.audioRec) return audioChildren;
 
     // Marcador "REC" sempre visível (mesmo com os controles escondidos).
     final badge = ListenableBuilder(
@@ -254,7 +309,8 @@ class _PlayerControlsState extends State<PlayerControls> {
               ),
               const SizedBox(width: 6),
               Text(
-                p.recNotice ?? '${rec ? 'REC' : 'PAUSADO'}  ${_fmt(p.recElapsed)}',
+                p.recNotice ??
+                    '${rec ? 'REC' : 'PAUSADO'}  ${_fmt(p.recElapsed)}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -267,23 +323,33 @@ class _PlayerControlsState extends State<PlayerControls> {
       },
     );
 
-    final controls = MouseRegion(
-      onHover: (_) => _poke(),
-      onEnter: (_) => _poke(),
-      onExit: (_) => _hideNow(),
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onDoubleTap: widget.onToggleFullscreen,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: AnimatedOpacity(
-            opacity: _visible ? 1 : 0,
-            duration: const Duration(milliseconds: 150),
-            child: IgnorePointer(ignoring: !_visible, child: bar),
-          ),
-        ),
-      ),
-    );
+    final controlled = widget.visible;
+    final Widget controls = controlled != null
+        ? Align(
+            alignment: Alignment.bottomCenter,
+            child: AnimatedOpacity(
+              opacity: controlled ? 1 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: IgnorePointer(ignoring: !controlled, child: bar),
+            ),
+          )
+        : MouseRegion(
+            onHover: (_) => _poke(),
+            onEnter: (_) => _poke(),
+            onExit: (_) => _hideNow(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onDoubleTap: widget.onToggleFullscreen,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: AnimatedOpacity(
+                  opacity: _visible ? 1 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: IgnorePointer(ignoring: !_visible, child: bar),
+                ),
+              ),
+            ),
+          );
 
     return Stack(
       fit: StackFit.expand,

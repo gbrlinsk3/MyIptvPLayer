@@ -5,6 +5,9 @@ import '../../core/theme.dart';
 import '../../state/app_scope.dart';
 import '../../data/catalog_models.dart';
 import '../widgets/shimmer.dart';
+import '../widgets/split_text.dart';
+import '../widgets/carousel_arrows.dart';
+import '../widgets/content_frame.dart';
 import 'favorite_button.dart';
 import 'poster_image.dart';
 
@@ -141,9 +144,15 @@ class _PosterCardState extends State<PosterCard> {
   }
 }
 
-/// Fileira horizontal com título, "Ver tudo" e setas que aparecem com o mouse.
-/// Os dados vêm de um Future em cache do controller (não consulta o banco de
-/// novo a cada reconstrução). Fileira vazia não ocupa espaço.
+/// Largura de cada coluna lateral de setas (fileira enquadrada). A seta (36 px)
+/// fica centralizada nela.
+const double _colunaSetas = 44;
+
+/// Fileira horizontal com título, "Ver tudo" e setas fixas. Os pôsteres podem
+/// ser arrastados com o mouse. Com largura fixa (enquadrado) as setas ficam em
+/// colunas laterais, fora dos pôsteres; em "preenchido" ficam sobre as bordas
+/// da lista. Os dados vêm de um Future em cache do controller (não consulta o
+/// banco de novo a cada reconstrução). Fileira vazia não ocupa espaço.
 class TitleRow extends StatefulWidget {
   const TitleRow({
     super.key,
@@ -168,23 +177,11 @@ class TitleRow extends StatefulWidget {
 
 class _TitleRowState extends State<TitleRow> {
   final ScrollController _scroll = ScrollController();
-  bool _hover = false;
 
   @override
   void dispose() {
     _scroll.dispose();
     super.dispose();
-  }
-
-  void _scrollBy(double delta) {
-    if (!_scroll.hasClients) return;
-    final max = _scroll.position.maxScrollExtent;
-    final target = (_scroll.offset + delta).clamp(0.0, max).toDouble();
-    _scroll.animateTo(
-      target,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
   }
 
   @override
@@ -197,32 +194,74 @@ class _TitleRowState extends State<TitleRow> {
             (list == null || list.isEmpty)) {
           return const SizedBox.shrink();
         }
-        // O pôster se ajusta à largura da fileira para caber a quantidade por
+        // O pôster se ajusta à largura útil da lista para caber a quantidade por
         // linha do tamanho de interface escolhido (12/11/11/9).
         final perRow = AppScope.of(context).portraitPerRow;
+        final framed = ContentFrameScope.framedOf(context);
         return LayoutBuilder(builder: (context, box) {
-        final posterWidth = RowMetrics.portraitWidth(box.maxWidth, perRow);
-        final itemWidth = posterWidth + TitleRow.gap;
-        // Altura: pôster 2:3 + espaço do texto.
-        final rowHeight = posterWidth * 1.5 + 56 + 24;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: MouseRegion(
-            onEnter: (_) => setState(() => _hover = true),
-            onExit: (_) => setState(() => _hover = false),
+          // Enquadrado: as colunas laterais de setas tiram largura da lista.
+          final recuo = framed ? _colunaSetas : 0.0;
+          final larguraLista = box.maxWidth - 2 * recuo;
+          final posterWidth = RowMetrics.portraitWidth(larguraLista, perRow);
+          final itemWidth = posterWidth + TitleRow.gap;
+          // Altura: pôster 2:3 + espaço do texto.
+          final rowHeight = posterWidth * 1.5 + 56 + 24;
+          // Centro vertical dos pôsteres (a lista tem folga de 12 em cima): é
+          // onde as setas ficam.
+          final yCentro = 12 + posterWidth * 0.75;
+          // Sem rolagem quando a lista cabe inteira: as setas somem.
+          final visiveis =
+              ((larguraLista - RowMetrics.pad * 2 + TitleRow.gap) / itemWidth)
+                  .floor();
+          final comSetas = list != null && list.length > visiveis;
+          final passo = itemWidth * 4;
+          final miolo = list == null
+              ? _skeleton(itemWidth)
+              : CarouselDragArea(
+                  child: ListView.builder(
+                    controller: _scroll,
+                    scrollDirection: Axis.horizontal,
+                    itemExtent: itemWidth,
+                    // Folga em cima e embaixo: o cartão cresce ao passar o mouse
+                    // e a borda não pode ser cortada.
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    itemCount: list.length,
+                    itemBuilder: (context, i) => Padding(
+                      padding: const EdgeInsets.only(right: TitleRow.gap),
+                      child: PosterCard(
+                        title: list[i],
+                        showProgress: widget.showProgress,
+                        onTap: () => widget.onOpen(list[i]),
+                      ),
+                    ),
+                  ),
+                );
+          final setaEsq = comSetas
+              ? CarouselArrow(controller: _scroll, left: true, passo: passo)
+              : null;
+          final setaDir = comSetas
+              ? CarouselArrow(controller: _scroll, left: false, passo: passo)
+              : null;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+                  padding: EdgeInsets.fromLTRB(24 + recuo, 0, 24 + recuo, 10),
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          widget.label.toUpperCase(),
+                        child: SplitText(
+                          text: widget.label.toUpperCase(),
+                          revealId: ('titulo-fileira', widget.label),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: AppFonts.title(22, spacing: 1.2),
+                          delayPerChar: const Duration(milliseconds: 22),
+                          charDuration: const Duration(milliseconds: 360),
                         ),
                       ),
                       if (widget.onSeeAll != null)
@@ -235,50 +274,52 @@ class _TitleRowState extends State<TitleRow> {
                 ),
                 SizedBox(
                   height: rowHeight,
-                  child: Stack(
-                    children: [
-                      if (list == null)
-                        _skeleton(itemWidth)
-                      else
-                        ListView.builder(
-                          controller: _scroll,
-                          scrollDirection: Axis.horizontal,
-                          itemExtent: itemWidth,
-                          // Folga em cima e embaixo: o cartão cresce ao passar
-                          // o mouse e a borda não pode ser cortada.
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                          itemCount: list.length,
-                          itemBuilder: (context, i) => Padding(
-                            padding: const EdgeInsets.only(right: TitleRow.gap),
-                            child: PosterCard(
-                              title: list[i],
-                              showProgress: widget.showProgress,
-                              onTap: () => widget.onOpen(list[i]),
-                            ),
-                          ),
+                  child: framed
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _colunaDeSetas(setaEsq, yCentro),
+                            Expanded(child: miolo),
+                            _colunaDeSetas(setaDir, yCentro),
+                          ],
+                        )
+                      : Stack(
+                          children: [
+                            miolo,
+                            if (setaEsq != null)
+                              Positioned(
+                                left: 4,
+                                top: yCentro - CarouselArrowButton.size / 2,
+                                child: setaEsq,
+                              ),
+                            if (setaDir != null)
+                              Positioned(
+                                right: 4,
+                                top: yCentro - CarouselArrowButton.size / 2,
+                                child: setaDir,
+                              ),
+                          ],
                         ),
-                      if (_hover && list != null && list.length > 5) ...[
-                        _Arrow(
-                          left: true,
-                          onTap: () => _scrollBy(-itemWidth * 4),
-                        ),
-                        _Arrow(
-                          left: false,
-                          onTap: () => _scrollBy(itemWidth * 4),
-                        ),
-                      ],
-                    ],
-                  ),
                 ),
               ],
             ),
-          ),
-        );
+          );
         });
       },
+    );
+  }
+
+  /// Coluna lateral de [_colunaSetas] px: a seta (se houver) fica na altura
+  /// dos pôsteres.
+  Widget _colunaDeSetas(Widget? seta, double yCentro) {
+    return SizedBox(
+      width: _colunaSetas,
+      child: Column(
+        children: [
+          SizedBox(height: yCentro - CarouselArrowButton.size / 2),
+          ?seta,
+        ],
+      ),
     );
   }
 
@@ -301,41 +342,6 @@ class _TitleRowState extends State<TitleRow> {
                   color: AppColors.hover,
                   borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Arrow extends StatelessWidget {
-  const _Arrow({required this.left, required this.onTap});
-
-  final bool left;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      bottom: 56,
-      left: left ? 4 : null,
-      right: left ? null : 4,
-      child: Center(
-        child: Material(
-          color: const Color(0xCC1F1E1D),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(
-                left ? Icons.chevron_left : Icons.chevron_right,
-                color: Colors.white,
-                size: 24,
               ),
             ),
           ),

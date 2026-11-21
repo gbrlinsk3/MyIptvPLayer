@@ -90,11 +90,11 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "iptv_player" "\0"
+            VALUE "FileDescription", "MyIptvPlayer" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "iptv_player" "\0"
+            VALUE "InternalName", "MyIptvPlayer" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "iptv_player.exe" "\0"
+            VALUE "OriginalFilename", "MyIptvPlayer.exe" "\0"
             VALUE "ProductName", "iptv_player" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

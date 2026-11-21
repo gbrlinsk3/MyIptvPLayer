@@ -8,6 +8,7 @@ import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../downloads/download_button.dart';
 import '../home/hero_buttons.dart';
+import '../widgets/shimmer.dart';
 import '../window/title_bar.dart';
 import 'favorite_button.dart';
 import 'manage_watched_dialog.dart';
@@ -306,13 +307,7 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
     Object? progress,
   ) {
     if (snap.connectionState != ConnectionState.done) {
-      return const Center(
-        child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
-        ),
-      );
+      return const _DetailsSkeleton();
     }
     if (snap.hasError || d == null) {
       return Center(
@@ -763,6 +758,139 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
     }
     if (u == widget.title.image || u == d.poster || u == d.backdrop) return null;
     return u;
+  }
+}
+
+/// Esqueleto da tela expandida enquanto os detalhes carregam, com a forma do
+/// conteúdo real: título, duas linhas de texto, botão e fileira de episódios
+/// 16:9. Fundo escuro nos dois temas, então usa cor própria (o [SkeletonBox]
+/// segue o tema claro e sumiria aqui).
+class _DetailsSkeleton extends StatelessWidget {
+  const _DetailsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: LayoutBuilder(
+        builder: (context, box) {
+          // Mesma largura da coluna de informações de [_info].
+          final wide = box.maxWidth >= 980;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned(
+                left: 56,
+                top: 0,
+                bottom: 232,
+                width: wide ? box.maxWidth * 0.5 : box.maxWidth - 112,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FractionallySizedBox(
+                        widthFactor: 0.75,
+                        child: const _Bone(height: 48),
+                      ),
+                      const SizedBox(height: 14),
+                      const _Bone(height: 12),
+                      const SizedBox(height: 8),
+                      FractionallySizedBox(
+                        widthFactor: 0.7,
+                        child: const _Bone(height: 12),
+                      ),
+                      const SizedBox(height: 22),
+                      _Bone(width: 170, height: 40, radius: AppShape.radius),
+                      const SizedBox(height: 28),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 216,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(56, 0, 48, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          _Bone(width: 140, height: 22),
+                          Spacer(),
+                          _Bone(width: 110, height: 16),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          itemCount: 4,
+                          itemBuilder: (context, i) => const Padding(
+                            padding: EdgeInsets.only(right: 14),
+                            child: _EpisodeBone(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Cartão de episódio do esqueleto: 16:9 (mesma largura do [_EpisodeCard]).
+class _EpisodeBone extends StatelessWidget {
+  const _EpisodeBone();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 240,
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: _Bone(radius: 8),
+          ),
+        ),
+        SizedBox(height: 8),
+        SizedBox(width: 180, child: _Bone(height: 12)),
+      ],
+    );
+  }
+}
+
+/// Bloco do esqueleto sobre fundo escuro.
+class _Bone extends StatelessWidget {
+  const _Bone({this.width, this.height, this.radius = 6});
+
+  final double? width;
+  final double? height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0x14FFFFFF),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
   }
 }
 

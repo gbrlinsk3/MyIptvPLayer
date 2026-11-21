@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../../catalog/catalog_controller.dart';
@@ -9,6 +13,11 @@ import '../catalog/play_actions.dart';
 import '../catalog/poster_image.dart';
 import '../catalog/title_details_panel.dart';
 import '../widgets/content_frame.dart';
+import '../widgets/magnet.dart';
+import '../widgets/morph_image_switcher.dart';
+import '../widgets/shimmer.dart';
+import '../widgets/shiny_text.dart';
+import '../widgets/sling_arrow.dart';
 import 'hero_buttons.dart';
 
 /// Carrossel do Início, de borda a borda: banner grande à esquerda (até 5
@@ -61,8 +70,12 @@ class _HeroCarouselState extends State<HeroCarousel>
   bool _hover = false;
   bool _prefetched = false;
 
+  /// Mouse sobre o banner grande (o título só brilha enquanto isso).
+  final ValueNotifier<bool> _bigHover = ValueNotifier(false);
+
   @override
   void dispose() {
+    _bigHover.dispose();
     _timer.dispose();
     super.dispose();
   }
@@ -116,6 +129,9 @@ class _HeroCarouselState extends State<HeroCarousel>
       builder: (context, snap) {
         final slides = snap.data;
         final height = HeroCarousel.heightFor(context);
+        if (slides == null && snap.connectionState != ConnectionState.done) {
+          return HeroSkeleton(height: height);
+        }
         if (slides == null || slides.isEmpty) {
           return SizedBox(height: height);
         }
@@ -164,22 +180,24 @@ class _HeroCarouselState extends State<HeroCarousel>
                           bottomRight: const Radius.circular(28),
                           bottomLeft: Radius.circular(side ? 0 : 28),
                         ),
-                        child: Stack(
+                        child: MouseRegion(
+                          onEnter: (_) => _bigHover.value = true,
+                          onExit: (_) => _bigHover.value = false,
+                          child: Stack(
                           fit: StackFit.expand,
                           children: [
+                            // O fundo troca por conta própria ("derretendo" de
+                            // uma imagem para a outra); o texto só aparece e some.
+                            _HeroBackground(title: title),
+                            const _HeroShade(),
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 750),
                               switchInCurve: Curves.easeInOutCubic,
                               switchOutCurve: Curves.easeInOutCubic,
-                              transitionBuilder: (child, anim) => FadeTransition(
-                                opacity: anim,
-                                child: ScaleTransition(
-                                  scale: Tween<double>(begin: 1.03, end: 1)
-                                      .animate(anim),
-                                  child: child,
-                                ),
-                              ),
+                              transitionBuilder: (child, anim) =>
+                                  FadeTransition(opacity: anim, child: child),
                               child: _SlideView(
+                                hover: _bigHover,
                                 key: ValueKey(
                                   '$_slide:${title.kind.key}:${title.id}',
                                 ),
@@ -199,9 +217,10 @@ class _HeroCarouselState extends State<HeroCarousel>
                                 top: 0,
                                 bottom: 0,
                                 child: Center(
-                                  child: _Arrow(
-                                    icon: Icons.chevron_left_rounded,
-                                    onTap: () => _go(_slide - 1),
+                                  child: SlingArrowButton(
+                                    left: true,
+                                    enabled: true,
+                                    onFire: () => _go(_slide - 1),
                                   ),
                                 ),
                               ),
@@ -210,9 +229,10 @@ class _HeroCarouselState extends State<HeroCarousel>
                                 top: 0,
                                 bottom: 0,
                                 child: Center(
-                                  child: _Arrow(
-                                    icon: Icons.chevron_right_rounded,
-                                    onTap: () => _go(_slide + 1),
+                                  child: SlingArrowButton(
+                                    left: false,
+                                    enabled: true,
+                                    onFire: () => _go(_slide + 1),
                                   ),
                                 ),
                               ),
@@ -233,6 +253,7 @@ class _HeroCarouselState extends State<HeroCarousel>
                               ),
                             ),
                           ],
+                        ),
                         ),
                       ),
                     ),
@@ -269,48 +290,261 @@ class _HeroCarouselState extends State<HeroCarousel>
   }
 }
 
-/// Seta de troca de slide (quadrado claro arredondado, como na referência).
-class _Arrow extends StatefulWidget {
-  const _Arrow({required this.icon, required this.onTap});
+/// Esqueleto do Início enquanto os banners carregam: mesma altura e mesma
+/// divisão do [HeroCarousel] (banner grande à esquerda e, em janela larga, dois
+/// banners menores à direita), com barras de título, texto e botão no grande.
+/// Também usado pelo Início enquanto o catálogo ainda está baixando.
+class HeroSkeleton extends StatelessWidget {
+  const HeroSkeleton({super.key, required this.height});
 
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  State<_Arrow> createState() => _ArrowState();
-}
-
-class _ArrowState extends State<_Arrow> {
-  bool _hover = false;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _hover ? 1.1 : 1,
-          duration: const Duration(milliseconds: 140),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: _hover ? 0.95 : 0.78),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x55000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
+    final framed = ContentFrameScope.framedOf(context);
+    return SizedBox(
+      height: height,
+      child: Shimmer(
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final side = box.maxWidth >= 900;
+            final sideWidth =
+                (box.maxWidth * 0.30).clamp(240.0, HeroMetrics.sideMax(height));
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(framed ? 22 : 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        bottomRight: const Radius.circular(28),
+                        bottomLeft: Radius.circular(side ? 0 : 28),
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          const SkeletonBox(radius: 0),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(84, 28, 84, 56),
+                            child: Align(
+                              alignment: Alignment.bottomLeft,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 560),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    FractionallySizedBox(
+                                      widthFactor: 0.7,
+                                      child: SkeletonBox(height: 40, radius: 4),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    FractionallySizedBox(
+                                      widthFactor: 0.9,
+                                      child: SkeletonBox(height: 12, radius: 4),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    FractionallySizedBox(
+                                      widthFactor: 0.75,
+                                      child: SkeletonBox(height: 12, radius: 4),
+                                    ),
+                                    const SizedBox(height: 22),
+                                    SkeletonBox(
+                                      width: 160,
+                                      height: 40,
+                                      radius: AppShape.radius,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (side) ...[
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: sideWidth,
+                      child: const Column(
+                        children: [
+                          Expanded(child: SkeletonBox(radius: 14)),
+                          SizedBox(height: 12),
+                          Expanded(child: SkeletonBox(radius: 14)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Seta de troca de slide (quadrado claro arredondado, como na referência).
+/// Camadas escuras fixas sobre o fundo do banner grande (nos dois temas: o texto
+/// branco precisa de contraste). Ficam fora da troca de slide para não piscar.
+class _HeroShade extends StatelessWidget {
+  const _HeroShade();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0xE6000000), Color(0x99000000), Color(0x10000000)],
+              stops: [0, 0.45, 1],
             ),
-            child: Icon(widget.icon, size: 28, color: const Color(0xFF1B1A19)),
           ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00000000), Color(0xAA000000)],
+              stops: [0.5, 1],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Fundo do banner grande. A imagem horizontal do título troca com a transição
+/// "derretendo" do [MorphImageSwitcher]: a nova imagem é baixada em segundo
+/// plano (tenta a versão grande do TMDB e cai para o endereço original) e só
+/// então entra; até lá a anterior continua. Título sem imagem horizontal usa o
+/// [_Backdrop] de antes (pôster nítido sobre o pôster borrado). Mantém o zoom
+/// lento; ao trocar de título o zoom volta ao início suavemente.
+class _HeroBackground extends StatefulWidget {
+  const _HeroBackground({required this.title});
+
+  final CatalogTitle title;
+
+  @override
+  State<_HeroBackground> createState() => _HeroBackgroundState();
+}
+
+class _HeroBackgroundState extends State<_HeroBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _zoom =
+      AnimationController(vsync: this, duration: const Duration(seconds: 16));
+
+  ImageProvider? _image;
+  bool _semImagem = false; // o título atual não tem imagem horizontal
+  int _carga = 0;
+  int _voltaZoom = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _zoom.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _carregar());
+  }
+
+  @override
+  void didUpdateWidget(_HeroBackground old) {
+    super.didUpdateWidget(old);
+    if (old.title.kind != widget.title.kind || old.title.id != widget.title.id) {
+      _carregar();
+      final volta = ++_voltaZoom;
+      _zoom
+          .animateTo(
+            0,
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeInOut,
+          )
+          .whenComplete(() {
+        if (mounted && volta == _voltaZoom) _zoom.forward(from: 0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _zoom.dispose();
+    super.dispose();
+  }
+
+  ImageProvider _provider(String url) => isLocalImagePath(url)
+      ? ResizeImage(FileImage(File(url)), width: 1920)
+      : CachedNetworkImageProvider(url, maxWidth: 1920);
+
+  Future<void> _carregar() async {
+    if (!mounted) return;
+    final titulo = widget.title;
+    final carga = ++_carga;
+    final catalogo = AppScope.read(context).catalog;
+    if (_semImagem) setState(() => _semImagem = false);
+
+    final d = await catalogo.detailsOrNull(titulo.kind, titulo.id);
+    if (!mounted || carga != _carga) return;
+    final bd = d?.backdrop;
+    if (bd == null || bd.isEmpty) {
+      setState(() => _semImagem = true);
+      return;
+    }
+    final grande = tmdbSize(bd, 'w1280');
+    for (final url in [if (grande != null && grande != bd) grande, bd]) {
+      final provider = _provider(url);
+      var ok = true;
+      await precacheImage(provider, context, onError: (_, _) => ok = false);
+      if (!mounted || carga != _carga) return;
+      if (ok) {
+        setState(() => _image = provider);
+        return;
+      }
+    }
+    setState(() => _semImagem = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduzir = MediaQuery.disableAnimationsOf(context);
+    final poster = widget.title.image;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _zoom,
+        builder: (context, filho) => Transform.scale(
+          scale: reduzir ? 1 : 1 + 0.08 * _zoom.value,
+          child: filho,
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            MorphImageSwitcher(
+              image: _image,
+              placeholder: Stack(
+                fit: StackFit.expand,
+                children: [
+                  const ColoredBox(color: Color(0xFF141312)),
+                  if (poster != null) SoftBlurBackdrop(url: poster),
+                  const ColoredBox(color: Color(0x55000000)),
+                ],
+              ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 600),
+              child: _semImagem
+                  ? _Backdrop(
+                      key: ValueKey('${widget.title.kind.key}:${widget.title.id}'),
+                      title: widget.title,
+                    )
+                  : const SizedBox.expand(key: ValueKey('sem-fallback')),
+            ),
+          ],
         ),
       ),
     );
@@ -322,7 +556,7 @@ class _ArrowState extends State<_Arrow> {
 /// fade quando carrega; tenta a versão grande do TMDB e cai para o endereço
 /// original) e, se não houver imagem horizontal, o pôster nítido na frente.
 class _Backdrop extends StatefulWidget {
-  const _Backdrop({required this.title, this.size = 'w1280', this.cache = 1920});
+  const _Backdrop({super.key, required this.title, this.size = 'w1280', this.cache = 1920});
 
   final CatalogTitle title;
   final String size;
@@ -411,6 +645,7 @@ class _BackdropState extends State<_Backdrop> {
 class _SlideView extends StatelessWidget {
   const _SlideView({
     super.key,
+    required this.hover,
     required this.slide,
     required this.title,
     required this.pick,
@@ -418,6 +653,8 @@ class _SlideView extends StatelessWidget {
     required this.onOpenCatalog,
   });
 
+  /// Mouse sobre o banner grande (o título brilha enquanto isso).
+  final ValueListenable<bool> hover;
   final HeroSlide slide;
   final CatalogTitle title;
   final int pick;
@@ -448,42 +685,6 @@ class _SlideView extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
-            // Zoom lento na imagem enquanto o slide está na tela.
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 1.0, end: 1.08),
-              duration: const Duration(seconds: 16),
-              curve: Curves.linear,
-              builder: (context, scale, child) =>
-                  Transform.scale(scale: scale, child: child),
-              // RepaintBoundary: o zoom lento só move a imagem já pintada
-              // (sem refazer o desfoque do pôster a cada quadro).
-              child: RepaintBoundary(child: _Backdrop(title: title)),
-            ),
-            // Sempre escuro por cima da imagem, nos dois temas: texto branco legível.
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Color(0xE6000000),
-                    Color(0x99000000),
-                    Color(0x10000000),
-                  ],
-                  stops: [0, 0.45, 1],
-                ),
-              ),
-            ),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x00000000), Color(0xAA000000)],
-                  stops: [0.5, 1],
-                ),
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(84, 28, 84, 56),
               child: Row(
@@ -519,6 +720,7 @@ class _SlideView extends StatelessWidget {
                               child: SizedBox(
                                 width: box.maxWidth,
                                 child: _Info(
+                                  hover: hover,
                                   slide: slide,
                                   title: title,
                                   meta: meta,
@@ -547,6 +749,7 @@ class _SlideView extends StatelessWidget {
 
 class _Info extends StatelessWidget {
   const _Info({
+    required this.hover,
     required this.slide,
     required this.title,
     required this.meta,
@@ -555,6 +758,7 @@ class _Info extends StatelessWidget {
     required this.onOpenCatalog,
   });
 
+  final ValueListenable<bool> hover;
   final HeroSlide slide;
   final CatalogTitle title;
   final String meta;
@@ -585,11 +789,17 @@ class _Info extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Text(
-          title.name.toUpperCase(),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: AppFonts.title(54, color: Colors.white, spacing: 1),
+        // O brilho passa só com o mouse sobre o banner.
+        ValueListenableBuilder<bool>(
+          valueListenable: hover,
+          builder: (context, sobre, _) => ShinyText(
+            text: title.name.toUpperCase(),
+            active: sobre,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            shineColor: Color.lerp(AppColors.accent, Colors.white, 0.45),
+            style: AppFonts.title(54, color: Colors.white, spacing: 1),
+          ),
         ),
         const SizedBox(height: 10),
         Text(
@@ -813,10 +1023,12 @@ class _SideBannerState extends State<_SideBanner> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          t.name.toUpperCase(),
+                        ShinyText(
+                          text: t.name.toUpperCase(),
+                          active: _hover,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                          shineColor: Color.lerp(AppColors.accent, Colors.white, 0.45),
                           style: AppFonts.title(
                             24,
                             color: Colors.white,
@@ -882,10 +1094,15 @@ class _Thumbs extends StatelessWidget {
         for (var i = 0; i < titles.length; i++)
           Padding(
             padding: const EdgeInsets.only(left: 10),
-            child: _Thumb(
-              title: titles[i],
-              selected: i == selected,
-              onTap: () => onPick(i),
+            // Os pôsteres são levemente atraídos pelo ponteiro.
+            child: Magnet(
+              padding: 40,
+              strength: 5,
+              child: _Thumb(
+                title: titles[i],
+                selected: i == selected,
+                onTap: () => onPick(i),
+              ),
             ),
           ),
       ],

@@ -112,6 +112,8 @@ class _EmptyHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Baixando: esqueleto da forma do banner, na altura que ele terá ao chegar.
+    if (syncing) return HeroSkeleton(height: HeroCarousel.heightFor(context));
     return Container(
       height: 220,
       margin: const EdgeInsets.fromLTRB(24, 8, 24, 0),
@@ -125,37 +127,25 @@ class _EmptyHero extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            syncing ? 'Baixando filmes e séries…' : 'Filmes e séries',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+          const Text(
+            'Filmes e séries',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text(
             error ??
-                (syncing
-                    ? 'Isso pode levar um tempo na primeira vez.'
-                    : 'O catálogo ainda não foi baixado ou o provedor não tem filmes/séries.'),
+                'O catálogo ainda não foi baixado ou o provedor não tem filmes/séries.',
             style: TextStyle(
               color: error != null ? AppColors.danger : AppColors.textMuted,
             ),
           ),
-          if (syncing)
-            const Padding(
-              padding: EdgeInsets.only(top: 16),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: OutlinedButton(
-                onPressed: onRetry,
-                child: const Text('Tentar de novo'),
-              ),
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: OutlinedButton(
+              onPressed: onRetry,
+              child: const Text('Tentar de novo'),
             ),
+          ),
         ],
       ),
     );

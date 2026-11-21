@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -16,7 +18,9 @@ import 'shell/lazy_pages.dart';
 import 'shell/search_overlay.dart';
 import 'shell/top_bar.dart';
 import 'widgets/animated_counter.dart';
+import 'widgets/animated_content.dart';
 import 'widgets/content_frame.dart';
+import 'widgets/split_text.dart';
 import 'window/title_bar.dart';
 import 'widgets/cubos_logo.dart';
 
@@ -39,6 +43,8 @@ class _ShellState extends State<Shell> {
 
   @override
   void dispose() {
+    _slideTimer?.cancel();
+    _restTimer?.cancel();
     _search.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -52,6 +58,69 @@ class _ShellState extends State<Shell> {
   }
 
   static const double _railWidth = 68;
+
+  /// Duração do destaque deslizando até a aba nova (um pouco mais que a
+  /// animação, que começa no quadro seguinte ao clique).
+  static const Duration _slideTime = Duration(milliseconds: 310);
+
+  /// Depois do deslize a barra espera isto antes de compactar (para quem quer
+  /// trocar de aba de novo), a não ser que o mouse saia dela.
+  static const Duration _restTime = Duration(seconds: 1);
+
+  Timer? _slideTimer;
+  Timer? _restTimer;
+  bool _collapsePending = false; // escolheu uma aba e a barra vai compactar
+  bool _slideDone = false; // o deslize terminou
+  bool _mouseInSidebar = true;
+
+  void _cancelCollapse() {
+    _slideTimer?.cancel();
+    _restTimer?.cancel();
+    _collapsePending = false;
+    _slideDone = false;
+  }
+
+  void _collapseNow(AppController c) {
+    _cancelCollapse();
+    if (!c.sidebarCollapsed) c.toggleSidebar();
+  }
+
+  /// Abre ou recolhe a barra pelo usuário (logo, setinha, fora da barra).
+  void _toggleSidebar(AppController c) {
+    _cancelCollapse();
+    c.toggleSidebar();
+  }
+
+  void _onSidebarHover(AppController c, bool inside) {
+    _mouseInSidebar = inside;
+    // Saiu da barra depois do deslize: não há o que esperar, compacta já.
+    if (!inside && _collapsePending && _slideDone) _collapseNow(c);
+  }
+
+  /// Escolha de uma aba na barra lateral. Com a barra expandida: o destaque
+  /// desliza da aba anterior até a nova e a tela muda junto. Terminado o
+  /// deslize, a barra espera 1 s (para o usuário poder trocar de aba de novo)
+  /// e compacta; se o mouse não estiver sobre a barra, compacta na hora.
+  void _selectTab(AppController c, int i) {
+    if (_query.isNotEmpty) _clearSearch();
+    final wasExpanded = !c.sidebarCollapsed;
+    c.setShellIndex(i);
+    if (!wasExpanded) return;
+    _cancelCollapse(); // nova escolha: o relógio recomeça
+    _collapsePending = true;
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    _slideTimer = Timer(reduce ? Duration.zero : _slideTime, () {
+      if (!mounted) return;
+      _slideDone = true;
+      if (!_mouseInSidebar) {
+        _collapseNow(c);
+      } else {
+        _restTimer = Timer(_restTime, () {
+          if (mounted) _collapseNow(c);
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +152,7 @@ class _ShellState extends State<Shell> {
                 ),
                 Expanded(
                   // "Largura do catálogo": coluna centralizada (ou preenchida).
+                  child: RevealScope(
                   child: ContentFrame(
                   child: Stack(
                     children: [
@@ -91,11 +161,14 @@ class _ShellState extends State<Shell> {
                       LazyPages(
                         index: index,
                         onDrop: () => c.catalog.trimCache(),
+                        // Início, TV ao vivo, Filmes e séries, Favoritos e
+                        // Minha biblioteca: entrada suave na primeira abertura.
+                        revealFirstOpen: const {0, 1, 2, 3, 4},
                         builders: [
                           (_) => DashboardPage(
                                 onOpenCatalog: () => c.setShellIndex(2),
                               ),
-                          (_) => const LiveTvPage(),
+                          (_) => LiveTvPage(active: c.shellIndex == 1),
                           (_) => CatalogPage(active: c.shellIndex == 2),
                           (_) => const FavoritesPage(),
                           (_) => const LibraryPage(),
@@ -111,11 +184,13 @@ class _ShellState extends State<Shell> {
                               ? SearchOverlay(
                                   key: const ValueKey('search'),
                                   query: _query,
+                                  onClose: _clearSearch,
                                 )
                               : const SizedBox.shrink(key: ValueKey('nosearch')),
                         ),
                       ),
                     ],
+                  ),
                   ),
                   ),
                 ),
@@ -132,7 +207,7 @@ class _ShellState extends State<Shell> {
                 duration: const Duration(milliseconds: 200),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: c.toggleSidebar,
+                  onTap: () => _toggleSidebar(c),
                   child: const ColoredBox(color: Color(0x55000000)),
                 ),
               ),
@@ -142,16 +217,16 @@ class _ShellState extends State<Shell> {
             left: 0,
             top: 0,
             bottom: 0,
-            child: _Sidebar(
-              index: index,
-              collapsed: c.sidebarCollapsed,
-              carryoverCount: c.carryoverCount,
-              onSelect: (i) {
-                if (_query.isNotEmpty) _clearSearch();
-                c.setShellIndex(i);
-                if (!c.sidebarCollapsed) c.toggleSidebar();
-              },
-              onToggle: c.toggleSidebar,
+            child: MouseRegion(
+              onEnter: (_) => _onSidebarHover(c, true),
+              onExit: (_) => _onSidebarHover(c, false),
+              child: _Sidebar(
+                index: index,
+                collapsed: c.sidebarCollapsed,
+                carryoverCount: c.carryoverCount,
+                onSelect: (i) => _selectTab(c, i),
+                onToggle: () => _toggleSidebar(c),
+              ),
             ),
           ),
         ],
@@ -160,7 +235,7 @@ class _ShellState extends State<Shell> {
   }
 }
 
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends StatefulWidget {
   const _Sidebar({
     required this.index,
     required this.collapsed,
@@ -177,22 +252,125 @@ class _Sidebar extends StatelessWidget {
   final ValueChanged<int> onSelect;
   final VoidCallback onToggle;
 
-  Widget _section(String label, bool collapsed) {
-    if (collapsed) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-        child: Divider(color: AppColors.border),
-      );
+  @override
+  State<_Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<_Sidebar> {
+  static const Duration _slide = Duration(milliseconds: 280);
+  static const double _itemHeight = 42;
+
+  // Destaque único da aba escolhida: um só retângulo que desliza de um item
+  // para o outro (em vez de cada item pintar o próprio fundo).
+  final GlobalKey _stackKey = GlobalKey();
+  final Map<int, GlobalKey> _itemKeys = {};
+  double? _top; // posição vertical do destaque, dentro da barra
+  bool _sliding = false; // true só enquanto troca de aba (senão acompanha o layout)
+  bool _measureQueued = false;
+
+  GlobalKey _keyFor(int i) => _itemKeys.putIfAbsent(i, GlobalKey.new);
+
+  @override
+  void didUpdateWidget(_Sidebar old) {
+    super.didUpdateWidget(old);
+    if (old.index != widget.index) {
+      _sliding = !MediaQuery.disableAnimationsOf(context);
     }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 18, 12, 8),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10.5,
-          letterSpacing: 1.4,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textMuted,
+  }
+
+  /// Mede onde o item escolhido está (depois do layout) e move o destaque.
+  void _queueMeasure() {
+    if (_measureQueued) return;
+    _measureQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureQueued = false;
+      if (!mounted) return;
+      final stack = _stackKey.currentContext?.findRenderObject();
+      final item = _itemKeys[widget.index]?.currentContext?.findRenderObject();
+      double? top;
+      if (stack is RenderBox &&
+          stack.attached &&
+          item is RenderBox &&
+          item.attached) {
+        top = stack.globalToLocal(item.localToGlobal(Offset.zero)).dy;
+      }
+      final old = _top;
+      final same = (old == null && top == null) ||
+          (old != null && top != null && (old - top).abs() < 0.5);
+      if (!same) setState(() => _top = top);
+    });
+  }
+
+  Widget _section(String label, bool collapsed) {
+    // Altura fixa nos dois modos: os itens não mudam de lugar quando a barra
+    // abre ou fecha, e o destaque acompanha sem pulos.
+    return SizedBox(
+      height: 40,
+      child: collapsed
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Center(child: Divider(color: AppColors.border)),
+            )
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  /// O retângulo de destaque e a barrinha lateral da aba escolhida.
+  Widget _highlight() {
+    final top = _top;
+    if (top == null) return const SizedBox.shrink();
+    return AnimatedPositioned(
+      duration: _sliding ? _slide : Duration.zero,
+      curve: Curves.easeInOutCubic,
+      onEnd: () {
+        if (_sliding) setState(() => _sliding = false);
+      },
+      left: 0,
+      right: 0,
+      top: top,
+      height: _itemHeight,
+      child: IgnorePointer(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.accentSoft,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            // Indicador lateral na cor de destaque do perfil.
+            Positioned(
+              left: -8,
+              top: 9,
+              bottom: 9,
+              width: 3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: const BorderRadius.horizontal(
+                    right: Radius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -200,6 +378,11 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final index = widget.index;
+    final collapsed = widget.collapsed;
+    final carryoverCount = widget.carryoverCount;
+    final onSelect = widget.onSelect;
+    final onToggle = widget.onToggle;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -222,7 +405,14 @@ class _Sidebar extends StatelessWidget {
       // quando cabem (antes estouravam alguns pixels ao expandir).
       child: LayoutBuilder(builder: (context, box) {
         final compact = collapsed || box.maxWidth < 170;
-        return Column(
+        _queueMeasure();
+        return Stack(
+          key: _stackKey,
+          clipBehavior: Clip.none,
+          fit: StackFit.expand,
+          children: [
+            _highlight(),
+            Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Faixa de arrastar a janela.
@@ -233,15 +423,34 @@ class _Sidebar extends StatelessWidget {
               mainAxisAlignment:
                   compact ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
-                CubosLogo(size: 36),
+                // Clicar no logo expande (ou recolhe) a barra.
+                Tooltip(
+                  message: collapsed ? 'Expandir menu' : 'Recolher menu',
+                  waitDuration: const Duration(milliseconds: 500),
+                  child: Semantics(
+                    button: true,
+                    label: collapsed ? 'Expandir menu' : 'Recolher menu',
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onToggle,
+                        child: CubosLogo(size: 36),
+                      ),
+                    ),
+                  ),
+                ),
                 if (!compact) ...[
                   const SizedBox(width: 12),
+                  // Nome por extenso com a barra aberta; as letras sobem uma a
+                  // uma toda vez que ela expande (o texto nasce a cada abertura).
                   Expanded(
-                    child: Text(
-                      AppInfo.name.toUpperCase(),
+                    child: SplitText(
+                      text: AppInfo.fullName,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppFonts.title(22, spacing: 1.2),
+                      style: AppFonts.title(22, spacing: 0.6),
+                      delayPerChar: const Duration(milliseconds: 25),
+                      charDuration: const Duration(milliseconds: 380),
                     ),
                   ),
                 ],
@@ -250,6 +459,7 @@ class _Sidebar extends StatelessWidget {
           ),
           _section('MENU', compact),
           _NavItem(
+            key: _keyFor(0),
             icon: Icons.home_outlined,
             activeIcon: Icons.home_rounded,
             label: 'Início',
@@ -259,6 +469,7 @@ class _Sidebar extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           _NavItem(
+            key: _keyFor(1),
             icon: Icons.live_tv_outlined,
             activeIcon: Icons.live_tv_rounded,
             label: 'TV ao vivo',
@@ -268,6 +479,7 @@ class _Sidebar extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           _NavItem(
+            key: _keyFor(2),
             icon: Icons.local_movies_outlined,
             activeIcon: Icons.local_movies_rounded,
             label: 'Filmes e séries',
@@ -277,6 +489,7 @@ class _Sidebar extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           _NavItem(
+            key: _keyFor(3),
             icon: Icons.favorite_border_rounded,
             activeIcon: Icons.favorite_rounded,
             label: 'Favoritos',
@@ -286,6 +499,7 @@ class _Sidebar extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           _NavItem(
+            key: _keyFor(4),
             icon: Icons.folder_special_outlined,
             activeIcon: Icons.folder_special_rounded,
             label: 'Minha biblioteca',
@@ -295,6 +509,7 @@ class _Sidebar extends StatelessWidget {
           ),
           _section('GERAL', compact),
           _NavItem(
+            key: _keyFor(5),
             icon: Icons.settings_outlined,
             activeIcon: Icons.settings_rounded,
             label: 'Conta e ajustes',
@@ -308,6 +523,7 @@ class _Sidebar extends StatelessWidget {
           if (carryoverCount > 0) ...[
             _section('TEMPORÁRIO', compact),
             _NavItem(
+              key: _keyFor(AppController.carryoverPage),
               icon: Icons.history_toggle_off_rounded,
               activeIcon: Icons.history_rounded,
               label: 'Dados anteriores',
@@ -331,7 +547,9 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
         ],
-      );
+      ),
+          ],
+        );
       }),
     );
   }
@@ -339,6 +557,7 @@ class _Sidebar extends StatelessWidget {
 
 class _NavItem extends StatefulWidget {
   const _NavItem({
+    super.key,
     required this.icon,
     required this.activeIcon,
     required this.label,
@@ -367,9 +586,13 @@ class _NavItemState extends State<_NavItem> {
 
   @override
   Widget build(BuildContext context) {
-    final Color background = widget.selected
-        ? AppColors.accentSoft
-        : (_hover ? AppColors.hover : Colors.transparent);
+    // O fundo da aba escolhida é o destaque único da barra, que desliza por
+    // baixo dos itens; aqui só o hover das demais.
+    // "Sem fundo" é a própria cor do hover com opacidade 0: animar a partir de
+    // Colors.transparent (preto) passava por um cinza escuro no meio do caminho.
+    final Color background = !widget.selected && _hover
+        ? AppColors.hover
+        : AppColors.hover.withValues(alpha: 0);
     final Color foreground =
         widget.selected ? AppColors.accent : AppColors.text;
 
@@ -425,22 +648,6 @@ class _NavItemState extends State<_NavItem> {
             top: 2,
             child: _Badge(count: widget.badge, small: true),
           ),
-        // Indicador lateral na cor de destaque do perfil.
-        Positioned(
-          left: -8,
-          top: 9,
-          bottom: 9,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: widget.selected ? 3 : 0,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: const BorderRadius.horizontal(
-                right: Radius.circular(3),
-              ),
-            ),
-          ),
-        ),
       ],
     );
 

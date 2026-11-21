@@ -112,6 +112,23 @@ ThemeData buildTheme() {
     outline: AppColors.border,
   );
 
+  // Cor da ação do aviso: o destaque, clareado/escurecido até ter contraste
+  // mínimo de 4,5:1 sobre o fundo do aviso.
+  final snackBg = AppColors.surface;
+  double contraste(Color a, Color b) {
+    final la = a.computeLuminance(), lb = b.computeLuminance();
+    return (la > lb ? la + 0.05 : lb + 0.05) / (la > lb ? lb + 0.05 : la + 0.05);
+  }
+
+  var snackAction = AppColors.accent;
+  for (var i = 1; i <= 10 && contraste(snackAction, snackBg) < 4.5; i++) {
+    snackAction = Color.lerp(
+      AppColors.accent,
+      dark ? Colors.white : Colors.black,
+      i * 0.1,
+    )!;
+  }
+
   return ThemeData(
     useMaterial3: true,
     fontFamily: AppFonts.body,
@@ -133,6 +150,21 @@ ThemeData buildTheme() {
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: SegmentedButton.styleFrom(shape: AppShape.button),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: snackBg,
+      contentTextStyle: TextStyle(
+        fontFamily: AppFonts.body,
+        color: AppColors.text,
+        fontSize: 13.5,
+      ),
+      actionTextColor: snackAction,
+      behavior: SnackBarBehavior.floating,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: AppColors.border),
+      ),
     ),
     dividerTheme: DividerThemeData(
       color: AppColors.border,
