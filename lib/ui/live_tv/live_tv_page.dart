@@ -612,7 +612,11 @@ class _LiveTvPageState extends State<LiveTvPage> {
                       ),
                       PlaybackOverlays(playback: c.playback),
                       _scrim(fade, box.maxHeight),
-                      // Tela cheia: acima da camada escura de "Todos os canais".
+                      _topBar(c, fade, controlsOn),
+                      _bottomArea(c, fade, controlsOn),
+                      // Tela cheia: acima da camada escura de "Todos os canais" e por cima da
+                      // área inferior (a fileira de recentes ocupa a largura toda e
+                      // engoliria o clique).
                       Positioned.fill(
                         bottom: _fullscreenLift,
                         child: PlayerControls(
@@ -625,8 +629,6 @@ class _LiveTvPageState extends State<LiveTvPage> {
                           ),
                         ),
                       ),
-                      _topBar(c, fade, controlsOn),
-                      _bottomArea(c, fade, controlsOn),
                     ],
                     _drawer(c, box.maxHeight, slide),
                   ],
