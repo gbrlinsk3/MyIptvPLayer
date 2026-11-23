@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../widgets/click_spark.dart';
 import '../../data/models.dart';
 import '../../state/app_scope.dart';
 import 'live_logo.dart';
@@ -41,8 +42,10 @@ class _ChannelRowState extends State<ChannelRow> {
 
   void _scrollBy(double delta) {
     if (!_scroll.hasClients) return;
-    final target =
-        (_scroll.offset + delta).clamp(0.0, _scroll.position.maxScrollExtent);
+    final target = (_scroll.offset + delta).clamp(
+      0.0,
+      _scroll.position.maxScrollExtent,
+    );
     _scroll.animateTo(
       target.toDouble(),
       duration: const Duration(milliseconds: 280),
@@ -96,7 +99,10 @@ class _ChannelRowState extends State<ChannelRow> {
                   scrollDirection: Axis.horizontal,
                   itemExtent: itemWidth,
                   // Folga em cima e embaixo: o cartão cresce ao passar o mouse.
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   itemCount: list.length,
                   itemBuilder: (context, i) => Padding(
                     padding: const EdgeInsets.only(right: 12),
@@ -223,7 +229,9 @@ class _ChannelCardState extends State<ChannelCard> {
                         fontSize: 13,
                         height: 1.25,
                         fontWeight: FontWeight.w700,
-                        color: (playing || fav) ? AppColors.accent : AppColors.text,
+                        color: (playing || fav)
+                            ? AppColors.accent
+                            : AppColors.text,
                       ),
                     ),
                   ),
@@ -236,7 +244,10 @@ class _ChannelCardState extends State<ChannelCard> {
                           tooltip: fav
                               ? 'Remover dos favoritos'
                               : 'Adicionar aos favoritos',
-                          onPressed: () => c.toggleFavorite(ch),
+                          onPressed: () {
+                            if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
+                            c.toggleFavorite(ch);
+                          },
                           icon: Icon(
                             fav ? Icons.favorite : Icons.favorite_border,
                             size: 20,
@@ -271,11 +282,7 @@ class _Logo extends StatelessWidget {
       alignment: Alignment.center,
       child: (url == null || url!.isEmpty)
           ? placeholder
-          : LiveLogo(
-              url: url!,
-              memCacheWidth: 160,
-              fallback: placeholder,
-            ),
+          : LiveLogo(url: url!, memCacheWidth: 160, fallback: placeholder),
     );
   }
 }

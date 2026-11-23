@@ -36,6 +36,7 @@ class SwipeToast extends StatefulWidget {
     this.restartKey,
     this.progress,
     this.dismissible = true,
+    this.fuseInset = 14,
   });
 
   final Widget child;
@@ -66,6 +67,10 @@ class SwipeToast extends StatefulWidget {
   /// pelo dono). O pavio continua.
   final bool dismissible;
 
+  /// Recuo do pavio nas laterais (px). Deve ser pelo menos o raio dos cantos do
+  /// aviso: assim a barra fica dentro da curva, em vez de passar por cima dela.
+  final double fuseInset;
+
   /// Fração da altura a partir da qual soltar dispensa o aviso.
   static const double dismissFraction = 0.4;
 
@@ -78,7 +83,7 @@ class SwipeToast extends StatefulWidget {
   /// Limite de quanto o aviso pode subir (com resistência).
   static const double _maxUp = 14;
 
-  static const double fuseHeight = 2;
+  static const double fuseHeight = 3;
 
   @override
   State<SwipeToast> createState() => _SwipeToastState();
@@ -309,24 +314,42 @@ class _SwipeToastState extends State<SwipeToast> with TickerProviderStateMixin {
           widget.child,
           if (_hasFuse)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
+              left: widget.fuseInset,
+              right: widget.fuseInset,
+              bottom: 1,
               height: SwipeToast.fuseHeight,
               child: IgnorePointer(
                 child: ValueListenableBuilder<double>(
                   valueListenable: _fuse,
-                  builder: (context, v, _) => Align(
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      key: const ValueKey('swipe-toast-fuse'),
-                      widthFactor: v,
-                      heightFactor: 1,
-                      child: ColoredBox(
-                        color: widget.fuseColor ?? AppColors.accent,
+                  builder: (context, v, _) {
+                    final color = widget.fuseColor ?? AppColors.accent;
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        key: const ValueKey('swipe-toast-fuse'),
+                        widthFactor: v,
+                        heightFactor: 1,
+                        // Cápsula com a cor cheia no meio e esmaecendo nas
+                        // duas pontas, como no SwipeToast de referência.
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(
+                              SwipeToast.fuseHeight,
+                            ),
+                            gradient: LinearGradient(
+                              colors: [
+                                color.withValues(alpha: 0),
+                                color,
+                                color,
+                                color.withValues(alpha: 0),
+                              ],
+                              stops: const [0, 0.25, 0.75, 1],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
             ),

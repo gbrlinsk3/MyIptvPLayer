@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../home/hero_buttons.dart';
+import '../widgets/click_spark.dart';
 
 /// Coração sobre os cartões de pôster/busca: aparece ao passar o mouse e fica
 /// visível (preenchido, na cor do perfil) quando o título já é favorito.
@@ -26,7 +27,10 @@ class FavoriteOverlay extends StatelessWidget {
           message: fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos',
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => catalog.toggleFavorite(title),
+            onTap: () {
+              if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
+              catalog.toggleFavorite(title);
+            },
             child: Container(
               width: 30,
               height: 30,
@@ -62,7 +66,10 @@ class FavoritePanelButton extends StatelessWidget {
         final fav = catalog.isFavorite(title.kind, title.id);
         return IconButton.filled(
           tooltip: fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos',
-          onPressed: () => catalog.toggleFavorite(title),
+          onPressed: () {
+            if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
+            catalog.toggleFavorite(title);
+          },
           style: IconButton.styleFrom(
             backgroundColor: const Color(0x99000000),
             foregroundColor: fav ? AppColors.accent : Colors.white,
@@ -90,7 +97,10 @@ class FavoriteHeroButton extends StatelessWidget {
         return HeroGhostButton(
           icon: fav ? Icons.favorite : Icons.favorite_border,
           label: fav ? 'Nos favoritos' : 'Favoritar',
-          onTap: () => catalog.toggleFavorite(title),
+          onTap: () {
+            if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
+            catalog.toggleFavorite(title);
+          },
         );
       },
     );

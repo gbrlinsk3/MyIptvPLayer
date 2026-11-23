@@ -18,7 +18,7 @@ import '../../state/app_scope.dart';
 import '../widgets/swipe_toast.dart';
 import '../widgets/wake_slider.dart';
 import '../window/title_bar.dart';
-import 'player_episodes_panel.dart';
+import 'player_episodes_strip.dart';
 import 'player_scrub.dart';
 
 /// Abre o player de filmes/séries cobrindo a janela inteira.
@@ -505,33 +505,34 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
         ),
         _BottomBar(
           visible: _controlsVisible,
-          child: _buildControls(),
-        ),
-        if (widget.items.length > 1)
-          Positioned(
-            right: 16,
-            top: 72,
-            bottom: 112,
-            child: AnimatedSlide(
-              offset: _episodesOpen ? Offset.zero : const Offset(1.1, 0),
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              child: AnimatedOpacity(
-                opacity: _episodesOpen ? 1 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: IgnorePointer(
-                  ignoring: !_episodesOpen,
-                  child: PlayerEpisodesPanel(
-                    key: ValueKey('eps-$_index-$_episodesOpen'),
-                    items: widget.items,
-                    current: _index,
-                    onSelect: _jumpTo,
-                    onClose: () => setState(() => _episodesOpen = false),
-                  ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Só aparece se o usuário clicar em "Episódios".
+              if (widget.items.length > 1)
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.bottomCenter,
+                  child: _episodesOpen
+                      ? Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: PlayerEpisodesStrip(
+                            key: ValueKey('eps-$_index'),
+                            items: widget.items,
+                            current: _index,
+                            onSelect: _jumpTo,
+                            onClose: () =>
+                                setState(() => _episodesOpen = false),
+                          ),
+                        )
+                      : const SizedBox(width: double.infinity),
                 ),
-              ),
-            ),
+              _buildControls(),
+            ],
           ),
+        ),
         if (_nextPanel != _NextPanel.hidden && _hasNext) _buildNextCard(),
         if (_error != null) _buildError(),
       ],
@@ -789,29 +790,92 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     );
   }
 
+  /// Altura medida do cartão aberto (muda com o título em 1 ou 2 linhas).
+  double _nextCardHeight = 140;
+  final GlobalKey _nextCardKey = GlobalKey();
+
+  void _measureNextCard() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final box = _nextCardKey.currentContext?.findRenderObject();
+      if (!mounted || box is! RenderBox || !box.hasSize) return;
+      final h = box.size.height;
+      if ((h - _nextCardHeight).abs() > 0.5) {
+        setState(() => _nextCardHeight = h);
+      }
+    });
+  }
+
+  /// Cartão e aba são UM elemento só, ancorado no canto inferior direito: uma
+  /// janela que encolhe do tamanho do cartão até o da aba (e cresce de volta),
+  /// enquanto o conteúdo troca por fade (o cartão some na primeira metade, a
+  /// seta aparece na segunda). Nada nasce no meio do caminho nem salta para a
+  /// borda. A margem de 24 px do cartão fica dentro do elemento (344 px de
+  /// largura), para a borda direita da janela ser sempre a âncora. Quando a
+  /// interface aparece, o conjunto sobe para não ficar por cima dos controles.
   Widget _buildNextCard() {
     final counting = _nextCountdown != null;
     final minimized = _nextPanel == _NextPanel.minimized && !counting;
-    // Aba e cartão trocam com escala + fade pelo canto inferior direito. Quando
-    // a interface aparece, a aba sobe para não ficar por cima dos controles.
+    const dur = Duration(milliseconds: 380);
+    const tabSize = 52.0;
+    const cardWidth = 344.0;
+    _measureNextCard();
     return AnimatedPositioned(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
-      right: minimized ? 0 : 24,
+      duration: dur,
+      curve: Curves.easeInOutCubic,
+      right: 0,
       bottom: minimized ? (_controlsVisible ? 110 : 28) : 96,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 240),
-        switchInCurve: Curves.easeOutBack,
-        switchOutCurve: Curves.easeIn,
-        transitionBuilder: (child, anim) => FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(
-            scale: anim,
-            alignment: Alignment.bottomRight,
-            child: child,
-          ),
-        ),
-        child: minimized ? _buildNextTab() : _buildNextPanelBody(counting),
+      child: TweenAnimationBuilder<double>(
+        // 1 = cartão aberto, 0 = aba. Começa em 0: ao aparecer pela primeira
+        // vez o cartão também cresce a partir do canto.
+        tween: Tween<double>(begin: 0, end: minimized ? 0 : 1),
+        duration: dur,
+        builder: (context, p, _) {
+          final e = Curves.easeInOutCubic.transform(p);
+          final cardOpacity = ((p - 0.35) / 0.65).clamp(0.0, 1.0);
+          final tabOpacity = ((0.65 - p) / 0.65).clamp(0.0, 1.0);
+          final showCard = !(minimized && p <= 0.001);
+          return SizedBox(
+            width: tabSize + (cardWidth - tabSize) * e,
+            height: tabSize + (_nextCardHeight - tabSize) * e,
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              clipBehavior: Clip.none,
+              children: [
+                if (showCard)
+                  Positioned.fill(
+                    child: ClipRect(
+                      child: IgnorePointer(
+                        ignoring: minimized,
+                        child: Opacity(
+                          opacity: cardOpacity,
+                          child: OverflowBox(
+                            alignment: Alignment.bottomRight,
+                            minWidth: cardWidth,
+                            maxWidth: cardWidth,
+                            minHeight: 0,
+                            maxHeight: double.infinity,
+                            child: KeyedSubtree(
+                              key: _nextCardKey,
+                              child: _buildNextPanelBody(counting),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (tabOpacity > 0)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: IgnorePointer(
+                      ignoring: !minimized,
+                      child: Opacity(opacity: tabOpacity, child: _buildNextTab()),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -870,9 +934,12 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     final next = widget.items[_index + 1];
     return KeyedSubtree(
       key: const ValueKey('next-card'),
-      // Pavio no rodapé: 12 s com o painel aberto, ou os 8 s da contagem.
-      // Arrastar para baixo minimiza (ou cancela a contagem).
-      child: SwipeToast(
+      // Margem direita de 24 px dentro do filho (ver _buildNextCard).
+      child: Padding(
+        padding: const EdgeInsets.only(right: 24),
+        // Pavio no rodapé: 12 s com o painel aberto, ou os 8 s da contagem.
+        // Arrastar para baixo minimiza (ou cancela a contagem).
+        child: SwipeToast(
         key: ValueKey(counting ? 'next-swipe-count' : 'next-swipe-wait'),
         lifetime: counting ? null : const Duration(seconds: 12),
         progress: counting ? _nextFuse : null,
@@ -947,6 +1014,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
         ),
         ),
         ),
+      ),
       ),
     );
   }

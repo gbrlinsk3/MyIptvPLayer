@@ -246,6 +246,7 @@ class PlayItem {
     required this.url,
     this.subtitle,
     this.image,
+    this.thumb,
     this.seriesId,
     this.season,
     this.episode,
@@ -263,6 +264,9 @@ class PlayItem {
 
   /// Pôster (filme) ou capa da série (episódio).
   final String? image;
+
+  /// Imagem do próprio episódio (horizontal), quando o servidor informa.
+  final String? thumb;
   final int? seriesId;
   final int? season;
   final int? episode;

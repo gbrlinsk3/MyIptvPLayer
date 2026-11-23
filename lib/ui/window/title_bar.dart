@@ -3,6 +3,13 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../core/theme.dart';
 
+/// Estado da "moldura" da janela: a TV ao vivo com vídeo tocando esconde a
+/// barra de título (busca, perfil e botões); os botões da janela voltam ao
+/// passar o mouse no canto superior direito.
+class WindowChrome {
+  static final ValueNotifier<bool> hidden = ValueNotifier(false);
+}
+
 /// Barra de título própria (a do Windows fica oculta em main.dart).
 /// Área livre para arrastar a janela + minimizar / maximizar / fechar.
 class TitleBar extends StatefulWidget {
@@ -65,13 +72,16 @@ class _TitleBarState extends State<TitleBar> with WindowListener {
       child: Row(
         children: [
           Expanded(
-            child: widget.child ??
-                const DragToMoveArea(child: SizedBox.expand()),
+            child:
+                widget.child ?? const DragToMoveArea(child: SizedBox.expand()),
           ),
           // Centralizados na altura da barra (alinhados ao perfil).
           Align(
             alignment: Alignment.center,
-            child: WindowButtons(maximized: _maximized, onToggleMaximize: _toggleMaximize),
+            child: WindowButtons(
+              maximized: _maximized,
+              onToggleMaximize: _toggleMaximize,
+            ),
           ),
         ],
       ),
@@ -118,28 +128,31 @@ class WindowButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      _WindowButton(
-        icon: Icons.remove,
-        tooltip: 'Minimizar',
-        tooltips: tooltips,
-        onTap: () => windowManager.minimize(),
-      ),
-      _WindowButton(
-        icon: maximized ? Icons.filter_none : Icons.crop_square,
-        iconSize: maximized ? 13 : 14,
-        tooltip: maximized ? 'Restaurar' : 'Maximizar',
-        tooltips: tooltips,
-        onTap: onToggleMaximize,
-      ),
-      _WindowButton(
-        icon: Icons.close,
-        tooltip: 'Fechar',
-        tooltips: tooltips,
-        danger: true,
-        onTap: () => windowManager.close(),
-      ),
-    ]);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _WindowButton(
+          icon: Icons.remove,
+          tooltip: 'Minimizar',
+          tooltips: tooltips,
+          onTap: () => windowManager.minimize(),
+        ),
+        _WindowButton(
+          icon: maximized ? Icons.filter_none : Icons.crop_square,
+          iconSize: maximized ? 13 : 14,
+          tooltip: maximized ? 'Restaurar' : 'Maximizar',
+          tooltips: tooltips,
+          onTap: onToggleMaximize,
+        ),
+        _WindowButton(
+          icon: Icons.close,
+          tooltip: 'Fechar',
+          tooltips: tooltips,
+          danger: true,
+          onTap: () => windowManager.close(),
+        ),
+      ],
+    );
   }
 }
 
@@ -202,20 +215,27 @@ class _WindowButtonsOverlayState extends State<WindowButtonsOverlay>
   @override
   Widget build(BuildContext context) {
     if (_full) return const SizedBox.shrink();
+    final buttons = ValueListenableBuilder<double>(
+      valueListenable: _TitleBarHeight.value,
+      builder: (context, h, child) => SizedBox(
+        height: h,
+        child: Align(alignment: Alignment.centerRight, child: child),
+      ),
+      child: WindowButtons(
+        maximized: _maximized,
+        onToggleMaximize: _toggle,
+        tooltips: false,
+      ),
+    );
     return Align(
       alignment: Alignment.topRight,
-      child: ValueListenableBuilder<double>(
-        valueListenable: _TitleBarHeight.value,
-        builder: (context, h, child) =>
-            SizedBox(
-          height: h,
-          child: Align(alignment: Alignment.centerRight, child: child),
-        ),
-        child: WindowButtons(
-          maximized: _maximized,
-          onToggleMaximize: _toggle,
-          tooltips: false,
-        ),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: WindowChrome.hidden,
+        builder: (context, hidden, _) {
+          // Player da TV ao vivo aberto: sem barra e sem botões da janela.
+          if (hidden) return const SizedBox.shrink();
+          return buttons;
+        },
       ),
     );
   }
@@ -251,26 +271,27 @@ class _WindowButtonState extends State<_WindowButton> {
     final Color background = _hover
         // Fundo claro e translúcido ao passar o mouse (antes ficava escuro).
         ? (widget.danger
-            ? const Color(0xFFE81123)
-            : AppColors.text.withValues(alpha: 0.14))
+              ? const Color(0xFFE81123)
+              : AppColors.text.withValues(alpha: 0.14))
         : Colors.transparent;
-    final Color foreground =
-        _hover && widget.danger ? Colors.white : AppColors.text;
+    final Color foreground = _hover && widget.danger
+        ? Colors.white
+        : AppColors.text;
     final button = MouseRegion(
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap,
-          child: Container(
-            width: 46,
-            height: 36,
-            color: background,
-            alignment: Alignment.center,
-            child: Icon(widget.icon, size: widget.iconSize, color: foreground),
-          ),
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Container(
+          width: 46,
+          height: 36,
+          color: background,
+          alignment: Alignment.center,
+          child: Icon(widget.icon, size: widget.iconSize, color: foreground),
         ),
-      );
+      ),
+    );
     return widget.tooltips
         ? Tooltip(message: widget.tooltip, child: button)
         : button;

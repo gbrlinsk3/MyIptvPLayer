@@ -13,8 +13,10 @@ import '../../playback/playback_errors.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../widgets/carousel_arrows.dart';
+import '../widgets/click_spark.dart';
 import '../widgets/edge_scroll_marks.dart';
 import 'epg_panel.dart';
+import '../window/title_bar.dart';
 import 'fullscreen.dart';
 import 'live_drawer.dart';
 import 'live_recent_card.dart';
@@ -87,6 +89,9 @@ class _LiveTvPageState extends State<LiveTvPage> {
   // animação depois de soltar (null = a de abrir/fechar).
   double? _drawerHeight;
   double _dragHeight = 0;
+  // Altura durante o arrasto: só a gaveta e o escurecimento a escutam, para a
+  // página (vídeo, controles) não ser reconstruída a cada movimento.
+  final ValueNotifier<double> _dragN = ValueNotifier<double>(0);
   bool _dragging = false;
   Duration? _snapDuration;
   double _area = 0; // altura da área da aba, atualizada no build
@@ -143,6 +148,10 @@ class _LiveTvPageState extends State<LiveTvPage> {
 
   @override
   void dispose() {
+    _dragN.dispose();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => WindowChrome.hidden.value = false,
+    );
     _hideTimer?.cancel();
     _app.playback.removeListener(_onPlayback);
     _focus.dispose();
@@ -433,6 +442,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
     // Calcula antes de marcar _dragging: com ele ligado, _currentDrawerHeight
     // devolveria o _dragHeight antigo.
     final start = _currentDrawerHeight(_area);
+    _dragN.value = start;
     setState(() {
       _dragHeight = start;
       _dragging = true;
@@ -441,9 +451,8 @@ class _LiveTvPageState extends State<LiveTvPage> {
 
   void _onDragUpdate(DragUpdateDetails d) {
     if (!_dragging) return;
-    setState(() {
-      _dragHeight = (_dragHeight - d.delta.dy).clamp(0.0, _area).toDouble();
-    });
+    _dragHeight = (_dragHeight - d.delta.dy).clamp(0.0, _area).toDouble();
+    _dragN.value = _dragHeight;
   }
 
   void _onDragEnd(DragEndDetails d) {
@@ -533,6 +542,16 @@ class _LiveTvPageState extends State<LiveTvPage> {
 
   // ---- construção -------------------------------------------------------
 
+  /// Com o vídeo tocando a barra de título (busca, perfil, botões da janela)
+  /// some e o player ocupa o espaço dela.
+  void _syncChrome(bool hidden) {
+    if (WindowChrome.hidden.value == hidden) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted && hidden) return;
+      WindowChrome.hidden.value = hidden;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = AppScope.of(context);
@@ -543,6 +562,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
     final fade = reduce ? Duration.zero : const Duration(milliseconds: 200);
     final session = _session;
     final controlsOn = session && !_drawerOpen && _controlsVisible;
+    _syncChrome(session && widget.active);
     final hideCursor = session && !_drawerOpen && !_controlsVisible;
 
     return CallbackShortcuts(
@@ -618,16 +638,24 @@ class _LiveTvPageState extends State<LiveTvPage> {
   /// Escurece o vídeo com a gaveta aberta (mais escuro quanto mais alta ela
   /// está, até 0,55); clicar nele fecha a gaveta.
   Widget _scrim(Duration fade, double area) {
-    final level = area <= 0
-        ? 1.0
-        : (_currentDrawerHeight(area) / area).clamp(0.0, 1.0).toDouble();
     return Positioned.fill(
       child: IgnorePointer(
         ignoring: !_drawerOpen,
-        child: AnimatedOpacity(
-          opacity: _drawerOpen ? level : 0,
-          // Durante o arrasto acompanha o dedo, sem animação.
-          duration: _dragging ? Duration.zero : fade,
+        child: ValueListenableBuilder<double>(
+          valueListenable: _dragN,
+          builder: (context, _, child) {
+            final level = area <= 0
+                ? 1.0
+                : (_currentDrawerHeight(area) / area)
+                      .clamp(0.0, 1.0)
+                      .toDouble();
+            return AnimatedOpacity(
+              opacity: _drawerOpen ? level : 0,
+              // Durante o arrasto acompanha o dedo, sem animação.
+              duration: _dragging ? Duration.zero : fade,
+              child: child,
+            );
+          },
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => _setDrawer(false),
@@ -641,7 +669,6 @@ class _LiveTvPageState extends State<LiveTvPage> {
   Widget _drawer(AppController c, double area, Duration slide) {
     final session = _session;
     final open = !session || _drawerOpen;
-    final h = _currentDrawerHeight(area);
     // No encaixe baixo (já solta) a lista volta ao início para mostrar
     // "Recentes e favoritos".
     final showTop =
@@ -656,13 +683,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
     final duration = (_dragging || MediaQuery.disableAnimationsOf(context))
         ? Duration.zero
         : (_snapDuration ?? slide);
-    return AnimatedPositioned(
-      duration: duration,
-      curve: Curves.easeOutCubic,
-      left: edge,
-      right: edge,
-      height: h + (session ? 1 : 0),
-      bottom: open ? edge : -(h * 1.1) - 2,
+    final content = RepaintBoundary(
       child: NotificationListener<Notification>(
         // Com vídeo tocando, a rolagem da gaveta não chega ao ContentFrameLayout.
         onNotification: (n) =>
@@ -685,39 +706,45 @@ class _LiveTvPageState extends State<LiveTvPage> {
               ),
               child: Material(
                 type: MaterialType.transparency,
-                // Arrastando para baixo a gaveta fica menor que o conteúdo:
-                // ele mantém a altura mínima (a espiada) e o resto é cortado.
-                child: LayoutBuilder(
-                  builder: (context, box) {
-                    final inner = math.max(
-                      box.maxHeight,
-                      LiveDrawer.peekHeight,
-                    );
-                    return OverflowBox(
-                      alignment: Alignment.topCenter,
-                      minHeight: inner,
-                      maxHeight: inner,
-                      child: LiveDrawer(
-                        onOpen: _openGroup,
-                        closable: session,
-                        onClose: () => _setDrawer(false),
-                        currentStreamId: session ? c.selected?.streamId : null,
-                        showBanner: !session,
-                        showTop: showTop,
-                        onOpenChannel: _playFromBanner,
-                        // A alça e o arrasto só existem com o vídeo tocando.
-                        onDragStart: session ? _onDragStart : null,
-                        onDragUpdate: session ? _onDragUpdate : null,
-                        onDragEnd: session ? _onDragEnd : null,
-                      ),
-                    );
-                  },
+                // Layout de altura fixa: arrastar só desloca a gaveta (sem
+                // recalcular as fileiras a cada quadro); o que sobra embaixo é
+                // cortado pela área.
+                child: LiveDrawer(
+                  onOpen: _openGroup,
+                  closable: session,
+                  onClose: () => _setDrawer(false),
+                  currentStreamId: session ? c.selected?.streamId : null,
+                  showBanner: !session,
+                  showTop: showTop,
+                  onOpenChannel: _playFromBanner,
+                  // A alça e o arrasto só existem com o vídeo tocando.
+                  onDragStart: session ? _onDragStart : null,
+                  onDragUpdate: session ? _onDragUpdate : null,
+                  onDragEnd: session ? _onDragEnd : null,
                 ),
               ),
             ),
           ),
         ),
       ),
+    );
+    final full = math.max(area, LiveDrawer.peekHeight) + (session ? 1 : 0);
+    return ValueListenableBuilder<double>(
+      valueListenable: _dragN,
+      child: content,
+      builder: (context, _, child) {
+        final h = _currentDrawerHeight(area);
+        return AnimatedPositioned(
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          left: edge,
+          right: edge,
+          height: full,
+          // Aberta: o topo fica a [h] do fundo; fechada: sai por baixo.
+          top: open ? area - h : area + 2,
+          child: child!,
+        );
+      },
     );
   }
 
@@ -738,7 +765,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
         child: IgnorePointer(
           ignoring: !on,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(_sidePad, 22, _sidePad, 48),
+            padding: const EdgeInsets.fromLTRB(_sidePad, 44, _sidePad, 48),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
@@ -752,6 +779,17 @@ class _LiveTvPageState extends State<LiveTvPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Encerra o vídeo e volta à página inicial da TV ao vivo.
+                _OverlayButton(
+                  tooltip: 'Voltar à TV ao vivo',
+                  onTap: _endSession,
+                  child: const Icon(
+                    Icons.arrow_back,
+                    size: 22,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -787,7 +825,10 @@ class _LiveTvPageState extends State<LiveTvPage> {
                       : 'Adicionar aos favoritos',
                   onTap: sel == null
                       ? null
-                      : () => unawaited(c.toggleFavorite(sel)),
+                      : () {
+                          if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
+                          unawaited(c.toggleFavorite(sel));
+                        },
                   child: Icon(
                     fav ? Icons.favorite : Icons.favorite_border,
                     size: 20,
@@ -986,16 +1027,50 @@ class _LiveTvPageState extends State<LiveTvPage> {
             ),
             const SizedBox(height: 8),
           ],
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: _sidePad),
-            child: FilledButton.icon(
-              onPressed: () => _setDrawer(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
+          // Divisor; abaixo dele a tela escurece e o convite abre a gaveta
+          // (clique ou arrasto para cima).
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: _sidePad),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: Color.fromRGBO(255, 255, 255, 0.3),
+            ),
+          ),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _setDrawer(true),
+              onVerticalDragUpdate: (d) {
+                if (d.delta.dy < -2) _setDrawer(true);
+              },
+              child: SizedBox(
+                height: 76,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Todos os canais',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'clique para expandir',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color.fromRGBO(255, 255, 255, 0.75),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              icon: const Icon(Icons.keyboard_arrow_up, size: 20),
-              label: const Text('Todos os canais'),
             ),
           ),
         ],
@@ -1031,6 +1106,17 @@ class _LiveTvPageState extends State<LiveTvPage> {
                   ),
                 ),
               ),
+              // Camada escura semitransparente do divisor até a borda de baixo.
+              if (!_guideOpen)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 76 + 56,
+                  child: const IgnorePointer(
+                    child: ColoredBox(color: Color.fromRGBO(0, 0, 0, 0.55)),
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.only(top: 40, bottom: 56),
                 child: Column(

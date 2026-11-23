@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/format.dart';
 import '../../core/theme.dart';
+import '../widgets/click_spark.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
@@ -192,6 +193,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
       subtitle: '${e.code} — ${e.title}',
       url: url,
       image: widget.title.image,
+      thumb: e.image,
       seriesId: widget.title.id,
       season: e.season,
       episode: e.number,
@@ -265,6 +267,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
   }
 
   Future<void> _toggleWatchedMovie(TitleDetails d, bool watched) async {
+    if (!watched) ClickSpark.noClique(context, shape: SparkShape.dashes);
     final app = AppScope.read(context);
     final item = _movieItem(app, d);
     if (item == null) return;
@@ -273,6 +276,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
   }
 
   Future<void> _toggleWatchedEpisode(Episode e, bool watched) async {
+    if (!watched) ClickSpark.noClique(context, shape: SparkShape.dashes);
     final app = AppScope.read(context);
     final item = _episodeItem(app, e);
     if (item == null) return;
@@ -595,6 +599,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
             ),
             TextButton.icon(
               onPressed: () {
+                ClickSpark.noClique(context, shape: SparkShape.comets);
                 AppScope.read(context).downloads.enqueueAll([
                   for (final e in list) _episodeRequest(d, e),
                 ]);

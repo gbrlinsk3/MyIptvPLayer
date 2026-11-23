@@ -87,8 +87,8 @@ class _ChannelGroupCardState extends State<ChannelGroupCard> {
     final Color borderColor = strong
         ? AppColors.accent
         : (_hover
-            ? Color.lerp(AppColors.border, AppColors.text, 0.35)!
-            : AppColors.border);
+              ? Color.lerp(AppColors.border, AppColors.text, 0.35)!
+              : AppColors.border);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 150);
@@ -138,10 +138,7 @@ class _ChannelGroupCardState extends State<ChannelGroupCard> {
               // conteúdo.
               foregroundDecoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(_radius),
-                border: Border.all(
-                  color: borderColor,
-                  width: strong ? 2 : 1,
-                ),
+                border: Border.all(color: borderColor, width: strong ? 2 : 1),
               ),
               // Facho de luz que acompanha o mouse (pinta por cima, sem tomar
               // toques; dentro de um SpotlightGroup acende também os vizinhos).
@@ -149,119 +146,122 @@ class _ChannelGroupCardState extends State<ChannelGroupCard> {
                 borderRadius: BorderRadius.circular(_radius),
                 borderGlow: 0.5,
                 child: ClipRRect(
-                borderRadius: BorderRadius.circular(_radius),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (hasCategory)
-                      ExcludeSemantics(
-                        child: SizedBox(
-                          height: ChannelGroupCard.categoryHeight,
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                category,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textMuted,
+                  borderRadius: BorderRadius.circular(_radius),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (hasCategory)
+                        ExcludeSemantics(
+                          child: SizedBox(
+                            height: ChannelGroupCard.categoryHeight,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                child: Text(
+                                  category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.2,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textMuted,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    SizedBox(
-                      height: ChannelGroupCard.imageHeight,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ExcludeSemantics(child: _WideImage(url: g.icon)),
-                          // Só o ícone, no canto da imagem.
-                          Positioned(
-                            top: 6,
-                            right: 6,
-                            child: _FavoriteButton(
-                              favorite: widget.favorite,
-                              onPressed: widget.onToggleFavorite,
-                              name: g.displayName,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      SizedBox(
+                        height: ChannelGroupCard.imageHeight,
+                        child: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            ExcludeSemantics(
-                              child: Text(
-                                g.displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.text,
-                                ),
-                              ),
-                            ),
-                            if (shown.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              ExcludeSemantics(
-                                child: SizedBox(
-                                  height: _Tag.height,
-                                  child: ClipRect(
-                                    child: OverflowBox(
-                                      alignment: Alignment.centerLeft,
-                                      minWidth: 0,
-                                      maxWidth: double.infinity,
-                                      minHeight: _Tag.height,
-                                      maxHeight: _Tag.height,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          for (final t in shown)
-                                            Padding(
-                                              padding:
-                                                  const EdgeInsets.only(right: 4),
-                                              child: _Tag(t),
-                                            ),
-                                          if (extra > 0) _Tag('+$extra'),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                            const Spacer(),
-                            ExcludeSemantics(
-                              child: Text(
-                                'Clique para assistir',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.accent,
-                                ),
+                            ExcludeSemantics(child: _WideImage(url: g.icon)),
+                            // Só o ícone, no canto da imagem.
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: _FavoriteButton(
+                                favorite: widget.favorite,
+                                onPressed: widget.onToggleFavorite,
+                                name: g.displayName,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ExcludeSemantics(
+                                child: Text(
+                                  g.displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    height: 1.2,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.text,
+                                  ),
+                                ),
+                              ),
+                              if (shown.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                ExcludeSemantics(
+                                  child: SizedBox(
+                                    height: _Tag.height,
+                                    child: ClipRect(
+                                      child: OverflowBox(
+                                        alignment: Alignment.centerLeft,
+                                        minWidth: 0,
+                                        maxWidth: double.infinity,
+                                        minHeight: _Tag.height,
+                                        maxHeight: _Tag.height,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            for (final t in shown)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  right: 4,
+                                                ),
+                                                child: _Tag(t),
+                                              ),
+                                            if (extra > 0) _Tag('+$extra'),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              ExcludeSemantics(
+                                child: Text(
+                                  'Clique para assistir',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.2,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.accent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -425,11 +425,7 @@ class _WideImage extends StatelessWidget {
         Center(
           child: SizedBox(
             height: 64,
-            child: LiveLogo(
-              url: u,
-              memCacheHeight: 128,
-              fallback: placeholder,
-            ),
+            child: LiveLogo(url: u, memCacheHeight: 128, fallback: placeholder),
           ),
         ),
       ],

@@ -8,10 +8,12 @@ import 'app.dart';
 import 'core/app_info.dart';
 import 'core/app_log.dart';
 import 'core/theme.dart';
+import 'ui/widgets/click_spark.dart';
 
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  ClickSpark.ouvirCliques();
   await AppLog.init();
   // Erros do Flutter, da plataforma e de código assíncrono sem tratamento
   // passam a ser registrados em arquivo.

@@ -1,29 +1,42 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../core/app_info.dart';
 import '../../core/theme.dart';
 
-/// Animação de abertura depois de escolher o perfil (a "marca" do programa):
-/// 4 cubos lado a lado (3 viram o logo; o 4º some ao formar), um deslize
-/// rápido junta os cubos no logo e o programa abre. Dura [duration], não pode
-/// ser pulada e cobre a tela enquanto o perfil carrega por baixo.
+/// Animação de abertura depois de escolher o perfil, estilo "cinema": tela
+/// escura, o logo (3 cubos) surge, depois a luz do projetor pisca e acende,
+/// um brilho atravessa o logo e o nome aparece. Ao fim da cena chama [onDone];
+/// quem usa troca a cena pelo Início com a transição "derreter" do Morph Slider
+/// (`MorphReveal`). [boundaryKey] marca a cena para ser capturada como imagem.
+/// Não pode ser pulada e cobre a tela enquanto o perfil carrega por baixo.
 class ProfileIntro extends StatefulWidget {
   const ProfileIntro({
     super.key,
     required this.onDone,
+    this.boundaryKey,
     this.duration = defaultDuration,
   });
 
-  static const defaultDuration = Duration(milliseconds: 3000);
+  /// Fração da linha do tempo da cena (pensada para 3 s) em que ela termina:
+  /// o resto seria a saída, que agora é a transição "derreter".
+  static const sceneEnd = 0.78;
+
+  /// Cena completa (0,78 de 3 s).
+  static const defaultDuration = Duration(milliseconds: 2340);
 
   final VoidCallback onDone;
+  final GlobalKey? boundaryKey;
   final Duration duration;
 
   @override
   State<ProfileIntro> createState() => _ProfileIntroState();
 }
+
+/// Fundo da sala escura (o mesmo nos dois temas).
+const _cinemaBg = Color(0xFF0B0A09);
 
 class _ProfileIntroState extends State<ProfileIntro>
     with SingleTickerProviderStateMixin {
@@ -43,56 +56,61 @@ class _ProfileIntroState extends State<ProfileIntro>
   @override
   Widget build(BuildContext context) {
     final hsl = HSLColor.fromColor(AppColors.accent);
-    final top =
-        hsl.withLightness((hsl.lightness + 0.14).clamp(0.0, 0.9)).toColor();
-    final right =
-        hsl.withLightness((hsl.lightness - 0.16).clamp(0.1, 1.0)).toColor();
+    final top = hsl
+        .withLightness((hsl.lightness + 0.14).clamp(0.0, 0.9))
+        .toColor();
+    final right = hsl
+        .withLightness((hsl.lightness - 0.16).clamp(0.1, 1.0))
+        .toColor();
     // Bloqueia cliques no que está por baixo durante a animação.
     return AbsorbPointer(
       child: AnimatedBuilder(
         animation: _c,
         builder: (context, _) {
-          final t = _c.value;
-          // Some no fim (últimos 8 %), revelando o programa.
-          final fade = 1 - Curves.easeIn.transform(((t - 0.94) / 0.06).clamp(0.0, 1.0));
-          final nameIn = Curves.easeOut.transform(((t - 0.84) / 0.10).clamp(0.0, 1.0));
-          return Opacity(
-            opacity: fade,
+          final t = _c.value * ProfileIntro.sceneEnd;
+          final nameIn = Curves.easeOut.transform(
+            ((t - 0.52) / 0.16).clamp(0.0, 1.0),
+          );
+          return RepaintBoundary(
+            key: widget.boundaryKey,
             child: ColoredBox(
-              color: AppColors.bg,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: IntroPainter(
-                        t: t,
-                        top: top,
-                        left: AppColors.accent,
-                        right: right,
+                color: _cinemaBg,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: IntroPainter(
+                          t: t,
+                          top: top,
+                          left: AppColors.accent,
+                          right: right,
+                        ),
                       ),
                     ),
-                  ),
-                  Align(
-                    alignment: const Alignment(0, 0.62),
-                    child: Opacity(
-                      opacity: nameIn,
-                      child: Transform.translate(
-                        offset: Offset(0, 10 * (1 - nameIn)),
-                        // Material transparente: sem ele o Text fora de um
-                        // Scaffold sai com o sublinhado amarelo de depuração.
-                        child: Material(
-                          type: MaterialType.transparency,
-                          child: Text(
-                            AppInfo.fullName,
-                            style: AppFonts.title(32, spacing: 3),
+                    Align(
+                      alignment: const Alignment(0, 0.62),
+                      child: Opacity(
+                        opacity: nameIn,
+                        child: Transform.translate(
+                          offset: Offset(0, 10 * (1 - nameIn)),
+                          // Material transparente: sem ele o Text fora de um
+                          // Scaffold sai com o sublinhado amarelo de depuração.
+                          child: Material(
+                            type: MaterialType.transparency,
+                            child: Text(
+                              AppInfo.fullName,
+                              style: AppFonts.title(
+                                32,
+                                spacing: 3,
+                              ).copyWith(color: const Color(0xFFF1EFE8)),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
           );
         },
       ),
@@ -129,7 +147,8 @@ class IntroPainter extends CustomPainter {
       Offset((x - y) * _w, (x + y) * _h - z);
 
   /// Centro do cubo na grade (em unidades) já projetado.
-  static Offset _cubeCenter(List<int> c) => _proj(c[0] + .5, c[1] + .5, c[2] + .5);
+  static Offset _cubeCenter(List<int> c) =>
+      _proj(c[0] + .5, c[1] + .5, c[2] + .5);
 
   /// Centro da caixa que contém os 3 cubos do logo (em unidades).
   static Offset get _logoCenter {
@@ -159,49 +178,86 @@ class IntroPainter extends CustomPainter {
     final u = (size.shortestSide * 0.11).clamp(36.0, 90.0);
     final mid = Offset(size.width / 2, size.height / 2 + u * 0.4);
     final logoOrigin = mid - _logoCenter * u;
-    final spacing = u * 2.3;
+    Offset logoPos(int i) => logoOrigin + _cubeCenter(_logo[i]) * u;
 
-    // Posição (centro) de cada cubo: na fileira e no logo.
-    Offset rowPos(int i) => Offset(mid.dx + (i - 1.5) * spacing, mid.dy);
-    Offset logoPos(int i) => i < 3
-        ? logoOrigin + _cubeCenter(_logo[i]) * u
-        : mid; // o 4º vai para o centro do logo e some
+    // O logo surge primeiro; a luz só vem depois e pisca antes de firmar.
+    final lit = Curves.easeOut.transform(_seg(t, 0.05, 0.28));
+    final ramp = Curves.easeOut.transform(_seg(t, 0.30, 0.50));
+    final flicker = t < 0.44 && t >= 0.30
+        ? (((t - 0.30) / 0.035).floor().isEven ? 0.85 : 0.0)
+        : 1.0;
+    final beamIn = t < 0.30 ? 0.0 : (t < 0.44 ? 1.0 : ramp) * flicker;
 
-    // Desenha de trás para a frente: o 4º (que some) fica atrás.
-    for (final i in const [3, 2, 1, 0]) {
-      // Entrada: cada cubo "salta" com atraso.
-      final pop = Curves.easeOutBack.transform(_seg(t, 0.04 + 0.05 * i, 0.26 + 0.05 * i));
-      if (pop <= 0) continue;
-      // Deslize rápido: curva exponencial, com pequeno atraso por cubo.
-      double dash(double tt) => Curves.easeInOutExpo
-          .transform(_seg(tt, 0.50 + 0.015 * i, 0.72 + 0.015 * i));
-      final a = rowPos(i), b = logoPos(i);
-
-      Offset at(double tt) => Offset.lerp(a, b, dash(tt))!;
-      // Quanto o 4º encolhe ao chegar.
-      double shrink(double tt) =>
-          i == 3 ? 1 - Curves.easeIn.transform(_seg(dash(tt), 0.55, 1.0)) : 1;
-
-      // Rastro do deslize (cópias mais fracas para trás no tempo).
-      if (dash(t) > 0 && dash(t) < 1) {
-        for (var k = 3; k >= 1; k--) {
-          final tt = t - 0.012 * k;
-          _cube(canvas, at(tt), u * pop * shrink(tt), 0.20 / k);
-        }
-      }
-      _cube(canvas, at(t), u * pop * shrink(t), 1);
+    // Feixe do projetor: desce do alto e se abre até o logo.
+    if (beamIn > 0) {
+      final bottom = mid.dy + u * 2.2;
+      final path = Path()
+        ..moveTo(mid.dx - u * 0.25, -4)
+        ..lineTo(mid.dx + u * 0.25, -4)
+        ..lineTo(mid.dx + u * 3.2, bottom)
+        ..lineTo(mid.dx - u * 3.2, bottom)
+        ..close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = ui.Gradient.linear(
+            Offset(mid.dx, 0),
+            Offset(mid.dx, bottom),
+            [
+              Colors.white.withValues(alpha: 0.0),
+              Colors.white.withValues(alpha: 0.10 * beamIn),
+              Colors.white.withValues(alpha: 0.0),
+            ],
+            const [0.0, 0.5, 0.95],
+          ),
+      );
     }
 
-    // Quando o logo se forma (t ≈ 0,76): uma cópia semitransparente do logo
-    // nasce sobre ele e cresce em 0,16 da animação, sumindo. O nome vem depois.
-    const echoStart = 0.76;
-    final echo = _seg(t, echoStart, echoStart + 0.16);
-    if (echo > 0 && echo < 1) {
-      final k = 1 + 0.55 * Curves.easeOut.transform(echo);
-      final a = 0.5 * (1 - echo);
+    // Halo atrás do logo (acompanha a luz).
+    if (beamIn > 0) {
+      final r = u * 3.2;
+      canvas.drawCircle(
+        mid,
+        r,
+        Paint()
+          ..shader = ui.Gradient.radial(mid, r, [
+            left.withValues(alpha: 0.28 * beamIn),
+            left.withValues(alpha: 0),
+          ]),
+      );
+    }
+
+    // Logo (3 cubos) que acende, com um brilho diagonal que o atravessa.
+    if (lit > 0) {
+      final k = 0.94 + 0.06 * lit;
+      canvas.saveLayer(null, Paint());
       for (final i in const [2, 1, 0]) {
-        _cube(canvas, mid + (logoPos(i) - mid) * k, u * k, a);
+        _cube(canvas, mid + (logoPos(i) - mid) * k, u * k, lit);
       }
+      final sweep = Curves.easeInOut.transform(_seg(t, 0.52, 0.76));
+      if (sweep > 0 && sweep < 1) {
+        final cx = mid.dx + (sweep * 2 - 1) * u * 3.2;
+        canvas.save();
+        canvas.translate(cx, mid.dy);
+        canvas.skew(-0.45, 0);
+        canvas.drawRect(
+          Rect.fromCenter(center: Offset.zero, width: u * 1.4, height: u * 6),
+          Paint()
+            ..blendMode = BlendMode.srcATop
+            ..shader = ui.Gradient.linear(
+              Offset(-u * 0.7, 0),
+              Offset(u * 0.7, 0),
+              [
+                Colors.white.withValues(alpha: 0),
+                Colors.white.withValues(alpha: 0.7),
+                Colors.white.withValues(alpha: 0),
+              ],
+              const [0.0, 0.5, 1.0],
+            ),
+        );
+        canvas.restore();
+      }
+      canvas.restore();
     }
   }
 

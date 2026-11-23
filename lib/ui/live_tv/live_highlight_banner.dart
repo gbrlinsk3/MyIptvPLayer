@@ -17,7 +17,9 @@ Color highlightGradientAt(double t) {
   final b = Color.lerp(AppColors.bg, AppColors.accent, 0.18)!;
   final c = AppColors.bg;
   t = t.clamp(0.0, 1.0);
-  return t < 0.55 ? Color.lerp(a, b, t / 0.55)! : Color.lerp(b, c, (t - 0.55) / 0.45)!;
+  return t < 0.55
+      ? Color.lerp(a, b, t / 0.55)!
+      : Color.lerp(b, c, (t - 0.55) / 0.45)!;
 }
 
 /// Banner de destaques da TV ao vivo: um slide por palavra-chave (máx. 4),
@@ -109,7 +111,9 @@ class _LiveHighlightBannerState extends State<LiveHighlightBanner> {
                                   decoration: BoxDecoration(
                                     color: k == i
                                         ? AppColors.accent
-                                        : AppColors.text.withValues(alpha: 0.35),
+                                        : AppColors.text.withValues(
+                                            alpha: 0.35,
+                                          ),
                                     borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
@@ -198,6 +202,7 @@ class _Slide extends StatefulWidget {
 
 class _SlideState extends State<_Slide> {
   int _start = 0;
+  double _drag = 0;
 
   // Texto do banner segue o tema: escuro no claro, claro no escuro.
   static ButtonStyle get _outlined => OutlinedButton.styleFrom(
@@ -231,14 +236,17 @@ class _SlideState extends State<_Slide> {
           // O cartão do meio é o principal e fica maior.
           const tile = 92.0, mainTile = 124.0, gap = 8.0;
           final mainIndex = shown ~/ 2;
-          final stripWidth = (shown - 1) * tile + (shown > 0 ? mainTile : 0) + (shown - 1) * gap;
+          final stripWidth =
+              (shown - 1) * tile +
+              (shown > 0 ? mainTile : 0) +
+              (shown - 1) * gap;
           final canScroll = channels.length > visible;
           return Stack(
             children: [
               Positioned(
                 left: 40,
                 bottom: 30,
-                right: stripWidth + 80,
+                right: stripWidth + 160,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,7 +265,11 @@ class _SlideState extends State<_Slide> {
                       h.keyword.toUpperCase(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppFonts.title(52, color: AppColors.text, spacing: 1.5),
+                      style: AppFonts.title(
+                        52,
+                        color: AppColors.text,
+                        spacing: 1.5,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -273,7 +285,8 @@ class _SlideState extends State<_Slide> {
                     Row(
                       children: [
                         FilledButton.icon(
-                          onPressed: () => widget.onOpen(channels.first, channels),
+                          onPressed: () =>
+                              widget.onOpen(channels.first, channels),
                           icon: const Icon(Icons.play_arrow_rounded, size: 20),
                           label: const Text('Assistir'),
                         ),
@@ -310,79 +323,115 @@ class _SlideState extends State<_Slide> {
                 ),
               ),
               Positioned(
-                right: 40,
+                right: 88,
                 bottom: 30,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Nome do canal do meio, sobre os cartões.
-                    SizedBox(
-                      width: stripWidth,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          channels[(_start + shown ~/ 2) % channels.length].name,
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.text,
+                // Segurar e arrastar passa os canais (um por ~100 px).
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragUpdate: (d) {
+                    _drag += d.delta.dx;
+                    const step = tile + gap;
+                    var moved = 0;
+                    while (_drag <= -step) {
+                      _drag += step;
+                      moved++;
+                    }
+                    while (_drag >= step) {
+                      _drag -= step;
+                      moved--;
+                    }
+                    if (moved != 0 && channels.length > visible) {
+                      setState(
+                        () => _start =
+                            ((_start + moved) % channels.length +
+                                channels.length) %
+                            channels.length,
+                      );
+                    }
+                  },
+                  onHorizontalDragEnd: (_) => _drag = 0,
+                  onHorizontalDragCancel: () => _drag = 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Nome do canal do meio, sobre os cartões.
+                      SizedBox(
+                        width: stripWidth,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            channels[(_start + shown ~/ 2) % channels.length]
+                                .name,
+                            maxLines: 1,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.text,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (canScroll)
-                      _StripButton(
-                        icon: Icons.chevron_left,
-                        onTap: () => setState(
-                          () => _start = (_start - 1 + channels.length) % channels.length,
-                        ),
-                      ),
-                    SizedBox(
-                      width: stripWidth,
-                      height: mainTile,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          for (var k = 0; k < shown; k++) ...[
-                            if (k > 0) const SizedBox(width: gap),
-                            Opacity(
-                              // As duas pontas ficam mais translúcidas quando há mais canais.
-                              opacity: canScroll && (k == 0 || k == shown - 1) ? 0.45 : 1,
-                              child: Magnet(
-                                padding: 40,
-                                strength: 5,
-                                child: _Tile(
-                                channel: channels[(_start + k) % channels.length],
-                                size: k == mainIndex ? mainTile : tile,
-                                main: k == mainIndex,
-                                onTap: () => widget.onOpen(
-                                  channels[(_start + k) % channels.length],
-                                  channels,
-                                ),
-                                ),
+                          if (canScroll)
+                            _StripButton(
+                              icon: Icons.chevron_left,
+                              onTap: () => setState(
+                                () => _start =
+                                    (_start - 1 + channels.length) %
+                                    channels.length,
                               ),
                             ),
-                          ],
+                          SizedBox(
+                            width: stripWidth,
+                            height: mainTile,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                for (var k = 0; k < shown; k++) ...[
+                                  if (k > 0) const SizedBox(width: gap),
+                                  Opacity(
+                                    // As duas pontas ficam mais translúcidas quando há mais canais.
+                                    opacity:
+                                        canScroll && (k == 0 || k == shown - 1)
+                                        ? 0.45
+                                        : 1,
+                                    child: Magnet(
+                                      padding: 40,
+                                      strength: 5,
+                                      child: _Tile(
+                                        channel:
+                                            channels[(_start + k) %
+                                                channels.length],
+                                        size: k == mainIndex ? mainTile : tile,
+                                        main: k == mainIndex,
+                                        onTap: () => widget.onOpen(
+                                          channels[(_start + k) %
+                                              channels.length],
+                                          channels,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (canScroll)
+                            _StripButton(
+                              icon: Icons.chevron_right,
+                              onTap: () => setState(
+                                () => _start = (_start + 1) % channels.length,
+                              ),
+                            ),
                         ],
                       ),
-                    ),
-                    if (canScroll)
-                      _StripButton(
-                        icon: Icons.chevron_right,
-                        onTap: () => setState(
-                          () => _start = (_start + 1) % channels.length,
-                        ),
-                      ),
-                  ],
-                ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -481,12 +530,19 @@ class _TileState extends State<_Tile> {
                       child: Padding(
                         padding: const EdgeInsets.all(8),
                         child: (url == null || url.isEmpty)
-                            ? const Icon(Icons.tv, color: Color(0x99FFFFFF), size: 26)
+                            ? const Icon(
+                                Icons.tv,
+                                color: Color(0x99FFFFFF),
+                                size: 26,
+                              )
                             : LiveLogo(
                                 url: url,
                                 memCacheWidth: 200,
-                                fallback: const Icon(Icons.tv,
-                                    color: Color(0x99FFFFFF), size: 26),
+                                fallback: const Icon(
+                                  Icons.tv,
+                                  color: Color(0x99FFFFFF),
+                                  size: 26,
+                                ),
                               ),
                       ),
                     ),
@@ -558,10 +614,8 @@ class _MiniRow extends StatelessWidget {
     final c = AppScope.read(context);
     final id = await showDialog<String>(
       context: context,
-      builder: (context) => _CategoryPicker(
-        categories: c.categories,
-        counts: c.countByCategory,
-      ),
+      builder: (context) =>
+          _CategoryPicker(categories: c.categories, counts: c.countByCategory),
     );
     if (id != null) await c.setMiniBanner(slide, slot, 'cat:$id');
   }
@@ -579,6 +633,7 @@ class _MiniCard extends StatefulWidget {
 
   final MiniBanner? banner;
   final bool hasToken;
+
   /// Posição horizontal do cartão na fileira (0 a 1), para casar a cor com o
   /// degradê do banner principal.
   final double position;
@@ -629,11 +684,18 @@ class _MiniCardState extends State<_MiniCard> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add_circle_outline, size: 22, color: AppColors.textMuted),
+                  Icon(
+                    Icons.add_circle_outline,
+                    size: 22,
+                    color: AppColors.textMuted,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Adicionar categoria',
-                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 ],
               ),
@@ -688,7 +750,10 @@ class _MiniCardState extends State<_MiniCard> {
                                     : '${b.channels.length} canais · ${b.categories.length} categorias',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.textMuted,
+                                ),
                               ),
                             ],
                           ),
@@ -793,7 +858,10 @@ class _CategoryPickerState extends State<_CategoryPicker> {
                         ),
                         trailing: Text(
                           '${widget.counts[list[i].id] ?? 0}',
-                          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
                         ),
                         onTap: () => Navigator.of(context).pop(list[i].id),
                       ),
@@ -811,7 +879,6 @@ class _CategoryPickerState extends State<_CategoryPicker> {
     );
   }
 }
-
 
 /// Painel "Ver todos": escolhe qual categoria abrir quando o banner reúne
 /// várias. Mesmo visual dos outros diálogos do programa.
@@ -898,7 +965,9 @@ class _CategoryOptionState extends State<_CategoryOption> {
           margin: const EdgeInsets.only(bottom: 6),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: _hover ? AppColors.accent.withValues(alpha: 0.14) : AppColors.bg,
+            color: _hover
+                ? AppColors.accent.withValues(alpha: 0.14)
+                : AppColors.bg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: _hover ? AppColors.accent : AppColors.border,

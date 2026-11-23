@@ -49,6 +49,10 @@ class MorphImageSwitcher extends StatefulWidget {
     return (await _loadProgram()) != null;
   }
 
+  /// Carrega (uma única vez) o shader do Morph Slider; `null` se indisponível.
+  /// Usado também por `MorphReveal`.
+  static Future<ui.FragmentProgram?> loadProgram() => _loadProgram();
+
   /// Carrega o shader uma única vez. `null` se não for possível (o widget usa o
   /// cross-fade nesse caso).
   static Future<ui.FragmentProgram?> _loadProgram() {

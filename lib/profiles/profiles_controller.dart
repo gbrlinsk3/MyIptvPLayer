@@ -96,11 +96,16 @@ class ProfilesController extends ChangeNotifier {
       db = await AppDatabase.open(_store!.pathFor(profile.id));
       epg = EpgController(db);
       app = AppController(db, playback, epg);
-      await app.init();
+      // Entra no perfil já: a abertura toca e o Início começa a montar enquanto
+      // o controlador carrega (a interface espera `phase` sair de "booting").
       AppColors.applyAccent(profile.accentColor);
       session = ProfileSession(profile, db, epg, app);
+      notifyListeners();
+      await app.init();
     } catch (e) {
       error = 'Não foi possível abrir o perfil: $e';
+      session = null;
+      AppColors.resetAccent();
       app?.dispose();
       epg?.dispose();
       await db?.close();

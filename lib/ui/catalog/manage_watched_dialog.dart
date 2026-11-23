@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../widgets/click_spark.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../widgets/animated_counter.dart';
@@ -50,6 +51,7 @@ class _ManageWatchedDialogState extends State<ManageWatchedDialog> {
 
   Future<void> _set(Iterable<Episode> episodes, bool watched) async {
     if (_busy) return;
+    if (watched) ClickSpark.noClique(context, shape: SparkShape.dashes);
     setState(() => _busy = true);
     final catalog = AppScope.read(context).catalog;
     for (final e in episodes) {

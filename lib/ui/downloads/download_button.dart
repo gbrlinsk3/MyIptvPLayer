@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/format.dart';
 import '../../core/theme.dart';
+import '../widgets/click_spark.dart';
 import '../../downloads/download_models.dart';
 import '../../state/app_scope.dart';
 
@@ -38,7 +39,10 @@ class DownloadButton extends StatelessWidget {
         IconData icon = Icons.download_outlined;
         String label = 'Baixar';
         String tip = 'Baixar no formato original';
-        VoidCallback action = () => downloads.enqueue(request);
+        VoidCallback action = () {
+          ClickSpark.noClique(context, shape: SparkShape.comets);
+          downloads.enqueue(request);
+        };
         double? ring;
         var accent = false;
 

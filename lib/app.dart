@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import 'core/app_info.dart';
 import 'core/theme.dart';
@@ -13,6 +15,7 @@ import 'ui/login_page.dart';
 import 'ui/profiles/profile_picker_page.dart';
 import 'ui/shell.dart';
 import 'ui/update/update_toast.dart';
+import 'ui/widgets/morph_reveal.dart';
 import 'ui/widgets/profile_intro.dart';
 import 'ui/widgets/ui_scale.dart';
 import 'ui/window/title_bar.dart';
@@ -191,8 +194,92 @@ class _Root extends StatefulWidget {
 }
 
 class _RootState extends State<_Root> {
-  // Animação da marca ao entrar no perfil (2,5 s, cobre o carregamento).
+  // Animação de abertura ao entrar no perfil (cobre o carregamento). Ao fim da
+  // cena, ela e o Início são capturados como imagens e trocados com a transição
+  // "derreter" do Morph Slider (MorphReveal).
   bool _intro = true;
+  bool _sceneDone = false;
+  bool _morphStarted = false;
+  ui.Image? _fromImage;
+  ui.Image? _toImage;
+  final _sceneKey = GlobalKey();
+  final _pageKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _fromImage?.dispose();
+    _toImage?.dispose();
+    super.dispose();
+  }
+
+  Future<ui.Image?> _capture(GlobalKey key) async {
+    final boundary = key.currentContext?.findRenderObject();
+    if (boundary is! RenderRepaintBoundary) return null;
+    return boundary.toImage(pixelRatio: 1.0);
+  }
+
+  /// A cena terminou e o perfil já saiu do carregamento: captura as duas telas
+  /// e começa a transição. Se algo falhar, a cena só some.
+  Future<void> _startMorph() async {
+    _morphStarted = true;
+    try {
+      // Espera as imagens do Início (banners e capas) chegarem, senão a captura
+      // sai com quadrados vazios: segue quando o cache de imagens para de
+      // crescer por ~0,4 s (no máximo 2,2 s de espera extra).
+      final cache = PaintingBinding.instance.imageCache;
+      var last = cache.currentSizeBytes;
+      var stable = 0;
+      final waited = Stopwatch()..start();
+      while (mounted &&
+          waited.elapsedMilliseconds < 2200 &&
+          (stable < 4 || waited.elapsedMilliseconds < 500)) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        final now = cache.currentSizeBytes;
+        if (now == last) {
+          stable++;
+        } else {
+          stable = 0;
+          last = now;
+        }
+      }
+      await WidgetsBinding.instance.endOfFrame;
+      final from = await _capture(_sceneKey);
+      final to = await _capture(_pageKey);
+      if (!mounted) {
+        from?.dispose();
+        to?.dispose();
+        return;
+      }
+      if (from == null || to == null) {
+        from?.dispose();
+        to?.dispose();
+        setState(() => _intro = false);
+        return;
+      }
+      setState(() {
+        _fromImage = from;
+        _toImage = to;
+      });
+    } catch (e) {
+      debugPrint('Abertura: captura falhou ($e)');
+      if (mounted) setState(() => _intro = false);
+    }
+  }
+
+  void _finishMorph() {
+    if (!mounted) return;
+    final from = _fromImage, to = _toImage;
+    setState(() {
+      _intro = false;
+      _fromImage = null;
+      _toImage = null;
+    });
+    // Libera depois do quadro em que o desenho deixou de usar as imagens.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      from?.dispose();
+      to?.dispose();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -206,13 +293,29 @@ class _RootState extends State<_Root> {
       case AppPhase.ready:
         page = const Shell();
     }
+    if (_intro && _sceneDone && !_morphStarted && controller.phase != AppPhase.booting) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startMorph();
+      });
+    }
     // A árvore não muda quando a animação termina (o app não é recriado).
     return Stack(
       children: [
-        Positioned.fill(child: page),
-        if (_intro)
+        Positioned.fill(child: RepaintBoundary(key: _pageKey, child: page)),
+        if (_intro && _toImage == null)
           Positioned.fill(
-            child: ProfileIntro(onDone: () => setState(() => _intro = false)),
+            child: ProfileIntro(
+              boundaryKey: _sceneKey,
+              onDone: () => setState(() => _sceneDone = true),
+            ),
+          ),
+        if (_intro && _fromImage != null && _toImage != null)
+          Positioned.fill(
+            child: MorphReveal(
+              from: _fromImage!,
+              to: _toImage!,
+              onDone: _finishMorph,
+            ),
           ),
       ],
     );

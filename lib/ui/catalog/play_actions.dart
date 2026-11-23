@@ -64,6 +64,7 @@ Future<void> resumeTitle(BuildContext context, CatalogTitle t) async {
         subtitle: '${e.code} — ${e.title}',
         url: url,
         image: t.image,
+        thumb: e.image,
         seriesId: t.id,
         season: e.season,
         episode: e.number,

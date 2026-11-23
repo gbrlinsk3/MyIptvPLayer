@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
@@ -77,6 +78,48 @@ class ClickSpark {
       ),
     );
     overlay.insert(entry);
+  }
+
+  static Offset? _ultimoToque;
+  static Stopwatch? _desdeToque;
+  static bool _ouvindo = false;
+
+  /// Passa a guardar onde foi o último toque/clique. Chame uma vez na partida
+  /// do app; sem isso [noClique] não desenha nada.
+  static void ouvirCliques() {
+    if (_ouvindo) return;
+    _ouvindo = true;
+    GestureBinding.instance.pointerRouter.addGlobalRoute((evento) {
+      if (evento is PointerDownEvent) {
+        _ultimoToque = evento.position;
+        _desdeToque = Stopwatch()..start();
+      }
+    });
+  }
+
+  /// Faíscas no ponto do último clique, para ações de botões cujo [BuildContext]
+  /// não é o do botão. Só vale para uma ação disparada por clique: se o último
+  /// toque foi há mais de um segundo (ação pelo teclado), não desenha nada.
+  static void noClique(
+    BuildContext context, {
+    SparkShape shape = SparkShape.dashes,
+    Color? color,
+    int count = 8,
+    double radius = 24,
+    double size = 10,
+  }) {
+    final ponto = _ultimoToque;
+    final t = _desdeToque;
+    if (ponto == null || t == null || t.elapsedMilliseconds > 1000) return;
+    burst(
+      context,
+      globalPosition: ponto,
+      shape: shape,
+      color: color,
+      count: count,
+      radius: radius,
+      size: size,
+    );
   }
 
   /// Igual a [burst], no centro do widget de [ctx].

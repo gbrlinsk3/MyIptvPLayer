@@ -83,7 +83,10 @@ class _EpgPanelState extends State<EpgPanel> {
             programs.isNotEmpty &&
             !identical(_scrolledFor, epg.programs)) {
           _scrolledFor = epg.programs;
-          final index = math.max(0, programs.indexWhere((p) => p.stop > nowEpoch));
+          final index = math.max(
+            0,
+            programs.indexWhere((p) => p.stop > nowEpoch),
+          );
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!_scroll.hasClients) return;
             _scroll.jumpTo(
@@ -121,7 +124,8 @@ class _EpgPanelState extends State<EpgPanel> {
                       // Tentar de novo refaz a busca do canal atual.
                       onRetry: channel == null
                           ? null
-                          : () => unawaited(epg.showChannel(channel, c.account)),
+                          : () =>
+                                unawaited(epg.showChannel(channel, c.account)),
                     ),
                   ),
                 ),
@@ -190,8 +194,11 @@ class _Header extends StatelessWidget {
         padding: const EdgeInsets.only(left: 16, right: 4),
         child: Row(
           children: [
-            Icon(Icons.event_note_outlined,
-                size: 16, color: AppColors.textMuted),
+            Icon(
+              Icons.event_note_outlined,
+              size: 16,
+              color: AppColors.textMuted,
+            ),
             const SizedBox(width: 8),
             Flexible(
               flex: 2,
@@ -223,14 +230,13 @@ class _Header extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 8),
                 child: Text(
                   'Fonte: $sourceLabel',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
               ),
             IconButton(
-              tooltip: collapsed ? 'Expandir programação' : 'Minimizar programação',
+              tooltip: collapsed
+                  ? 'Expandir programação'
+                  : 'Minimizar programação',
               onPressed: onToggle,
               icon: Icon(
                 collapsed ? Icons.expand_less : Icons.expand_more,
@@ -310,10 +316,7 @@ class _ProgramCard extends StatelessWidget {
                   description,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
               ],
               const Spacer(),

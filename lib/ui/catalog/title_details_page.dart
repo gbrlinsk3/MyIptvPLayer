@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/format.dart';
 import '../../core/theme.dart';
+import '../widgets/click_spark.dart';
 import '../../data/catalog_models.dart';
 import '../../downloads/download_models.dart';
 import '../../state/app_controller.dart';
@@ -146,6 +147,7 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
       subtitle: '${e.code} — ${e.title}',
       url: url,
       image: widget.title.image,
+      thumb: e.image,
       seriesId: widget.title.id,
       season: e.season,
       episode: e.number,
@@ -211,6 +213,7 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
   }
 
   Future<void> _toggleWatchedMovie(TitleDetails d, bool watched) async {
+    if (!watched) ClickSpark.noClique(context, shape: SparkShape.dashes);
     final app = AppScope.read(context);
     final item = _movieItem(app, d);
     if (item == null) return;
@@ -219,6 +222,7 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
   }
 
   Future<void> _toggleWatchedEpisode(Episode e, bool watched) async {
+    if (!watched) ClickSpark.noClique(context, shape: SparkShape.dashes);
     final app = AppScope.read(context);
     final item = _episodeItem(app, e);
     if (item == null) return;
@@ -615,20 +619,29 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
                   : 'Assistir ${target.code}',
               onTap: () => _playEpisode(d, target, map),
             ),
-            if (resume)
-              HeroGhostButton(
-                label: 'Do início',
-                onTap: () => _playEpisode(d, target, map, fromStart: true),
-              ),
             FavoriteHeroButton(title: widget.title),
           ],
         ),
         const SizedBox(height: 8),
-        TextButton.icon(
-          style: link(),
-          onPressed: () => _manageWatched(d, target.season),
-          icon: const Icon(Icons.checklist_rounded, size: 16),
-          label: const Text('Gerenciar assistidos', style: linkStyle),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (resume)
+              TextButton.icon(
+                style: link(),
+                onPressed: () =>
+                    _playEpisode(d, target, map, fromStart: true),
+                icon: const Icon(Icons.replay, size: 16),
+                label: const Text('Assistir do início', style: linkStyle),
+              ),
+            if (resume) const SizedBox(width: 16),
+            TextButton.icon(
+              style: link(),
+              onPressed: () => _manageWatched(d, target.season),
+              icon: const Icon(Icons.checklist_rounded, size: 16),
+              label: const Text('Gerenciar assistidos', style: linkStyle),
+            ),
+          ],
         ),
       ],
     );
@@ -684,9 +697,12 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
                 ),
               const Spacer(),
               TextButton.icon(
-                onPressed: () => AppScope.read(context).downloads.enqueueAll([
-                  for (final e in episodes) _episodeRequest(d, e),
-                ]),
+                onPressed: () {
+                  ClickSpark.noClique(context, shape: SparkShape.comets);
+                  AppScope.read(context).downloads.enqueueAll([
+                    for (final e in episodes) _episodeRequest(d, e),
+                  ]);
+                },
                 icon: const Icon(Icons.download_outlined, size: 18),
                 label: const Text('Baixar temporada'),
                 style: TextButton.styleFrom(foregroundColor: Colors.white70),

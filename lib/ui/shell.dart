@@ -138,17 +138,24 @@ class _ShellState extends State<Shell> {
             left: _railWidth,
             child: Column(
               children: [
-                TitleBar(
-                  height: 64,
-                  child: TopBarContent(
-                    search: _search,
-                    focus: _searchFocus,
-                    onQuery: _onQuery,
-                    onOpenAccount: () {
-                      _clearSearch();
-                      c.setShellIndex(5);
-                    },
-                  ),
+                // Com vídeo tocando na TV ao vivo a barra some e o player
+                // ocupa esse espaço.
+                ValueListenableBuilder<bool>(
+                  valueListenable: WindowChrome.hidden,
+                  builder: (context, hidden, _) => hidden
+                      ? const SizedBox.shrink()
+                      : TitleBar(
+                          height: 64,
+                          child: TopBarContent(
+                            search: _search,
+                            focus: _searchFocus,
+                            onQuery: _onQuery,
+                            onOpenAccount: () {
+                              _clearSearch();
+                              c.setShellIndex(5);
+                            },
+                          ),
+                        ),
                 ),
                 Expanded(
                   // "Largura do catálogo": coluna centralizada (ou preenchida).

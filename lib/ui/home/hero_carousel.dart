@@ -444,6 +444,10 @@ class _HeroBackgroundState extends State<_HeroBackground>
 
   ImageProvider? _image;
   bool _semImagem = false; // o título atual não tem imagem horizontal
+  // A imagem horizontal do título atual já carregou e pode aparecer. Enquanto
+  // for falso, só o pôster desfocado do próprio título fica visível (nunca o
+  // fundo de outro banner).
+  bool _mostrar = false;
   int _carga = 0;
   int _voltaZoom = 0;
 
@@ -487,7 +491,12 @@ class _HeroBackgroundState extends State<_HeroBackground>
     final titulo = widget.title;
     final carga = ++_carga;
     final catalogo = AppScope.read(context).catalog;
-    if (_semImagem) setState(() => _semImagem = false);
+    if (_semImagem || _mostrar) {
+      setState(() {
+        _semImagem = false;
+        _mostrar = false;
+      });
+    }
 
     final d = await catalogo.detailsOrNull(titulo.kind, titulo.id);
     if (!mounted || carga != _carga) return;
@@ -503,7 +512,10 @@ class _HeroBackgroundState extends State<_HeroBackground>
       await precacheImage(provider, context, onError: (_, _) => ok = false);
       if (!mounted || carga != _carga) return;
       if (ok) {
-        setState(() => _image = provider);
+        setState(() {
+          _image = provider;
+          _mostrar = true;
+        });
         return;
       }
     }
@@ -524,9 +536,13 @@ class _HeroBackgroundState extends State<_HeroBackground>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            MorphImageSwitcher(
-              image: _image,
-              placeholder: Stack(
+            // Base: pôster desfocado do título atual (dissolve ao trocar).
+            AnimatedSwitcher(
+              duration: reduzir
+                  ? Duration.zero
+                  : const Duration(milliseconds: 600),
+              child: Stack(
+                key: ValueKey('${widget.title.kind.key}:${widget.title.id}'),
                 fit: StackFit.expand,
                 children: [
                   const ColoredBox(color: Color(0xFF141312)),
@@ -534,6 +550,14 @@ class _HeroBackgroundState extends State<_HeroBackground>
                   const ColoredBox(color: Color(0x55000000)),
                 ],
               ),
+            ),
+            // Imagem horizontal: só aparece quando a do título atual carregou.
+            AnimatedOpacity(
+              opacity: _mostrar ? 1 : 0,
+              duration: reduzir
+                  ? Duration.zero
+                  : const Duration(milliseconds: 600),
+              child: MorphImageSwitcher(image: _image),
             ),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 600),

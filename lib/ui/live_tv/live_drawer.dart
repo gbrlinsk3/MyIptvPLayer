@@ -212,6 +212,9 @@ class _LiveDrawerState extends State<LiveDrawer>
     curve: Curves.easeOutCubic,
   );
 
+  final TextEditingController _search = TextEditingController();
+  String _query = '';
+
   bool _reduce = false;
   bool _entryPending = false;
 
@@ -285,6 +288,7 @@ class _LiveDrawerState extends State<LiveDrawer>
   @override
   void dispose() {
     _banner.dispose();
+    _search.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -433,6 +437,11 @@ class _LiveDrawerState extends State<LiveDrawer>
               ),
             ),
             const SizedBox(width: 8),
+            // Com o vídeo tocando a barra de cima some: a busca vem para cá.
+            if (widget.closable) ...[
+              SizedBox(width: 280, child: _searchField()),
+              const SizedBox(width: 8),
+            ],
             IconButton(
               tooltip: 'Atualizar catálogo',
               onPressed: c.syncing ? null : c.refreshCatalog,
@@ -520,6 +529,64 @@ class _LiveDrawerState extends State<LiveDrawer>
     );
   }
 
+  Widget _searchField() {
+    return TextField(
+      controller: _search,
+      onChanged: (v) => setState(() => _query = v),
+      style: const TextStyle(fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Buscar canais…',
+        hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
+        isDense: true,
+        filled: true,
+        fillColor: AppColors.surface,
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        prefixIcon: Icon(Icons.search, size: 18, color: AppColors.textMuted),
+        suffixIcon: _query.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Limpar',
+                icon: Icon(Icons.close, size: 16, color: AppColors.textMuted),
+                onPressed: () {
+                  _search.clear();
+                  setState(() => _query = '');
+                },
+              ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: AppColors.accent),
+        ),
+      ),
+    );
+  }
+
+  /// Seções com a busca aplicada (só na gaveta aberta sobre o vídeo).
+  List<_Section> get _visibleSections {
+    final f = foldText(_query.trim());
+    if (!widget.closable || f.isEmpty) return _sections;
+    final out = <_Section>[];
+    for (final s in _sections) {
+      final g = [
+        for (final x in s.groups)
+          if (foldText(x.displayName).contains(f)) x,
+      ];
+      if (g.isNotEmpty) {
+        out.add(
+          _Section(s.title, g, categoryId: s.categoryId, recents: s.recents),
+        );
+      }
+    }
+    return out;
+  }
+
   Widget _body(AppController c) {
     _bannerShown = false;
     if (c.totalChannels == 0) {
@@ -547,7 +614,8 @@ class _LiveDrawerState extends State<LiveDrawer>
     _bannerShown =
         widget.showBanner && onOpenChannel != null && highlights.isNotEmpty;
 
-    if (_sections.isEmpty && !_bannerShown) {
+    final sections = _visibleSections;
+    if (sections.isEmpty && !_bannerShown) {
       return Center(
         child: Text(
           'Nenhum canal encontrado.',
@@ -574,16 +642,16 @@ class _LiveDrawerState extends State<LiveDrawer>
             ),
           ),
         SliverVariedExtentList(
-          itemExtentBuilder: (i, dimensions) => _sections[i].extent,
+          itemExtentBuilder: (i, dimensions) => sections[i].extent,
           delegate: SliverChildBuilderDelegate((context, i) {
-            final s = _sections[i];
+            final s = sections[i];
             return _SectionRow(
               key: ValueKey('$i:${s.title}'),
               section: s,
               currentStreamId: widget.currentStreamId,
               onOpen: widget.onOpen,
             );
-          }, childCount: _sections.length),
+          }, childCount: sections.length),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
@@ -686,7 +754,9 @@ class _SectionRowState extends State<_SectionRow> {
                   : 0.0;
               final comSetas =
                   groups.length * itemWidth + extra >
-                  box.maxWidth - 2 * _LiveDrawerState._pad + _LiveDrawerState._gap;
+                  box.maxWidth -
+                      2 * _LiveDrawerState._pad +
+                      _LiveDrawerState._gap;
               final passo = itemWidth * 3;
               final top = (rowHeight - CarouselArrowButton.size) / 2;
               return Stack(
@@ -698,58 +768,64 @@ class _SectionRowState extends State<_SectionRow> {
                       }
                     },
                     child: CarouselDragArea(
-                    child: SpotlightGroup(
-                    child: ListView.builder(
-                      controller: _scroll,
-                      scrollDirection: Axis.horizontal,
-                      // Largura fixa por item, exceto em Recentes (os cartões
-                      // mudam de largura ao expandir).
-                      itemExtent: recents ? null : itemWidth,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: _LiveDrawerState._pad,
-                        vertical: 4,
-                      ),
-                      itemCount: groups.length,
-                      itemBuilder: (context, i) {
-                        final g = groups[i];
-                        final current =
-                            widget.currentStreamId != null &&
-                            g.contains(widget.currentStreamId!);
-                        return Padding(
-                          padding: const EdgeInsets.only(
-                            right: _LiveDrawerState._gap,
+                      child: SpotlightGroup(
+                        child: ListView.builder(
+                          controller: _scroll,
+                          scrollDirection: Axis.horizontal,
+                          // Largura fixa por item, exceto em Recentes (os cartões
+                          // mudam de largura ao expandir).
+                          itemExtent: recents ? null : itemWidth,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: _LiveDrawerState._pad,
+                            vertical: 4,
                           ),
-                          child: recents
-                              ? LiveRecentCard(
-                                  key: ValueKey(g.key),
-                                  group: g,
-                                  current: current,
-                                  favorite: groupIsFavorite(c, g),
-                                  recent: groupIsRecent(c, g),
-                                  expanded: i == open,
-                                  onEnter: () {
-                                    if (_hover != i) setState(() => _hover = i);
-                                  },
-                                  onTap: () => widget.onOpen(g, groups),
-                                  onToggleFavorite: () =>
-                                      unfavoriteGroupWithUndo(context, c, g),
-                                  onRemoveRecent: () =>
-                                      removeGroupFromRecents(c, g),
-                                )
-                              : ChannelGroupCard(
-                                  key: ValueKey(g.key),
-                                  group: g,
-                                  current: current,
-                                  category: section.title,
-                                  favorite: groupIsFavorite(c, g),
-                                  onToggleFavorite: () =>
-                                      toggleGroupFavorite(c, g),
-                                  onTap: () => widget.onOpen(g, groups),
-                                ),
-                        );
-                      },
-                    ),
-                    ),
+                          itemCount: groups.length,
+                          itemBuilder: (context, i) {
+                            final g = groups[i];
+                            final current =
+                                widget.currentStreamId != null &&
+                                g.contains(widget.currentStreamId!);
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                right: _LiveDrawerState._gap,
+                              ),
+                              child: recents
+                                  ? LiveRecentCard(
+                                      key: ValueKey(g.key),
+                                      group: g,
+                                      current: current,
+                                      favorite: groupIsFavorite(c, g),
+                                      recent: groupIsRecent(c, g),
+                                      expanded: i == open,
+                                      onEnter: () {
+                                        if (_hover != i) {
+                                          setState(() => _hover = i);
+                                        }
+                                      },
+                                      onTap: () => widget.onOpen(g, groups),
+                                      onToggleFavorite: () =>
+                                          unfavoriteGroupWithUndo(
+                                            context,
+                                            c,
+                                            g,
+                                          ),
+                                      onRemoveRecent: () =>
+                                          removeGroupFromRecents(c, g),
+                                    )
+                                  : ChannelGroupCard(
+                                      key: ValueKey(g.key),
+                                      group: g,
+                                      current: current,
+                                      category: section.title,
+                                      favorite: groupIsFavorite(c, g),
+                                      onToggleFavorite: () =>
+                                          toggleGroupFavorite(c, g),
+                                      onTap: () => widget.onOpen(g, groups),
+                                    ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
                   if (comSetas)
