@@ -66,6 +66,8 @@ class _LiveTvPageState extends State<LiveTvPage> {
   static const Duration _hideAfter = Duration(milliseconds: 4500);
   static const double _drawerFraction = 0.72;
   static const double _sidePad = 28;
+  /// Altura da camada escura de "Todos os canais"; o botão de tela cheia fica acima dela.
+  static const double _fullscreenLift = 76 + 56;
   static const int _maxRecentGroups = 24;
 
   static const Duration _snapTime = Duration(milliseconds: 250);
@@ -610,7 +612,9 @@ class _LiveTvPageState extends State<LiveTvPage> {
                       ),
                       PlaybackOverlays(playback: c.playback),
                       _scrim(fade, box.maxHeight),
+                      // Tela cheia: acima da camada escura de "Todos os canais".
                       Positioned.fill(
+                        bottom: _fullscreenLift,
                         child: PlayerControls(
                           playback: c.playback,
                           fullscreen: false,
@@ -1114,7 +1118,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
                   bottom: 0,
                   height: 76 + 56,
                   child: const IgnorePointer(
-                    child: ColoredBox(color: Color.fromRGBO(0, 0, 0, 0.55)),
+                    child: ColoredBox(color: Color.fromRGBO(0, 0, 0, 0.35)),
                   ),
                 ),
               Padding(
