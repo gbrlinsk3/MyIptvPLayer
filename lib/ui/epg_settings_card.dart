@@ -47,7 +47,7 @@ class _EpgSettingsCardState extends State<EpgSettingsCard> {
       return refreshing ? 'Atualizando…' : 'Ainda não atualizada';
     }
     return 'Atualizada em ${formatDateTime(source.updatedAt!)} · '
-        '${source.programCount} programas';
+        '${plural(source.programCount, 'programa', 'programas')}';
   }
 
   @override

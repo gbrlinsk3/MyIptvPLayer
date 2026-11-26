@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
 import '../../library/library_import.dart';
 import '../../library/video_thumb.dart';
 import '../../state/app_controller.dart';
@@ -236,6 +237,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 style: const TextStyle(
                   color: Colors.white,
                   fontFeatures: [FontFeature.tabularFigures()],
+                  shadows: videoTextShadows,
                 ),
               ),
             ],

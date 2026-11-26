@@ -69,6 +69,16 @@ class _LibraryPageState extends State<LibraryPage> {
           );
         }
 
+        // Só o que existe: nada de "0 episódios" ou "0 B".
+        final summary = done.isEmpty && mine.isEmpty && recordings.isEmpty
+            ? 'Arquivos baixados ficam aqui, no formato original do provedor.'
+            : [
+                if (movies.isNotEmpty) plural(movies.length, 'filme', 'filmes'),
+                if (episodes.isNotEmpty)
+                  plural(episodes.length, 'episódio', 'episódios'),
+                if (downloads.usedBytes > 0) formatBytes(downloads.usedBytes),
+              ].join('  ·  ');
+
         return ListView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           children: [
@@ -91,15 +101,13 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
             const SizedBox(height: 10),
             _tabs(),
-            const SizedBox(height: 10),
-            Text(
-              done.isEmpty && mine.isEmpty && recordings.isEmpty
-                  ? 'Arquivos baixados ficam aqui, no formato original do provedor.'
-                  : '${movies.length} ${movies.length == 1 ? 'filme' : 'filmes'}'
-                      '  ·  ${episodes.length} ${episodes.length == 1 ? 'episódio' : 'episódios'}'
-                      '  ·  ${formatBytes(downloads.usedBytes)}',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-            ),
+            if (summary.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                summary,
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
+            ],
             const SizedBox(height: 24),
             if (queue.isEmpty && done.isEmpty && mine.isEmpty && recordings.isEmpty) const _Empty(),
             if (queue.isNotEmpty) ...[
@@ -535,11 +543,20 @@ class _LandCardState extends State<_LandCard> {
                           child: PopupMenuButton<String>(
                             tooltip: 'Opções',
                             color: AppColors.surface,
-                            icon: const Icon(
-                              Icons.more_vert,
-                              color: Colors.white,
-                              size: 20,
-                              shadows: [Shadow(blurRadius: 6)],
+                            // Círculo escuro, como o do coração nos pôsteres:
+                            // o ícone aparece também sobre imagem clara.
+                            icon: Container(
+                              width: 30,
+                              height: 30,
+                              decoration: const BoxDecoration(
+                                color: Color(0xB3000000),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.more_vert,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                             onSelected: (v) {
                               if (v == 'folder') app.downloads.openFolder(e);
@@ -654,7 +671,7 @@ PlayItem _importItem(LibraryImport i) => PlayItem(
       // Id negativo: nunca colide com o id de um filme do provedor, então o
       // progresso (continuar de onde parou) fica separado.
       id: -(i.id ?? 0),
-      title: i.title,
+      title: cleanFileTitle(i.title),
       subtitle: i.year,
       url: i.filePath,
       image: i.image ?? i.backdrop,
@@ -831,7 +848,7 @@ class _ImportCardState extends State<_ImportCard> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    PosterImage(url: image, name: i.title, cacheWidth: 560),
+                    PosterImage(url: image, name: cleanFileTitle(i.title), cacheWidth: 560),
                     if (_hover) ...[
                       const ColoredBox(
                         color: Color(0x66000000),
@@ -864,7 +881,7 @@ class _ImportCardState extends State<_ImportCard> {
               ),
               const SizedBox(height: 8),
               Text(
-                i.title,
+                cleanFileTitle(i.title),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),

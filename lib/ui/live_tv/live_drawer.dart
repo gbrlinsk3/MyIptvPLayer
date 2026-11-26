@@ -16,6 +16,8 @@ import 'channel_group_card.dart';
 import 'live_highlight_banner.dart';
 import 'live_recent_card.dart';
 import 'manage_categories_panel.dart';
+import 'now_playing_builder.dart';
+import '../../core/format.dart';
 
 // ---- ações de favorito/recente de um grupo ---------------------------------
 // Usadas pela gaveta e pela faixa "Recentes e favoritos" sobre o vídeo.
@@ -103,11 +105,15 @@ class LiveDrawer extends StatefulWidget {
     this.currentStreamId,
     this.showBanner = false,
     this.showTop = false,
+    this.watchPrograms = true,
     this.onOpenChannel,
     this.onDragStart,
     this.onDragUpdate,
     this.onDragEnd,
   });
+
+  /// Os cartões acompanham o programa no ar (falso com a gaveta fechada).
+  final bool watchPrograms;
 
   /// Cartão tocado: o grupo e os grupos da fileira onde ele estava (a fila
   /// para "canal anterior/próximo").
@@ -293,7 +299,7 @@ class _LiveDrawerState extends State<LiveDrawer>
     super.dispose();
   }
 
-  static String _canais(int n) => n == 1 ? '1 canal' : '$n canais';
+  static String _canais(int n) => plural(n, 'canal', 'canais');
 
   void _refresh(AppController c) {
     if (identical(_forVisible, c.visible) &&
@@ -396,7 +402,7 @@ class _LiveDrawerState extends State<LiveDrawer>
     _refresh(c);
     final summary = c.visible.length == c.totalChannels
         ? _canais(c.totalChannels)
-        : '${c.visible.length} de ${c.totalChannels} canais';
+        : '${formatCount(c.visible.length)} de ${_canais(c.totalChannels)}';
     final draggable = widget.onDragUpdate != null;
 
     final header = Padding(
@@ -649,6 +655,7 @@ class _LiveDrawerState extends State<LiveDrawer>
               key: ValueKey('$i:${s.title}'),
               section: s,
               currentStreamId: widget.currentStreamId,
+              watchPrograms: widget.watchPrograms,
               onOpen: widget.onOpen,
             );
           }, childCount: sections.length),
@@ -665,11 +672,13 @@ class _SectionRow extends StatefulWidget {
     super.key,
     required this.section,
     required this.currentStreamId,
+    required this.watchPrograms,
     required this.onOpen,
   });
 
   final _Section section;
   final int? currentStreamId;
+  final bool watchPrograms;
   final void Function(ChannelGroup group, List<ChannelGroup> row) onOpen;
 
   @override
@@ -812,15 +821,23 @@ class _SectionRowState extends State<_SectionRow> {
                                       onRemoveRecent: () =>
                                           removeGroupFromRecents(c, g),
                                     )
-                                  : ChannelGroupCard(
+                                  : NowPlayingBuilder(
                                       key: ValueKey(g.key),
-                                      group: g,
-                                      current: current,
-                                      category: section.title,
-                                      favorite: groupIsFavorite(c, g),
-                                      onToggleFavorite: () =>
-                                          toggleGroupFavorite(c, g),
-                                      onTap: () => widget.onOpen(g, groups),
+                                      source: c.epg.nowPlaying,
+                                      versions: g.versions,
+                                      account: c.account,
+                                      active: widget.watchPrograms,
+                                      builder: (context, program) =>
+                                          ChannelGroupCard(
+                                            group: g,
+                                            current: current,
+                                            program: program,
+                                            favorite: groupIsFavorite(c, g),
+                                            onToggleFavorite: () =>
+                                                toggleGroupFavorite(c, g),
+                                            onTap: () =>
+                                                widget.onOpen(g, groups),
+                                          ),
                                     ),
                             );
                           },

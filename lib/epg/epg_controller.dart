@@ -8,6 +8,7 @@ import '../data/db.dart';
 import '../data/epg_parsing.dart';
 import '../data/models.dart';
 import '../data/xtream_client.dart';
+import 'now_playing.dart';
 
 class _Found {
   const _Found(this.programs, this.label);
@@ -42,6 +43,14 @@ class EpgController extends ChangeNotifier {
   static const _pastSeconds = 3 * 3600;
   static const _futureSeconds = 5 * 24 * 3600;
   static const _staleSourceAge = Duration(hours: 12);
+
+  /// Programa no ar mostrado nos cartões de canal.
+  late final NowPlaying nowPlaying = NowPlaying(
+    userPrograms: _userProgramsFor,
+    cached: _providerSaved,
+    fetch: _fetchProvider,
+    preferUser: () => preferUser,
+  );
 
   // ---- ajustes -----------------------------------------------------------
 
@@ -79,6 +88,7 @@ class EpgController extends ChangeNotifier {
     preferUser = value;
     _notify();
     await _db.setSetting('epg_prefer_user', value ? '1' : '0');
+    nowPlaying.invalidate();
     unawaited(_loadView());
   }
 
@@ -141,18 +151,9 @@ class EpgController extends ChangeNotifier {
         key,
         fromEpoch: now - _pastSeconds,
       );
-      final fetchedAt = await _db.epgFetchedAt(_providerSource, key);
-      final fresh = fetchedAt != null && now - fetchedAt < _providerFreshSeconds;
-      if (!fresh) {
-        XtreamClient? client;
+      if (!await _providerIsFresh(key, now)) {
         try {
-          client = XtreamClient(
-            server: account.server,
-            username: account.username,
-            password: account.password,
-          );
-          final fetched = await client.fetchChannelEpg(channel.streamId);
-          await _db.replaceChannelPrograms(_providerSource, key, fetched, now);
+          await _fetchProvider(channel, account);
           rows = await _db.epgPrograms(
             _providerSource,
             key,
@@ -162,8 +163,6 @@ class EpgController extends ChangeNotifier {
           providerError = e.message;
         } catch (e) {
           providerError = 'Falha ao buscar a programação: $e';
-        } finally {
-          client?.close();
         }
       }
       return _hasUpcoming(rows, now) ? _Found(rows, 'Provedor') : null;
@@ -194,6 +193,66 @@ class EpgController extends ChangeNotifier {
     return _Resolved(null, providerError);
   }
 
+  Future<bool> _providerIsFresh(String key, int now) async {
+    final fetchedAt = await _db.epgFetchedAt(_providerSource, key);
+    return fetchedAt != null && now - fetchedAt < _providerFreshSeconds;
+  }
+
+  /// Busca o guia do canal no provedor e guarda no banco (vale por 1 hora).
+  Future<List<EpgProgram>> _fetchProvider(
+    LiveChannel channel,
+    SavedAccount account,
+  ) async {
+    final client = XtreamClient(
+      server: account.server,
+      username: account.username,
+      password: account.password,
+    );
+    try {
+      final fetched = await client.fetchChannelEpg(channel.streamId);
+      // O perfil pode ter sido trocado enquanto o provedor respondia.
+      if (!_disposed) {
+        await _db.replaceChannelPrograms(
+          _providerSource,
+          '${channel.streamId}',
+          fetched,
+          _nowEpoch(),
+        );
+      }
+      return fetched;
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<ProviderEpgCache> _providerSaved(LiveChannel channel) async {
+    final key = '${channel.streamId}';
+    final now = _nowEpoch();
+    final rows = await _db.epgPrograms(_providerSource, key, fromEpoch: now);
+    return (rows: rows, fresh: await _providerIsFresh(key, now));
+  }
+
+  /// Programas das fontes do usuário para qualquer versão do canal: a primeira
+  /// fonte que ainda tem programação.
+  Future<List<EpgProgram>> _userProgramsFor(List<LiveChannel> versions) async {
+    final keys = {
+      for (final v in versions)
+        if (v.epgKey != null) v.epgKey!,
+    };
+    final now = _nowEpoch();
+    for (final source in sources) {
+      for (final key in keys) {
+        final rows = await _db.epgPrograms(
+          'url:${source.id}',
+          key,
+          fromEpoch: now,
+        );
+        if (_hasUpcoming(rows, now)) return rows;
+      }
+    }
+    return const [];
+  }
+
   // ---- fontes por URL ----------------------------------------------------
 
   /// Devolve null se deu certo, ou a mensagem de erro de validação.
@@ -220,6 +279,7 @@ class EpgController extends ChangeNotifier {
     await _db.deleteEpgSource(source.id);
     sources = await _db.loadEpgSources();
     _notify();
+    nowPlaying.invalidate();
     unawaited(_loadView());
   }
 
@@ -251,6 +311,7 @@ class EpgController extends ChangeNotifier {
       refreshing = false;
       _notify();
     }
+    nowPlaying.invalidate();
     unawaited(_loadView());
   }
 
@@ -314,6 +375,7 @@ class EpgController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    nowPlaying.dispose();
     super.dispose();
   }
 }

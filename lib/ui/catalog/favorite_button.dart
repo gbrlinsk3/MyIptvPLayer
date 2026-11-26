@@ -5,6 +5,7 @@ import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../home/hero_buttons.dart';
 import '../widgets/click_spark.dart';
+import '../widgets/press_scale.dart';
 
 /// Coração sobre os cartões de pôster/busca: aparece ao passar o mouse e fica
 /// visível (preenchido, na cor do perfil) quando o título já é favorito.
@@ -23,25 +24,27 @@ class FavoriteOverlay extends StatelessWidget {
       builder: (context, _, _) {
         final fav = catalog.isFavorite(title.kind, title.id);
         if (!hover && !fav) return const SizedBox.shrink();
-        return Tooltip(
-          message: fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos',
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
-              catalog.toggleFavorite(title);
-            },
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: const BoxDecoration(
-                color: Color(0xB3000000),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                fav ? Icons.favorite : Icons.favorite_border,
-                size: 18,
-                color: fav ? AppColors.accent : Colors.white,
+        return PressShield(
+          child: Tooltip(
+            message: fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
+                catalog.toggleFavorite(title);
+              },
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: const BoxDecoration(
+                  color: Color(0xB3000000),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  fav ? Icons.favorite : Icons.favorite_border,
+                  size: 18,
+                  color: fav ? AppColors.accent : Colors.white,
+                ),
               ),
             ),
           ),

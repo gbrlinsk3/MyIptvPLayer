@@ -32,7 +32,7 @@ class _CatalogSettingsCardState extends State<CatalogSettingsCard> {
 
     String vodValue(CatalogSection s) => s.total == 0
         ? 'Ainda não baixados'
-        : '${s.total} títulos (atualizado em '
+        : '${plural(s.total, 'título', 'títulos')} (atualizado em '
             '${s.updatedAt == null ? '—' : formatDateTime(s.updatedAt!)})';
 
     Widget error(String? message) => message == null
@@ -62,12 +62,12 @@ class _CatalogSettingsCardState extends State<CatalogSettingsCard> {
       title: 'Catálogo',
       children: [
         heading('TV AO VIVO'),
-        KeyValueRow(label: 'Canais', value: '${c.totalChannels}'),
+        KeyValueRow(label: 'Canais', value: formatCount(c.totalChannels)),
         if (c.hiddenChannelCount > 0)
-          KeyValueRow(label: 'Canais ocultos', value: '${c.hiddenChannelCount}'),
+          KeyValueRow(label: 'Canais ocultos', value: formatCount(c.hiddenChannelCount)),
         KeyValueRow(
           label: 'Categorias',
-          value: '${c.categories.length} visíveis (com ao menos um canal)',
+          value: '${plural(c.categories.length, 'visível', 'visíveis')} (com ao menos um canal)',
         ),
         KeyValueRow(label: 'Atualizado em', value: c.catalogUpdatedLabel),
         error(c.syncError),

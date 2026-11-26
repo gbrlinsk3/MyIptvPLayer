@@ -246,3 +246,10 @@ bool resolveDark(ThemePref pref, {required bool platformDark, DateTime? now}) {
       return h < 9 || h >= 17;
   }
 }
+
+/// Sombra de textos escritos direto sobre o vídeo: mantém a leitura em imagem
+/// clara sem escurecer o vídeo.
+const List<Shadow> videoTextShadows = [
+  Shadow(color: Color(0xE6000000), blurRadius: 3, offset: Offset(0, 1)),
+  Shadow(color: Color(0x99000000), blurRadius: 10),
+];

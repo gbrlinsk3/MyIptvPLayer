@@ -56,11 +56,11 @@ class _AccountPageState extends State<AccountPage> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                'Conta e ajustes',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                'CONTA E AJUSTES',
+                style: AppFonts.title(34, spacing: 1.5),
               ),
             ),
             Padding(

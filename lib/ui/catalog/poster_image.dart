@@ -155,7 +155,7 @@ class _ChainImageState extends State<ChainImage> {
       width: double.infinity,
       height: double.infinity,
       memCacheWidth: widget.cacheWidth,
-      fadeInDuration: const Duration(milliseconds: 450),
+      fadeInDuration: const Duration(milliseconds: 200),
       placeholder: (context, url) => const SizedBox.shrink(),
       errorWidget: (context, url, error) {
         _next(index);

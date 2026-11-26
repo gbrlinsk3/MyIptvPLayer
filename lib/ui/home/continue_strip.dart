@@ -8,6 +8,7 @@ import '../catalog/play_actions.dart';
 import '../catalog/poster_image.dart';
 import '../catalog/title_details_page.dart';
 import '../widgets/carousel_arrows.dart';
+import '../widgets/press_scale.dart';
 import '../widgets/shimmer.dart';
 
 /// "Continuar assistindo": cartões horizontais (capa do servidor) que se
@@ -199,134 +200,138 @@ class _ContinueCard extends StatelessWidget {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => onEnter(),
-      child: GestureDetector(
-        onTap: onOpenCard,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic,
-          width: width,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: expanded ? AppColors.accent : AppColors.border,
-              width: expanded ? 2 : 1,
+      child: PressScale(
+        child: GestureDetector(
+          onTap: onOpenCard,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            width: width,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: expanded ? AppColors.accent : AppColors.border,
+                width: expanded ? 2 : 1,
+              ),
+              boxShadow: expanded
+                  ? [
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: 0.25),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : const [],
             ),
-            boxShadow: expanded
-                ? [
-                    BoxShadow(
-                      color: AppColors.accent.withValues(alpha: 0.25),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: FutureBuilder<TitleDetails?>(
+                future: catalog.detailsOrNull(title.kind, title.id),
+                builder: (context, snap) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    PosterImage(
+                      url: tmdbSize(snap.data?.backdrop, 'w780') ?? title.image,
+                      name: title.name,
+                      cacheWidth: 700,
                     ),
-                  ]
-                : const [],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: FutureBuilder<TitleDetails?>(
-              future: catalog.detailsOrNull(title.kind, title.id),
-              builder: (context, snap) => Stack(
-                fit: StackFit.expand,
-                children: [
-                  PosterImage(
-                    url: tmdbSize(snap.data?.backdrop, 'w780') ?? title.image,
-                    name: title.name,
-                    cacheWidth: 700,
-                  ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Color(0x00000000), Color(0xCC000000)],
-                        stops: [0.35, 1],
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x00000000), Color(0xCC000000)],
+                          stops: [0.35, 1],
+                        ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: 14,
-                    right: 14,
-                    bottom: progress != null ? 18 : 12,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title.name,
-                          maxLines: expanded ? 2 : 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (title.subtitle != null && expanded)
+                    Positioned(
+                      left: 14,
+                      right: 14,
+                      bottom: progress != null ? 18 : 12,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            title.subtitle!,
-                            maxLines: 1,
+                            title.name,
+                            maxLines: expanded ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Color(0xCCFFFFFF),
-                              fontSize: 11,
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        if (expanded) ...[
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: onResume,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 26,
-                                  height: 26,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.accent,
-                                    borderRadius: BorderRadius.circular(13),
-                                  ),
-                                  child: const Icon(
-                                    Icons.play_arrow_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'CLIQUE AQUI PARA CONTINUAR ASSISTINDO',
-                                      maxLines: 1,
-                                      style: AppFonts.title(
-                                        13,
+                          if (title.subtitle != null && expanded)
+                            Text(
+                              title.subtitle!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xCCFFFFFF),
+                                fontSize: 11,
+                              ),
+                            ),
+                          if (expanded) ...[
+                            const SizedBox(height: 8),
+                            PressScale(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: onResume,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 26,
+                                      height: 26,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accent,
+                                        borderRadius: BorderRadius.circular(13),
+                                      ),
+                                      child: const Icon(
+                                        Icons.play_arrow_rounded,
                                         color: Colors.white,
-                                        spacing: 1.4,
+                                        size: 18,
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          'CLIQUE AQUI PARA CONTINUAR ASSISTINDO',
+                                          maxLines: 1,
+                                          style: AppFonts.title(
+                                            13,
+                                            color: Colors.white,
+                                            spacing: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ),
-                  if (progress != null)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 4,
-                        backgroundColor: const Color(0x66000000),
-                        color: AppColors.accent,
                       ),
                     ),
-                ],
+                    if (progress != null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 4,
+                          backgroundColor: const Color(0x66000000),
+                          color: AppColors.accent,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

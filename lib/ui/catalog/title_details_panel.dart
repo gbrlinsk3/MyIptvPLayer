@@ -341,7 +341,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
       if ((d?.year ?? t.year) != null) (d?.year ?? t.year)!,
       if ((d?.rating ?? t.rating) != null)
         '★ ${(d?.rating ?? t.rating)!.toStringAsFixed(1)}',
-      if (_isMovie && d?.durationLabel != null) d!.durationLabel!,
+      if (_isMovie) ?formatRuntime(d?.durationLabel),
       if (d?.genre != null) d!.genre!,
     ];
 
@@ -437,11 +437,11 @@ class _DetailsPanelState extends State<_DetailsPanel> {
                   Text(plot, style: const TextStyle(fontSize: 13.5, height: 1.45)),
                 if (dd.cast != null) ...[
                   const SizedBox(height: 12),
-                  _labeled('Elenco', dd.cast!),
+                  _labeled('Elenco', uniqueNames(dd.cast!)),
                 ],
                 if (dd.director != null) ...[
                   const SizedBox(height: 8),
-                  _labeled('Direção', dd.director!),
+                  _labeled('Direção', uniqueNames(dd.director!)),
                 ],
                 if (!_isMovie) ...[
                   const SizedBox(height: 20),

@@ -460,12 +460,11 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
       _isMovie ? 'Filme' : 'Série',
       if (year != null && year.isNotEmpty) year,
       if (d.genre != null && d.genre!.isNotEmpty) d.genre!,
-      if (_isMovie && d.durationLabel != null && d.durationLabel!.isNotEmpty)
-        d.durationLabel!,
+      if (_isMovie) ?formatRuntime(d.durationLabel),
       if (!_isMovie && d.seasons.isNotEmpty)
         '${d.seasons.length} ${d.seasons.length == 1 ? 'temporada' : 'temporadas'}',
       if (!_isMovie && _allEpisodes(d).isNotEmpty)
-        '${_allEpisodes(d).length} episódios',
+        plural(_allEpisodes(d).length, 'episódio', 'episódios'),
     ];
 
     return Column(
@@ -524,11 +523,11 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
           ),
         if (d.cast != null && d.cast!.isNotEmpty) ...[
           const SizedBox(height: 14),
-          _labeled('Elenco', d.cast!),
+          _labeled('Elenco', uniqueNames(d.cast!)),
         ],
         if (d.director != null && d.director!.isNotEmpty) ...[
           const SizedBox(height: 6),
-          _labeled('Direção', d.director!),
+          _labeled('Direção', uniqueNames(d.director!)),
         ],
         const SizedBox(height: 22),
         _actions(d, progress, map),

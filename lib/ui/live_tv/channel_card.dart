@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import '../widgets/click_spark.dart';
+import '../widgets/full_name_tooltip.dart';
+import '../widgets/press_scale.dart';
+import '../../data/channel_groups.dart';
 import '../../data/models.dart';
 import '../../state/app_scope.dart';
 import 'live_logo.dart';
@@ -185,78 +188,92 @@ class _ChannelCardState extends State<ChannelCard> {
     final fav = c.isFavorite(ch.streamId);
     final playing = c.selected?.streamId == ch.streamId;
     final highlight = _hover || playing || fav;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _hover ? 1.03 : 1,
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-          child: AnimatedContainer(
+    return PressScale(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: AnimatedScale(
+            scale: _hover ? 1.03 : 1,
             duration: const Duration(milliseconds: 150),
-            height: ChannelCard.height,
-            padding: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              // Favorito: fundo levemente tingido na cor de destaque do perfil.
-              color: fav
-                  ? Color.lerp(AppColors.surface, AppColors.accent, 0.14)
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: highlight ? AppColors.accent : AppColors.border,
-                width: highlight ? 2 : 1,
+            curve: Curves.easeOut,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              height: ChannelCard.height,
+              padding: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                // Favorito: fundo levemente tingido na cor de destaque do perfil.
+                color: fav
+                    ? Color.lerp(AppColors.surface, AppColors.accent, 0.14)
+                    : AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: highlight ? AppColors.accent : AppColors.border,
+                  width: highlight ? 2 : 1,
+                ),
               ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _Logo(url: ch.icon),
-                const SizedBox(width: 12),
-                Expanded(
-                  // Texto centralizado na vertical em relação ao logo.
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      ch.name,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
-                        color: (playing || fav)
-                            ? AppColors.accent
-                            : AppColors.text,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Logo(url: ch.icon),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    // Texto centralizado na vertical em relação ao logo.
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FullNameTooltip(
+                        fullName: ch.name,
+                        shownName: shortChannelName(ch.name),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 3,
+                        child: Text(
+                          shortChannelName(ch.name),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                            color: (playing || fav)
+                                ? AppColors.accent
+                                : AppColors.text,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                SizedBox(
-                  width: 34,
-                  child: (_hover || fav)
-                      ? IconButton(
-                          padding: EdgeInsets.zero,
-                          tooltip: fav
-                              ? 'Remover dos favoritos'
-                              : 'Adicionar aos favoritos',
-                          onPressed: () {
-                            if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
-                            c.toggleFavorite(ch);
-                          },
-                          icon: Icon(
-                            fav ? Icons.favorite : Icons.favorite_border,
-                            size: 20,
-                            color: fav ? AppColors.accent : AppColors.textMuted,
-                          ),
+                  SizedBox(
+                    width: 34,
+                    child: (_hover || fav)
+                        ? PressShield(
+                          child: IconButton(
+                              padding: EdgeInsets.zero,
+                              tooltip: fav
+                                  ? 'Remover dos favoritos'
+                                  : 'Adicionar aos favoritos',
+                              onPressed: () {
+                                if (!fav) ClickSpark.noClique(context, shape: SparkShape.stars);
+                                c.toggleFavorite(ch);
+                              },
+                              icon: Icon(
+                                fav ? Icons.favorite : Icons.favorite_border,
+                                size: 20,
+                                color: fav ? AppColors.accent : AppColors.textMuted,
+                              ),
+                            ),
                         )
-                      : null,
-                ),
-              ],
+                        : null,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

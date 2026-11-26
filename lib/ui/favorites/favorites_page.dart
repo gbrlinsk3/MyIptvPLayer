@@ -10,6 +10,7 @@ import '../live_tv/channel_card.dart';
 import '../live_tv/live_player_page.dart';
 import '../widgets/sliding_tabs.dart';
 import '../widgets/state_views.dart';
+import '../../core/format.dart';
 
 /// Favoritos: filmes, séries e canais. Abas Todos / Filmes / Séries / Canais;
 /// dentro de "Todos", primeiro filmes e séries (do mais recente para o mais
@@ -110,7 +111,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
-                  '$total ${total == 1 ? 'item' : 'itens'}',
+                  plural(total, 'item', 'itens'),
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ),
@@ -122,9 +123,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
           child: SlidingTabs(
             labels: [
               'Todos · $total',
-              'Filmes · ${_movies.length}',
-              'Séries · ${_series.length}',
-              'Canais · ${channels.length}',
+              'Filmes · ${formatCount(_movies.length)}',
+              'Séries · ${formatCount(_series.length)}',
+              'Canais · ${formatCount(channels.length)}',
             ],
             selected: _tab,
             onChanged: (i) => setState(() => _tab = i),

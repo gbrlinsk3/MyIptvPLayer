@@ -13,6 +13,7 @@ import '../widgets/shimmer.dart';
 import '../widgets/sliding_tabs.dart';
 import 'title_details_panel.dart';
 import 'title_widgets.dart';
+import '../../core/format.dart';
 
 /// Catálogo: abas Filmes | Séries, fileiras por categoria (estilo Netflix),
 /// "Ver tudo" por categoria e painel de detalhes.
@@ -66,7 +67,7 @@ class _CatalogPageState extends State<CatalogPage> {
     String label(String nome, CatalogKind kind) {
       final sec = catalog.section(kind);
       if (sec.updatedAt == null && sec.total == 0) return nome;
-      return '$nome · ${sec.visibleTotal}';
+      return '$nome · ${formatCount(sec.visibleTotal)}';
     }
 
     return Column(
@@ -277,7 +278,7 @@ class _KindViewState extends State<_KindView> {
               final cat = rows[i - special.length];
               return TitleRow(
                 key: ValueKey('${kind.key}:row:${cat.id}'),
-                label: '${cat.name}  ·  ${section.counts[cat.id] ?? 0}',
+                label: '${cat.name}  ·  ${formatCount(section.counts[cat.id] ?? 0)}',
                 future: catalog.rowTitles(kind, cat.id),
                 onOpen: _open,
                 onSeeAll: () => setState(() => _openCategory = cat),

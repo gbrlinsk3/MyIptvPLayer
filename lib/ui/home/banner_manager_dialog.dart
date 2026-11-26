@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/animation_categories_dialog.dart';
+import '../../core/format.dart';
 
 /// Gerenciador dos banners do Início: "Continue de onde parou" é fixo (só
 /// aparece quando há algo em andamento); dá para ter de 1 a 4 banners, com
@@ -68,7 +69,7 @@ class _ManagerDialogState extends State<_ManagerDialog> {
   String _summary(BannerConfig b) => switch (b.source) {
         BannerSource.categories => b.categories.isEmpty
             ? 'Nenhuma categoria escolhida (o banner não aparece)'
-            : '${b.categories.length} categoria(s)',
+            : plural(b.categories.length, 'categoria', 'categorias'),
         BannerSource.titles => b.titles.isEmpty
             ? 'Nenhum título escolhido (o banner não aparece)'
             : b.titles.map((t) => t.name).join(', '),

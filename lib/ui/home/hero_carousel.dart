@@ -19,6 +19,7 @@ import '../widgets/shimmer.dart';
 import '../widgets/shiny_text.dart';
 import '../widgets/sling_arrow.dart';
 import 'hero_buttons.dart';
+import '../../core/format.dart';
 
 /// Carrossel do Início, de borda a borda: banner grande à esquerda (até 5
 /// slides; a cada 12 s passa ao próximo título do banner e, depois do último,
@@ -698,8 +699,7 @@ class _SlideView extends StatelessWidget {
           title.kind == CatalogKind.movies ? 'Filme' : 'Série',
           if (year != null && year.isNotEmpty) year,
           if (genre != null && genre.isNotEmpty) genre,
-          if (d?.durationLabel != null && d!.durationLabel!.isNotEmpty)
-            d.durationLabel!,
+          ?formatRuntime(d?.durationLabel),
           if ((d?.rating ?? title.rating) != null)
             '★ ${(d?.rating ?? title.rating)!.toStringAsFixed(1)}',
         ].join('   ·   ');

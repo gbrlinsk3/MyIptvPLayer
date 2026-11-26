@@ -142,6 +142,21 @@ ChannelNameParts parseChannelName(String name) {
   );
 }
 
+/// Começo dos canais de evento: "(01)   ⏰ " (número na lista e relógio).
+final _eventPrefix = RegExp(r'^\s*\(\d+\)\s*⏰\uFE0F?\s*');
+final _eventSuffix = RegExp(r'\s*•\s*$');
+
+/// Nome para exibir: nos canais de evento, sem o "(01) ⏰" do começo e o "•"
+/// do fim. Só muda a tela; busca, favoritos e banco usam o nome original.
+String shortChannelName(String name) {
+  if (!_eventPrefix.hasMatch(name)) return name;
+  final short = name
+      .replaceFirst(_eventPrefix, '')
+      .replaceFirst(_eventSuffix, '')
+      .trim();
+  return short.isEmpty ? name : short;
+}
+
 /// Versões do mesmo canal (mesmo nome base), da melhor para a pior.
 class ChannelGroup {
   ChannelGroup({

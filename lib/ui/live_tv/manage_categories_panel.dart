@@ -5,6 +5,7 @@ import '../../data/models.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
+import '../../core/format.dart';
 
 /// De onde o painel lê e para onde grava as categorias (TV ao vivo, filmes ou séries).
 abstract class ManageSource {
@@ -265,7 +266,7 @@ class _ManagePanelState extends State<_ManagePanel> {
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      '${c.rawCount(cat.id)}',
+                                      formatCount(c.rawCount(cat.id)),
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: AppColors.textMuted,

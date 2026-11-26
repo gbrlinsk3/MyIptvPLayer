@@ -3,11 +3,13 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../data/channel_groups.dart';
 import '../../data/live_highlight.dart';
 import '../../data/models.dart';
 import '../../state/app_scope.dart';
 import '../widgets/magnet.dart';
 import 'live_logo.dart';
+import '../../core/format.dart';
 
 /// Cor do degradê do banner principal numa posição `t` (0 = canto azul, 1 =
 /// canto escuro). Os mini banners usam a mesma função para "continuar" o
@@ -200,9 +202,46 @@ class _Slide extends StatefulWidget {
   State<_Slide> createState() => _SlideState();
 }
 
-class _SlideState extends State<_Slide> {
-  int _start = 0;
-  double _drag = 0;
+class _SlideState extends State<_Slide> with SingleTickerProviderStateMixin {
+  /// Posição da faixa em canais; a fração é o quanto já deslizou até o próximo.
+  double _pos = 0;
+  double _snapFrom = 0, _snapTo = 0;
+
+  /// Encaixe no canal mais próximo ao soltar o arrasto.
+  late final AnimationController _snap =
+      AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 220),
+      )..addListener(() {
+        final t = Curves.easeOutCubic.transform(_snap.value);
+        setState(() => _pos = _snapFrom + (_snapTo - _snapFrom) * t);
+      });
+
+  void _snapToNearest() {
+    _snapFrom = _pos;
+    _snapTo = _pos.roundToDouble();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      setState(() => _pos = _snapTo);
+    } else if (_snapFrom != _snapTo) {
+      _snap.forward(from: 0);
+    }
+  }
+
+  /// Setas: um canal para o lado, sem animação.
+  void _step(int by) {
+    _snap.stop();
+    setState(() => _pos = _pos.roundToDouble() + by);
+  }
+
+  @override
+  void dispose() {
+    _snap.dispose();
+    super.dispose();
+  }
+
+  /// As setas da faixa de canais só aparecem com o mouse (ou o foco) nela.
+  bool _stripHover = false;
+  bool _stripFocus = false;
 
   // Texto do banner segue o tema: escuro no claro, claro no escuro.
   static ButtonStyle get _outlined => OutlinedButton.styleFrom(
@@ -241,10 +280,53 @@ class _SlideState extends State<_Slide> {
               (shown > 0 ? mainTile : 0) +
               (shown - 1) * gap;
           final canScroll = channels.length > visible;
+          const step = tile + gap, grow = mainTile - tile;
+          final position = canScroll ? _pos : 0.0;
+          final first = position.floor();
+          final fraction = position - first;
+          // Deslizando, aparece um cartão a mais entrando pela direita.
+          final count = fraction > 0 ? shown + 1 : shown;
+          // As duas pontas ficam mais translúcidas quando há mais canais; quem
+          // sai ou entra pela borda some ou surge aos poucos.
+          double fade(double at) {
+            if (!canScroll) return 1;
+            final inner = at < shown - 1 - at ? at : shown - 1 - at;
+            final value = inner < 0
+                ? 0.45 * (1 + inner)
+                : 0.45 + 0.55 * (inner < 1 ? inner : 1);
+            return value.clamp(0.0, 1.0);
+          }
+
+          Widget slot(int k) {
+            final at = k - fraction;
+            final index = (first + k) % channels.length;
+            final near = (1 - (at - mainIndex).abs()).clamp(0.0, 1.0);
+            final size = tile + grow * near;
+            return Positioned(
+              key: ValueKey(index),
+              left: at * step + grow * (at - mainIndex).clamp(0.0, 1.0),
+              bottom: 0,
+              child: Opacity(
+                opacity: fade(at),
+                child: Magnet(
+                  padding: 40,
+                  strength: 5,
+                  child: _Tile(
+                    channel: channels[index],
+                    size: size,
+                    main: near > 0.5,
+                    onTap: () => widget.onOpen(channels[index], channels),
+                  ),
+                ),
+              ),
+            );
+          }
+
           return Stack(
             children: [
               Positioned(
-                left: 40,
+                // Depois da seta esquerda do banner, que vai até 50 px.
+                left: 68,
                 bottom: 30,
                 right: stripWidth + 160,
                 child: Column(
@@ -273,7 +355,7 @@ class _SlideState extends State<_Slide> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${channels.length} canais · $cats',
+                      '${plural(channels.length, 'canal', 'canais')} · $cats',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -325,112 +407,83 @@ class _SlideState extends State<_Slide> {
               Positioned(
                 right: 88,
                 bottom: 30,
-                // Segurar e arrastar passa os canais (um por ~100 px).
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onHorizontalDragUpdate: (d) {
-                    _drag += d.delta.dx;
-                    const step = tile + gap;
-                    var moved = 0;
-                    while (_drag <= -step) {
-                      _drag += step;
-                      moved++;
-                    }
-                    while (_drag >= step) {
-                      _drag -= step;
-                      moved--;
-                    }
-                    if (moved != 0 && channels.length > visible) {
-                      setState(
-                        () => _start =
-                            ((_start + moved) % channels.length +
-                                channels.length) %
-                            channels.length,
-                      );
-                    }
-                  },
-                  onHorizontalDragEnd: (_) => _drag = 0,
-                  onHorizontalDragCancel: () => _drag = 0,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Nome do canal do meio, sobre os cartões.
-                      SizedBox(
-                        width: stripWidth,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            channels[(_start + shown ~/ 2) % channels.length]
-                                .name,
-                            maxLines: 1,
-                            textAlign: TextAlign.center,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.text,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Row(
+                // Segurar e arrastar desliza os canais; soltar encaixa no mais
+                // próximo.
+                child: MouseRegion(
+                  onEnter: (_) => setState(() => _stripHover = true),
+                  onExit: (_) => setState(() => _stripHover = false),
+                  child: Focus(
+                    canRequestFocus: false,
+                    skipTraversal: true,
+                    onFocusChange: (v) => setState(() => _stripFocus = v),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onHorizontalDragStart: canScroll
+                          ? (_) => _snap.stop()
+                          : null,
+                      onHorizontalDragUpdate: canScroll
+                          ? (d) => setState(() => _pos -= d.delta.dx / step)
+                          : null,
+                      onHorizontalDragEnd: canScroll
+                          ? (_) => _snapToNearest()
+                          : null,
+                      onHorizontalDragCancel: canScroll ? _snapToNearest : null,
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          if (canScroll)
-                            _StripButton(
-                              icon: Icons.chevron_left,
-                              onTap: () => setState(
-                                () => _start =
-                                    (_start - 1 + channels.length) %
-                                    channels.length,
-                              ),
-                            ),
+                          // Nome do canal do meio, sobre os cartões.
                           SizedBox(
                             width: stripWidth,
-                            height: mainTile,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                for (var k = 0; k < shown; k++) ...[
-                                  if (k > 0) const SizedBox(width: gap),
-                                  Opacity(
-                                    // As duas pontas ficam mais translúcidas quando há mais canais.
-                                    opacity:
-                                        canScroll && (k == 0 || k == shown - 1)
-                                        ? 0.45
-                                        : 1,
-                                    child: Magnet(
-                                      padding: 40,
-                                      strength: 5,
-                                      child: _Tile(
-                                        channel:
-                                            channels[(_start + k) %
-                                                channels.length],
-                                        size: k == mainIndex ? mainTile : tile,
-                                        main: k == mainIndex,
-                                        onTap: () => widget.onOpen(
-                                          channels[(_start + k) %
-                                              channels.length],
-                                          channels,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          if (canScroll)
-                            _StripButton(
-                              icon: Icons.chevron_right,
-                              onTap: () => setState(
-                                () => _start = (_start + 1) % channels.length,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                shortChannelName(
+                                  channels[(position.round() + mainIndex) %
+                                          channels.length]
+                                      .name,
+                                ),
+                                maxLines: 1,
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.text,
+                                ),
                               ),
                             ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (canScroll)
+                                _StripButton(
+                                  icon: Icons.chevron_left,
+                                  visible: _stripHover || _stripFocus,
+                                  onTap: () => _step(-1),
+                                ),
+                              SizedBox(
+                                width: stripWidth,
+                                height: mainTile,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    for (var k = 0; k < count; k++) slot(k),
+                                  ],
+                                ),
+                              ),
+                              if (canScroll)
+                                _StripButton(
+                                  icon: Icons.chevron_right,
+                                  visible: _stripHover || _stripFocus,
+                                  onTap: () => _step(1),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -443,17 +496,31 @@ class _SlideState extends State<_Slide> {
 }
 
 class _StripButton extends StatelessWidget {
-  const _StripButton({required this.icon, required this.onTap});
+  const _StripButton({
+    required this.icon,
+    required this.onTap,
+    required this.visible,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
 
+  /// Escondida, continua ocupando o lugar (a faixa não se mexe).
+  final bool visible;
+
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      visualDensity: VisualDensity.compact,
-      icon: Icon(icon, color: AppColors.text),
+    return AnimatedOpacity(
+      opacity: visible ? 1 : 0,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      child: IconButton(
+        onPressed: onTap,
+        visualDensity: VisualDensity.compact,
+        icon: Icon(icon, color: AppColors.text),
+      ),
     );
   }
 }
@@ -490,78 +557,79 @@ class _TileState extends State<_Tile> {
         onTap: widget.onTap,
         child: Tooltip(
           message: ch.name,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: widget.size,
-            height: widget.size,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1F1E1D),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _hover || widget.main
-                    ? AppColors.accent
-                    : const Color(0x33FFFFFF),
-                width: _hover || widget.main ? 2 : 1,
+          child: SizedBox.square(
+            dimension: widget.size,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1F1E1D),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _hover || widget.main
+                      ? AppColors.accent
+                      : const Color(0x33FFFFFF),
+                  width: _hover || widget.main ? 2 : 1,
+                ),
               ),
-            ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Fundo: o próprio pôster do canal, ampliado e desfocado.
-                if (url != null && url.isNotEmpty)
-                  RepaintBoundary(
-                    child: ClipRect(
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                        child: LiveLogo(
-                          url: url,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 96,
-                          fallback: const SizedBox.shrink(),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Fundo: o próprio pôster do canal, ampliado e desfocado.
+                  if (url != null && url.isNotEmpty)
+                    RepaintBoundary(
+                      child: ClipRect(
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                          child: LiveLogo(
+                            url: url,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 96,
+                            fallback: const SizedBox.shrink(),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                const ColoredBox(color: Color(0x66000000)),
-                Column(
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: (url == null || url.isEmpty)
-                            ? const Icon(
-                                Icons.tv,
-                                color: Color(0x99FFFFFF),
-                                size: 26,
-                              )
-                            : LiveLogo(
-                                url: url,
-                                memCacheWidth: 200,
-                                fallback: const Icon(
+                  const ColoredBox(color: Color(0x66000000)),
+                  Column(
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: (url == null || url.isEmpty)
+                              ? const Icon(
                                   Icons.tv,
                                   color: Color(0x99FFFFFF),
                                   size: 26,
+                                )
+                              : LiveLogo(
+                                  url: url,
+                                  memCacheWidth: 200,
+                                  fallback: const Icon(
+                                    Icons.tv,
+                                    color: Color(0x99FFFFFF),
+                                    size: 26,
+                                  ),
                                 ),
-                              ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 5),
-                      child: Text(
-                        ch.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: widget.main ? 11 : 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 5),
+                        child: Text(
+                          shortChannelName(ch.name),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: widget.main ? 11 : 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -746,8 +814,12 @@ class _MiniCardState extends State<_MiniCard> {
                               const SizedBox(height: 2),
                               Text(
                                 b.categories.length == 1
-                                    ? '${b.channels.length} canais'
-                                    : '${b.channels.length} canais · ${b.categories.length} categorias',
+                                    ? plural(
+                                        b.channels.length,
+                                        'canal',
+                                        'canais',
+                                      )
+                                    : '${plural(b.channels.length, 'canal', 'canais')} · ${plural(b.categories.length, 'categoria', 'categorias')}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -857,7 +929,7 @@ class _CategoryPickerState extends State<_CategoryPicker> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: Text(
-                          '${widget.counts[list[i].id] ?? 0}',
+                          formatCount(widget.counts[list[i].id] ?? 0),
                           style: TextStyle(
                             color: AppColors.textMuted,
                             fontSize: 12,

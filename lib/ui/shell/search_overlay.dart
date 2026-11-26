@@ -14,6 +14,7 @@ import '../live_tv/live_player_page.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/sliding_tabs.dart';
 import 'search_result_card.dart';
+import '../../core/format.dart';
 
 /// Resultados da busca do topo (filmes, séries e canais), por cima da página atual.
 ///
@@ -293,7 +294,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
             SliverToBoxAdapter(
               child: TitleRow(
                 key: ValueKey('s:mr:$_active:$_tab'),
-                label: 'Filmes relacionados · ${view.movieRel.length}',
+                label: 'Filmes relacionados · ${formatCount(view.movieRel.length)}',
                 future: view.movieRelFuture,
                 onOpen: open,
               ),
@@ -302,7 +303,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
             SliverToBoxAdapter(
               child: TitleRow(
                 key: ValueKey('s:sr:$_active:$_tab'),
-                label: 'Séries relacionadas · ${view.seriesRel.length}',
+                label: 'Séries relacionadas · ${formatCount(view.seriesRel.length)}',
                 future: view.seriesRelFuture,
                 onOpen: open,
               ),
@@ -328,7 +329,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
               children: [
                 Expanded(
                   child: Text(
-                    'CANAIS · ${all.length}',
+                    'CANAIS · ${formatCount(all.length)}',
                     style: AppFonts.title(20, spacing: 1),
                   ),
                 ),
@@ -433,11 +434,11 @@ class _SearchOverlayState extends State<SearchOverlay> {
                     (2, 'Séries'),
                     (3, 'Canais'),
                   ])
-                    '$label · ${switch (i) {
+                    '$label · ${formatCount(switch (i) {
                       0 => views[0].shown.length + views[0].channels.length,
                       3 => views[0].channels.length,
                       _ => views[i].shown.length,
-                    }}',
+                    })}',
                 ],
                 selected: _tab,
                 onChanged: (i) => setState(() => _tab = i),
@@ -449,8 +450,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Nada encontrado. A busca olha canais, filmes e séries '
-                  'já baixados.',
+                  'Nada encontrado no catálogo carregado. Tente outro nome.',
                   style: TextStyle(color: AppColors.textMuted),
                 ),
               ),

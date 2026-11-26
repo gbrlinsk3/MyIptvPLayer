@@ -8,6 +8,8 @@ import '../widgets/shimmer.dart';
 import '../widgets/split_text.dart';
 import '../widgets/carousel_arrows.dart';
 import '../widgets/content_frame.dart';
+import '../widgets/full_name_tooltip.dart';
+import '../widgets/press_scale.dart';
 import 'favorite_button.dart';
 import 'poster_image.dart';
 
@@ -37,111 +39,123 @@ class _PosterCardState extends State<PosterCard> {
   Widget build(BuildContext context) {
     final t = widget.title;
     final progress = widget.showProgress ? t.progress : null;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 2 / 3,
-              child: AnimatedScale(
-                scale: _hover ? 1.04 : 1,
-                duration: const Duration(milliseconds: 150),
-                curve: Curves.easeOut,
-                child: AnimatedContainer(
+    return FullNameTooltip(
+      fullName: t.name,
+      style: _nameStyle,
+      maxLines: 2,
+      child: PressScale(
+        child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 2 / 3,
+                child: AnimatedScale(
+                  scale: _hover ? 1.04 : 1,
                   duration: const Duration(milliseconds: 150),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _hover ? AppColors.accent : AppColors.border,
-                      width: _hover ? 2 : 1,
+                  curve: Curves.easeOut,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _hover ? AppColors.accent : AppColors.border,
+                        width: _hover ? 2 : 1,
+                      ),
+                      boxShadow: _hover
+                          ? const [
+                              BoxShadow(
+                                color: Color(0x33000000),
+                                blurRadius: 14,
+                                offset: Offset(0, 6),
+                              ),
+                            ]
+                          : const [],
                     ),
-                    boxShadow: _hover
-                        ? const [
-                            BoxShadow(
-                              color: Color(0x33000000),
-                              blurRadius: 14,
-                              offset: Offset(0, 6),
-                            ),
-                          ]
-                        : const [],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        PosterImage(url: t.image, name: t.name),
-                        Positioned(
-                          top: 6,
-                          left: 6,
-                          child: FavoriteOverlay(title: t, hover: _hover),
-                        ),
-                        if (t.rating != null)
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          PosterImage(url: t.image, name: t.name),
                           Positioned(
                             top: 6,
-                            right: 6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xB3000000),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '★ ${t.rating!.toStringAsFixed(1)}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                            left: 6,
+                            child: FavoriteOverlay(title: t, hover: _hover),
+                          ),
+                          if (t.rating != null)
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xB3000000),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '★ ${t.rating!.toStringAsFixed(1)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        if (progress != null)
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 4,
-                              backgroundColor: const Color(0x99000000),
-                              color: AppColors.accent,
+                          if (progress != null)
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 4,
+                                backgroundColor: const Color(0x99000000),
+                                color: AppColors.accent,
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              t.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
-            ),
-            if (t.subtitle != null)
+              const SizedBox(height: 8),
               Text(
-                t.subtitle!,
-                maxLines: 1,
+                t.name,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                style: _nameStyle,
               ),
-          ],
+              if (t.subtitle != null)
+                Text(
+                  t.subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                ),
+            ],
+          ),
+        ),
         ),
       ),
     );
   }
+
+  static const _nameStyle = TextStyle(
+    fontSize: 12.5,
+    fontWeight: FontWeight.w500,
+  );
 }
 
 /// Largura de cada coluna lateral de setas (fileira enquadrada). A seta (36 px)

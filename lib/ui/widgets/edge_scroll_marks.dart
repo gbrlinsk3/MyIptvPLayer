@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -40,7 +42,8 @@ class PaginaRolagemNotification extends Notification {
 
 /// Faixa de traços na borda direita da janela. Mostra a posição da página
 /// (os traços da janela visível ficam maiores e em destaque) e permite rolar
-/// clicando ou arrastando. Quando a página não tem o que rolar, a faixa some
+/// clicando ou arrastando. Em repouso é compacta, uma coluna de pontos; com o
+/// mouse em cima (ou arrastando) os pontos viram os traços. Quando a página não tem o que rolar, a faixa some
 /// com fade e desliza para fora da borda, sem bloquear cliques.
 class EdgeScrollMarks extends StatefulWidget {
   const EdgeScrollMarks({
@@ -55,6 +58,10 @@ class EdgeScrollMarks extends StatefulWidget {
   static const double _altura = 2;
   static const double _traco = 8;
   static const double _tracoNaJanela = 14;
+  static const double _ponto = 3;
+  static const double _pontoNaJanela = 4;
+  static const double _recuoPonto = 2;
+  static const Duration _expansao = Duration(milliseconds: 180);
   static const Duration _duracao = Duration(milliseconds: 220);
   static const Curve _curva = Curves.easeOutCubic;
   static const Offset _deslocamentoOculto = Offset(0.6, 0);
@@ -73,6 +80,9 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
   /// Última posição rolável. Os traços continuam desenhados com ela enquanto
   /// a faixa some, para o fade-out não mostrar uma faixa vazia.
   PosicaoRolagem? _ultima;
+
+  bool _mouse = false;
+  bool _arrastando = false;
 
   @override
   void initState() {
@@ -135,6 +145,8 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
                     message: 'Rolar a página',
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
+                      onEnter: (_) => setState(() => _mouse = true),
+                      onExit: (_) => setState(() => _mouse = false),
                       child: SizedBox(
                         width: EdgeScrollMarks.largura,
                         height: double.infinity,
@@ -161,6 +173,15 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
                                 final delta = alvo - atual.pixels;
                                 if (delta != 0) widget.aoRolar(delta);
                               },
+                              onVerticalDragStart: (_) =>
+                                  setState(() => _arrastando = true),
+                              onVerticalDragEnd: (_) =>
+                                  setState(() => _arrastando = false),
+                              onVerticalDragCancel: () {
+                                if (_arrastando) {
+                                  setState(() => _arrastando = false);
+                                }
+                              },
                               onVerticalDragUpdate: (d) {
                                 final atual = widget.posicao.value;
                                 if (atual == null || trilho <= 0) return;
@@ -168,15 +189,25 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
                                     atual.viewportDimension;
                                 widget.aoRolar(d.delta.dy * total / trilho);
                               },
-                              child: CustomPaint(
-                                size: Size(
-                                  EdgeScrollMarks.largura,
-                                  box.maxHeight,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween<double>(
+                                  end: _mouse || _arrastando ? 1 : 0,
                                 ),
-                                painter: _TracosPainter(
-                                  posicao: _ultima,
-                                  cinza: cinza,
-                                  destaque: destaque,
+                                duration: duracao == Duration.zero
+                                    ? Duration.zero
+                                    : EdgeScrollMarks._expansao,
+                                curve: EdgeScrollMarks._curva,
+                                builder: (context, aberta, _) => CustomPaint(
+                                  size: Size(
+                                    EdgeScrollMarks.largura,
+                                    box.maxHeight,
+                                  ),
+                                  painter: _TracosPainter(
+                                    posicao: _ultima,
+                                    cinza: cinza,
+                                    destaque: destaque,
+                                    aberta: aberta,
+                                  ),
                                 ),
                               ),
                             );
@@ -202,11 +233,15 @@ class _TracosPainter extends CustomPainter {
     required this.posicao,
     required this.cinza,
     required this.destaque,
+    required this.aberta,
   });
 
   final PosicaoRolagem? posicao;
   final Color cinza;
   final Color destaque;
+
+  /// 0 = pontos (compacta), 1 = traços.
+  final double aberta;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -228,18 +263,28 @@ class _TracosPainter extends CustomPainter {
       final ini = i / n * total;
       final fim = (i + 1) / n * total;
       final naJanela = ini < janelaFim && fim > janelaIni;
-      final largura = naJanela
+      final ponto = naJanela
+          ? EdgeScrollMarks._pontoNaJanela
+          : EdgeScrollMarks._ponto;
+      final traco = naJanela
           ? EdgeScrollMarks._tracoNaJanela
           : EdgeScrollMarks._traco;
-      final y = EdgeScrollMarks._margemV + i * EdgeScrollMarks._espaco;
+      final largura = lerpDouble(ponto, traco, aberta)!;
+      final altura = lerpDouble(ponto, EdgeScrollMarks._altura, aberta)!;
+      final recuo = lerpDouble(EdgeScrollMarks._recuoPonto, 0, aberta)!;
+      // Centro na mesma linha nas duas formas.
+      final y =
+          EdgeScrollMarks._margemV +
+          i * EdgeScrollMarks._espaco +
+          (EdgeScrollMarks._altura - altura) / 2;
       final rect = Rect.fromLTWH(
-        size.width - largura,
+        size.width - recuo - largura,
         y,
         largura,
-        EdgeScrollMarks._altura,
+        altura,
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(1)),
+        RRect.fromRectAndRadius(rect, Radius.circular(altura / 2)),
         naJanela ? pDestaque : pCinza,
       );
     }
@@ -247,5 +292,8 @@ class _TracosPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TracosPainter old) =>
-      old.posicao != posicao || old.cinza != cinza || old.destaque != destaque;
+      old.posicao != posicao ||
+      old.cinza != cinza ||
+      old.destaque != destaque ||
+      old.aberta != aberta;
 }

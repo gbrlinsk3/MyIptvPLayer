@@ -148,7 +148,7 @@ class _XtreamCardState extends State<XtreamCard> {
     return SectionCard(
       title: 'Conta Xtream',
       children: [
-        KeyValueRow(label: 'Status', value: info?.status ?? '—'),
+        KeyValueRow(label: 'Status', value: accountStatusLabel(info?.status)),
         KeyValueRow(label: 'Expira em', value: expires),
         KeyValueRow(label: 'Conexões', value: connections),
         const SizedBox(height: 12),
@@ -216,4 +216,19 @@ class _XtreamCardState extends State<XtreamCard> {
       ],
     );
   }
+}
+
+/// Estado da conta como o provedor (Xtream) envia, em português. Um valor que
+/// não conhecemos aparece como veio.
+String accountStatusLabel(String? status) {
+  final text = status?.trim() ?? '';
+  if (text.isEmpty) return '—';
+  return switch (text.toLowerCase()) {
+    'active' => 'Ativa',
+    'expired' => 'Expirada',
+    'banned' => 'Banida',
+    'disabled' => 'Desativada',
+    'trial' => 'Teste',
+    _ => text,
+  };
 }

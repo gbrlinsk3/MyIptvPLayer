@@ -722,6 +722,8 @@ class _LiveTvPageState extends State<LiveTvPage> {
                   currentStreamId: session ? c.selected?.streamId : null,
                   showBanner: !session,
                   showTop: showTop,
+                  // Fechada sobre o vídeo, os cartões não pedem programação.
+                  watchPrograms: open,
                   onOpenChannel: _playFromBanner,
                   // A alça e o arrasto só existem com o vídeo tocando.
                   onDragStart: session ? _onDragStart : null,
@@ -801,13 +803,13 @@ class _LiveTvPageState extends State<LiveTvPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        g?.displayName ?? sel?.name ?? '',
+                        shortChannelName(g?.displayName ?? sel?.name ?? ''),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: AppFonts.title(
-                          26,
-                          spacing: 1,
-                        ).copyWith(color: Colors.white),
+                        style: AppFonts.title(26, spacing: 1).copyWith(
+                          color: Colors.white,
+                          shadows: videoTextShadows,
+                        ),
                       ),
                       if (versionLabel != null) ...[
                         const SizedBox(height: 2),
@@ -818,6 +820,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
                           style: const TextStyle(
                             fontSize: 12,
                             color: Color.fromRGBO(255, 255, 255, 0.75),
+                            shadows: videoTextShadows,
                           ),
                         ),
                       ],
@@ -922,7 +925,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
           child: Text(
-            'Versões de ${g.displayName}',
+            'Versões de ${shortChannelName(g.displayName)}',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -1021,6 +1024,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
                 style: TextStyle(
                   fontSize: 12,
                   color: Color.fromRGBO(255, 255, 255, 0.75),
+                  shadows: videoTextShadows,
                 ),
               ),
             ),
@@ -1063,6 +1067,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
+                          shadows: videoTextShadows,
                         ),
                       ),
                       SizedBox(height: 2),
@@ -1071,6 +1076,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
                         style: TextStyle(
                           fontSize: 12,
                           color: Color.fromRGBO(255, 255, 255, 0.75),
+                          shadows: videoTextShadows,
                         ),
                       ),
                     ],

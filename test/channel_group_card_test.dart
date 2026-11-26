@@ -16,7 +16,6 @@ void main() {
   Future<void> monta(
     WidgetTester tester,
     List<String> nomes, {
-    String? category,
     bool favorite = false,
     VoidCallback? onTap,
     VoidCallback? onToggleFavorite,
@@ -32,7 +31,6 @@ void main() {
               child: ChannelGroupCard(
                 group: g,
                 onTap: onTap ?? () {},
-                category: category,
                 favorite: favorite,
                 onToggleFavorite: onToggleFavorite,
               ),
@@ -50,7 +48,7 @@ void main() {
       'Canal SD',
       'Canal FHD [ALT]',
       'Canal HD [ALT]',
-    ], category: 'Esportes');
+    ]);
     expect(tester.takeException(), isNull);
     expect(find.text('FHD'), findsOneWidget);
     expect(find.text('HD'), findsOneWidget);
@@ -64,18 +62,8 @@ void main() {
     expect(find.text('Padrão'), findsNothing);
   });
 
-  testWidgets('faixa da categoria só aparece quando passada', (tester) async {
-    await monta(tester, ['Canal FHD', 'Canal HD'], category: 'Filmes');
-    expect(tester.takeException(), isNull);
-    expect(find.text('Filmes'), findsOneWidget);
-
-    await monta(tester, ['Canal FHD', 'Canal HD']);
-    expect(tester.takeException(), isNull);
-    expect(find.text('Filmes'), findsNothing);
-  });
-
   testWidgets('largura do cartão é 240', (tester) async {
-    await monta(tester, ['Canal FHD'], category: 'Filmes');
+    await monta(tester, ['Canal FHD']);
     expect(tester.getSize(find.byType(ChannelGroupCard)).width, 240);
   });
 
@@ -85,7 +73,6 @@ void main() {
     await monta(
       tester,
       ['Canal FHD', 'Canal HD'],
-      category: 'Filmes',
       onTap: () => taps++,
       onToggleFavorite: () => favs++,
     );
@@ -147,18 +134,33 @@ void main() {
     expect(find.text('Favoritar'), findsNothing);
   });
 
-  testWidgets('mostra "Clique para assistir" embaixo do cartão', (tester) async {
-    await monta(tester, ['Canal FHD'], category: 'Filmes');
+  testWidgets('nome longo usa até 3 linhas, sem estourar o cartão', (tester) async {
+    const nome = '(01)   ⏰ 14:45 • Borussia Mönchengladbach x Eintracht Frankfurt am Main •';
+    await monta(tester, ['$nome FHD', '$nome HD']);
     expect(tester.takeException(), isNull);
-    expect(find.text('Clique para assistir'), findsOneWidget);
+    expect(find.text('Clique para assistir'), findsNothing);
+    expect(find.text('FHD'), findsOneWidget);
+    final base = parseChannelName('$nome FHD').base;
+    final texto = tester.widget<Text>(find.text(shortChannelName(base)));
+    expect(texto.maxLines, 3);
+  });
+
+  test('shortChannelName só encurta os canais de evento', () {
+    expect(
+      shortChannelName('(01)   ⏰ 14:45 • Bodø/Glimt x LASK Linz •'),
+      '14:45 • Bodø/Glimt x LASK Linz',
+    );
+    expect(shortChannelName('(10) ⏰'), '(10) ⏰');
+    expect(shortChannelName('Canal (2) ⏰ HD'), 'Canal (2) ⏰ HD');
+    expect(shortChannelName('Globo SP •'), 'Globo SP •');
   });
 
   testWidgets('o coração fica sobre a imagem, acima do corpo', (tester) async {
-    await monta(tester, ['Canal FHD'], category: 'Filmes', onToggleFavorite: () {});
+    await monta(tester, ['Canal FHD'], onToggleFavorite: () {});
     final cartao = tester.getTopLeft(find.byType(ChannelGroupCard));
     final coracao = tester.getCenter(find.byIcon(Icons.favorite_border));
     final dy = coracao.dy - cartao.dy;
-    expect(dy, greaterThan(ChannelGroupCard.categoryHeight));
-    expect(dy, lessThan(ChannelGroupCard.categoryHeight + ChannelGroupCard.imageHeight));
+    expect(dy, greaterThan(0));
+    expect(dy, lessThan(ChannelGroupCard.imageHeight));
   });
 }

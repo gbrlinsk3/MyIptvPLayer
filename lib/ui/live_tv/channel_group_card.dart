@@ -2,16 +2,20 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/channel_groups.dart';
+import '../../data/models.dart';
 import '../widgets/click_spark.dart';
+import '../widgets/full_name_tooltip.dart';
+import '../widgets/press_scale.dart';
 import '../widgets/spotlight.dart';
 import 'live_logo.dart';
 
-/// Cartão de um canal agrupado, no estilo da loja Nuuvem: faixa com a
-/// categoria no alto, imagem larga (logo sobre o próprio logo desfocado),
-/// nome, etiquetas das versões (FHD, HD, SD...) e "Clique para assistir" embaixo;
-/// o coração de favoritar fica sobre a imagem.
+/// Cartão de um canal agrupado: imagem larga (logo sobre o próprio logo
+/// desfocado), nome em até 3 linhas (2 com programa), o programa no ar quando
+/// há guia e etiquetas das versões (FHD, HD, SD...) embaixo; o coração de
+/// favoritar fica sobre a imagem.
 /// [current] marca o canal que está tocando.
 class ChannelGroupCard extends StatefulWidget {
   const ChannelGroupCard({
@@ -19,7 +23,7 @@ class ChannelGroupCard extends StatefulWidget {
     required this.group,
     required this.onTap,
     this.current = false,
-    this.category,
+    this.program,
     this.favorite = false,
     this.onToggleFavorite,
   });
@@ -28,28 +32,22 @@ class ChannelGroupCard extends StatefulWidget {
   final VoidCallback onTap;
   final bool current;
 
-  /// Nome da categoria; sem ele a faixa do alto não aparece.
-  final String? category;
+  /// Programa no ar; sem guia, o cartão fica só com o nome e as etiquetas.
+  final EpgProgram? program;
 
   final bool favorite;
   final VoidCallback? onToggleFavorite;
 
   static const double width = 240;
 
-  /// Altura da faixa da categoria.
-  static const double categoryHeight = 24;
-
   /// Altura da imagem larga.
   static const double imageHeight = 120;
 
-  /// Altura do corpo: padding 12 + nome + etiquetas + botão (32) + padding 12.
+  /// Altura do corpo: nome em 3 linhas com etiquetas, ou em 2 linhas com o
+  /// programa no ar e etiquetas, com 10 px em cima e 8 px embaixo.
   static const double bodyHeight = 104;
 
-  /// Altura do cartão com a faixa da categoria.
-  static const double height = categoryHeight + imageHeight + bodyHeight;
-
-  /// Altura do cartão sem a faixa da categoria.
-  static const double heightWithoutCategory = imageHeight + bodyHeight;
+  static const double height = imageHeight + bodyHeight;
 
   /// Máximo de etiquetas mostradas; as outras viram "+N".
   static const int maxTags = 3;
@@ -69,8 +67,8 @@ class _ChannelGroupCardState extends State<ChannelGroupCard> {
     final g = widget.group;
     final n = g.versions.length;
     final current = widget.current;
-    final category = widget.category;
-    final hasCategory = category != null && category.isNotEmpty;
+    final program = widget.program;
+    final nameLines = program == null ? 3 : 2;
     final labels = <String>[];
     for (final v in g.versions) {
       final l = g.labelOf(v).replaceAll(' [ALT]', '');
@@ -96,171 +94,150 @@ class _ChannelGroupCardState extends State<ChannelGroupCard> {
     return Semantics(
       container: true,
       button: true,
-      label: '${g.displayName}, $n ${n == 1 ? 'versão' : 'versões'}',
+      label:
+          '${g.displayName}, $n ${n == 1 ? 'versão' : 'versões'}'
+          '${program == null ? '' : ', no ar: ${program.title}, até ${formatClock(program.stopTime)}'}',
       onTap: widget.onTap,
-      child: FocusableActionDetector(
-        mouseCursor: SystemMouseCursors.click,
-        onShowHoverHighlight: (v) => setState(() => _hover = v),
-        onShowFocusHighlight: (v) => setState(() => _focus = v),
-        actions: {
-          ActivateIntent: CallbackAction<ActivateIntent>(
-            onInvoke: (_) {
-              widget.onTap();
-              return null;
+      child: FullNameTooltip(
+        fullName: g.displayName,
+        shownName: shortChannelName(g.displayName),
+        style: _nameStyle,
+        maxLines: nameLines,
+        // Largura do cartão menos os 12 px de cada lado.
+        textWidth: ChannelGroupCard.width - 24,
+        // Abaixo do nome, sem cobrir o que se está lendo.
+        verticalOffset: 104,
+        child: PressScale(
+          child: FocusableActionDetector(
+            mouseCursor: SystemMouseCursors.click,
+            onShowHoverHighlight: (v) => setState(() => _hover = v),
+            onShowFocusHighlight: (v) => setState(() => _focus = v),
+            actions: {
+              ActivateIntent: CallbackAction<ActivateIntent>(
+                onInvoke: (_) {
+                  widget.onTap();
+                  return null;
+                },
+              ),
             },
-          ),
-        },
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap,
-          child: SizedBox(
-            width: ChannelGroupCard.width,
-            height: hasCategory
-                ? ChannelGroupCard.height
-                : ChannelGroupCard.heightWithoutCategory,
-            child: AnimatedContainer(
-              duration: duration,
-              curve: Curves.easeOut,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(_radius),
-                boxShadow: _hover && !current
-                    ? const [
-                        BoxShadow(
-                          color: Color(0x33000000),
-                          blurRadius: 8,
-                          offset: Offset(0, 3),
-                        ),
-                      ]
-                    : const [],
-              ),
-              // A borda é desenhada por cima: mudar a espessura não mexe no
-              // conteúdo.
-              foregroundDecoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(_radius),
-                border: Border.all(color: borderColor, width: strong ? 2 : 1),
-              ),
-              // Facho de luz que acompanha o mouse (pinta por cima, sem tomar
-              // toques; dentro de um SpotlightGroup acende também os vizinhos).
-              child: SpotlightCard(
-                borderRadius: BorderRadius.circular(_radius),
-                borderGlow: 0.5,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(_radius),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (hasCategory)
-                        ExcludeSemantics(
-                          child: SizedBox(
-                            height: ChannelGroupCard.categoryHeight,
-                            child: Center(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                child: Text(
-                                  category,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.2,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ),
-                              ),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.onTap,
+              child: SizedBox(
+                width: ChannelGroupCard.width,
+                height: ChannelGroupCard.height,
+                child: AnimatedContainer(
+                  duration: duration,
+                  curve: Curves.easeOut,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(_radius),
+                    boxShadow: _hover && !current
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x33000000),
+                              blurRadius: 8,
+                              offset: Offset(0, 3),
                             ),
-                          ),
-                        ),
-                      SizedBox(
-                        height: ChannelGroupCard.imageHeight,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ExcludeSemantics(child: _WideImage(url: g.icon)),
-                            // Só o ícone, no canto da imagem.
-                            Positioned(
-                              top: 6,
-                              right: 6,
-                              child: _FavoriteButton(
-                                favorite: widget.favorite,
-                                onPressed: widget.onToggleFavorite,
-                                name: g.displayName,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ExcludeSemantics(
-                                child: Text(
-                                  g.displayName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    height: 1.2,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.text,
-                                  ),
-                                ),
-                              ),
-                              if (shown.isNotEmpty) ...[
-                                const SizedBox(height: 6),
+                          ]
+                        : const [],
+                  ),
+                  // A borda é desenhada por cima: mudar a espessura não mexe no
+                  // conteúdo.
+                  foregroundDecoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(_radius),
+                    border: Border.all(
+                      color: borderColor,
+                      width: strong ? 2 : 1,
+                    ),
+                  ),
+                  // Facho de luz que acompanha o mouse (pinta por cima, sem tomar
+                  // toques; dentro de um SpotlightGroup acende também os vizinhos).
+                  child: SpotlightCard(
+                    borderRadius: BorderRadius.circular(_radius),
+                    borderGlow: 0.5,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(_radius),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                            height: ChannelGroupCard.imageHeight,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
                                 ExcludeSemantics(
-                                  child: SizedBox(
-                                    height: _Tag.height,
-                                    child: ClipRect(
-                                      child: OverflowBox(
-                                        alignment: Alignment.centerLeft,
-                                        minWidth: 0,
-                                        maxWidth: double.infinity,
-                                        minHeight: _Tag.height,
-                                        maxHeight: _Tag.height,
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            for (final t in shown)
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  right: 4,
-                                                ),
-                                                child: _Tag(t),
-                                              ),
-                                            if (extra > 0) _Tag('+$extra'),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                                  child: _WideImage(url: g.icon),
+                                ),
+                                // Só o ícone, no canto da imagem.
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: _FavoriteButton(
+                                    favorite: widget.favorite,
+                                    onPressed: widget.onToggleFavorite,
+                                    name: g.displayName,
                                   ),
                                 ),
                               ],
-                              const Spacer(),
-                              ExcludeSemantics(
-                                child: Text(
-                                  'Clique para assistir',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.2,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.accent,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ExcludeSemantics(
+                                    child: Text(
+                                      shortChannelName(g.displayName),
+                                      maxLines: nameLines,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: _nameStyle,
+                                    ),
+                                  ),
+                                  if (program != null) ...[
+                                    const SizedBox(height: 9),
+                                    ExcludeSemantics(child: _NowLine(program)),
+                                  ],
+                                  if (shown.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    ExcludeSemantics(
+                                      child: SizedBox(
+                                        height: _Tag.height,
+                                        child: ClipRect(
+                                          child: OverflowBox(
+                                            alignment: Alignment.centerLeft,
+                                            minWidth: 0,
+                                            maxWidth: double.infinity,
+                                            minHeight: _Tag.height,
+                                            maxHeight: _Tag.height,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                for (final t in shown)
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          right: 4,
+                                                        ),
+                                                    child: _Tag(t),
+                                                  ),
+                                                if (extra > 0) _Tag('+$extra'),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -268,6 +245,72 @@ class _ChannelGroupCardState extends State<ChannelGroupCard> {
           ),
         ),
       ),
+    );
+  }
+
+  static TextStyle get _nameStyle => TextStyle(
+    fontSize: 14,
+    height: 1.2,
+    fontWeight: FontWeight.w600,
+    color: AppColors.text,
+  );
+}
+
+/// Programa no ar: título e hora do fim, com a barra do quanto já passou.
+class _NowLine extends StatelessWidget {
+  const _NowLine(this.program);
+
+  final EpgProgram program;
+
+  @override
+  Widget build(BuildContext context) {
+    final length = program.stop - program.start;
+    final passed =
+        DateTime.now().millisecondsSinceEpoch ~/ 1000 - program.start;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 14,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  program.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.2,
+                    color: AppColors.text,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'até ${formatClock(program.stopTime)}',
+                style: TextStyle(
+                  fontSize: 10,
+                  height: 1.2,
+                  color: AppColors.textMuted,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 3),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            value: length <= 0 ? 0 : (passed / length).clamp(0.0, 1.0),
+            minHeight: 2,
+            backgroundColor: AppColors.border,
+            color: AppColors.accent,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -323,27 +366,29 @@ class _FavoriteButtonState extends State<_FavoriteButton> {
       label: '$tip: $name',
       onTap: onPressed,
       excludeSemantics: true,
-      child: Tooltip(
-        message: tip,
-        excludeFromSemantics: true,
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            onTap: onPressed == null ? null : _alternar,
-            customBorder: const CircleBorder(),
-            child: Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0x99000000),
-              ),
-              child: Icon(
-                favorite ? Icons.favorite : Icons.favorite_border,
-                key: _iconKey,
-                size: 18,
-                color: color,
+      child: PressShield(
+        child: Tooltip(
+          message: tip,
+          excludeFromSemantics: true,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: onPressed == null ? null : _alternar,
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0x99000000),
+                ),
+                child: Icon(
+                  favorite ? Icons.favorite : Icons.favorite_border,
+                  key: _iconKey,
+                  size: 18,
+                  color: color,
+                ),
               ),
             ),
           ),

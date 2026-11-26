@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import '../../data/channel_groups.dart';
+import '../widgets/full_name_tooltip.dart';
+import '../widgets/press_scale.dart';
 import 'live_logo.dart';
 
 /// Cartão de "Recentes e favoritos" da TV ao vivo, no visual do cartão do
@@ -109,117 +111,132 @@ class _LiveRecentCardState extends State<LiveRecentCard> {
       button: true,
       label: '${g.displayName}, $n ${n == 1 ? 'versão' : 'versões'}',
       onTap: widget.onTap,
-      child: FocusableActionDetector(
-        mouseCursor: SystemMouseCursors.click,
-        onShowFocusHighlight: (v) => setState(() => _focus = v),
-        actions: {
-          ActivateIntent: CallbackAction<ActivateIntent>(
-            onInvoke: (_) {
-              widget.onTap();
-              return null;
-            },
-          ),
-        },
-        child: MouseRegion(
-          onEnter: (_) => widget.onEnter?.call(),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onTap,
-            child: AnimatedContainer(
-              duration: dur,
-              curve: Curves.easeOutCubic,
-              width: expanded
-                  ? LiveRecentCard.expandedWidth
-                  : LiveRecentCard.collapsedWidth,
-              height: LiveRecentCard.height,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: strong ? AppColors.accent : AppColors.border,
-                  width: strong ? 2 : 1,
+      child: FullNameTooltip(
+        fullName: g.displayName,
+        shownName: shortChannelName(g.displayName),
+        // O mouse em cima expande o cartão: mede na largura expandida.
+        style: const TextStyle(
+          fontSize: 16,
+          height: 1.2,
+          fontWeight: FontWeight.w600,
+        ),
+        maxLines: 1,
+        textWidth: LiveRecentCard.expandedWidth - 28,
+        verticalOffset: LiveRecentCard.height / 2 + 4,
+        child: PressScale(
+          child: FocusableActionDetector(
+          mouseCursor: SystemMouseCursors.click,
+          onShowFocusHighlight: (v) => setState(() => _focus = v),
+          actions: {
+            ActivateIntent: CallbackAction<ActivateIntent>(
+              onInvoke: (_) {
+                widget.onTap();
+                return null;
+              },
+            ),
+          },
+          child: MouseRegion(
+            onEnter: (_) => widget.onEnter?.call(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.onTap,
+              child: AnimatedContainer(
+                duration: dur,
+                curve: Curves.easeOutCubic,
+                width: expanded
+                    ? LiveRecentCard.expandedWidth
+                    : LiveRecentCard.collapsedWidth,
+                height: LiveRecentCard.height,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: strong ? AppColors.accent : AppColors.border,
+                    width: strong ? 2 : 1,
+                  ),
+                  boxShadow: expanded
+                      ? [
+                          BoxShadow(
+                            color: AppColors.accent.withValues(alpha: 0.25),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : const [],
                 ),
-                boxShadow: expanded
-                    ? [
-                        BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.25),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ]
-                    : const [],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ExcludeSemantics(
-                      child: _Backdrop(
-                        url: g.icon,
-                        expanded: expanded,
-                        duration: dur,
-                      ),
-                    ),
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0x00000000), Color(0xCC000000)],
-                          stops: [0.35, 1],
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ExcludeSemantics(
+                        child: _Backdrop(
+                          url: g.icon,
+                          expanded: expanded,
+                          duration: dur,
                         ),
                       ),
-                    ),
-                    // Os textos usam a largura disponível com reticências, então
-                    // não estouram em nenhum quadro da animação de largura.
-                    Positioned(
-                      left: expanded ? 14 : 8,
-                      right: expanded ? 14 : 8,
-                      bottom: 12,
-                      child: ExcludeSemantics(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            AnimatedDefaultTextStyle(
-                              duration: dur,
-                              curve: Curves.easeOutCubic,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: expanded ? 16 : 13,
-                                height: 1.2,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              child: Text(g.displayName),
-                            ),
-                            if (expanded && versions != null)
-                              Text(
-                                versions,
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0x00000000), Color(0xCC000000)],
+                            stops: [0.35, 1],
+                          ),
+                        ),
+                      ),
+                      // Os textos usam a largura disponível com reticências, então
+                      // não estouram em nenhum quadro da animação de largura.
+                      Positioned(
+                        left: expanded ? 14 : 8,
+                        right: expanded ? 14 : 8,
+                        bottom: 12,
+                        child: ExcludeSemantics(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AnimatedDefaultTextStyle(
+                                duration: dur,
+                                curve: Curves.easeOutCubic,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xCCFFFFFF),
-                                  fontSize: 11,
-                                  height: 1.3,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: expanded ? 16 : 13,
+                                  height: 1.2,
+                                  fontWeight: FontWeight.w600,
                                 ),
+                                child: Text(shortChannelName(g.displayName)),
                               ),
-                          ],
+                              if (expanded && versions != null)
+                                Text(
+                                  versions,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xCCFFFFFF),
+                                    fontSize: 11,
+                                    height: 1.3,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    if (action != null)
-                      Positioned(
-                        top: expanded ? 4 : 8,
-                        right: expanded ? 4 : 8,
-                        child: action,
-                      ),
-                  ],
+                      if (action != null)
+                        Positioned(
+                          top: expanded ? 4 : 8,
+                          right: expanded ? 4 : 8,
+                          child: action,
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -248,26 +265,28 @@ class _CornerButton extends StatelessWidget {
       label: tooltip,
       onTap: onPressed,
       excludeSemantics: true,
-      child: Tooltip(
-        message: tooltip,
-        excludeFromSemantics: true,
-        child: SizedBox(
-          width: 32,
-          height: 32,
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: onPressed,
-              customBorder: const CircleBorder(),
-              child: Center(
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    color: Color(0x99000000),
-                    shape: BoxShape.circle,
+      child: PressShield(
+        child: Tooltip(
+          message: tooltip,
+          excludeFromSemantics: true,
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                onTap: onPressed,
+                customBorder: const CircleBorder(),
+                child: Center(
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      color: Color(0x99000000),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 16, color: iconColor),
                   ),
-                  child: Icon(icon, size: 16, color: iconColor),
                 ),
               ),
             ),
