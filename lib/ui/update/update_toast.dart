@@ -6,6 +6,7 @@ import '../../update/app_updater.dart';
 import '../../update/update_info.dart';
 import '../widgets/cubos_logo.dart';
 import '../widgets/glass.dart';
+import '../widgets/smooth_scroll.dart';
 import '../widgets/swipe_toast.dart';
 
 /// Tela de abertura enquanto o app procura atualização (no máximo ~6 s).
@@ -226,41 +227,44 @@ class _UpdateDetails extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (info.hasDetails)
-                              for (final e in UpdateInfo.sectionTitles.entries)
-                                if (info.details[e.key]?.isNotEmpty ?? false) ...[
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.only(top: 8, bottom: 6),
-                                    child: Text(
-                                      e.value,
-                                      style: TextStyle(
-                                        color: AppColors.accentInk,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                  for (final item in info.details[e.key]!)
+                      child: SmoothScroll(
+                        builder: (_, smooth) => SingleChildScrollView(
+                          controller: smooth,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (info.hasDetails)
+                                for (final e in UpdateInfo.sectionTitles.entries)
+                                  if (info.details[e.key]?.isNotEmpty ?? false) ...[
                                     Padding(
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('•  '),
-                                          Expanded(child: Text(item)),
-                                        ],
+                                      padding:
+                                          const EdgeInsets.only(top: 8, bottom: 6),
+                                      child: Text(
+                                        e.value,
+                                        style: TextStyle(
+                                          color: AppColors.accentInk,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                     ),
-                                ]
-                            else
-                              Text(info.notes),
-                          ],
+                                    for (final item in info.details[e.key]!)
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text('•  '),
+                                            Expanded(child: Text(item)),
+                                          ],
+                                        ),
+                                      ),
+                                  ]
+                              else
+                                Text(info.notes),
+                            ],
+                          ),
                         ),
                       ),
                     ),

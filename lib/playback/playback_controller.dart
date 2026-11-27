@@ -293,6 +293,10 @@ class PlaybackController extends ChangeNotifier {
     await _open();
   }
 
+  /// Há um canal tocando (ou tentando voltar): a hibernação espera.
+  bool get isPlaying =>
+      _active && (player.state.playing || buffering || reconnecting);
+
   Future<void> stop() async {
     await stopRecording();
     _active = false;

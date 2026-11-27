@@ -67,6 +67,10 @@ class EdgeScrollMarks extends StatefulWidget {
   });
 
   static const double largura = 14;
+
+  /// Verdadeiro enquanto a faixa é arrastada (o Início espera soltar para
+  /// completar a transição do banner).
+  static final ValueNotifier<bool> segurando = ValueNotifier(false);
   static const double _margemV = 8;
   static const double _espaco = 10;
   static const double _altura = 2;
@@ -100,6 +104,12 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
 
   bool _mouse = false;
   bool _arrastando = false;
+
+  void _arrastar(bool sim) {
+    EdgeScrollMarks.segurando.value = sim;
+    setState(() => _arrastando = sim);
+  }
+
   bool _rolando = false;
   Timer? _recolher;
 
@@ -124,6 +134,7 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
   void dispose() {
     widget.posicao.removeListener(_aoMudar);
     _recolher?.cancel();
+    if (_arrastando) EdgeScrollMarks.segurando.value = false;
     super.dispose();
   }
 
@@ -211,14 +222,10 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
                                 final delta = alvo - atual.pixels;
                                 if (delta != 0) widget.aoRolar(delta);
                               },
-                              onVerticalDragStart: (_) =>
-                                  setState(() => _arrastando = true),
-                              onVerticalDragEnd: (_) =>
-                                  setState(() => _arrastando = false),
+                              onVerticalDragStart: (_) => _arrastar(true),
+                              onVerticalDragEnd: (_) => _arrastar(false),
                               onVerticalDragCancel: () {
-                                if (_arrastando) {
-                                  setState(() => _arrastando = false);
-                                }
+                                if (_arrastando) _arrastar(false);
                               },
                               onVerticalDragUpdate: (d) {
                                 final atual = widget.posicao.value;

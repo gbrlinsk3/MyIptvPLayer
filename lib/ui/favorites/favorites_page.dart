@@ -9,6 +9,7 @@ import '../catalog/title_widgets.dart';
 import '../live_tv/channel_card.dart';
 import '../live_tv/live_player_page.dart';
 import '../widgets/sliding_tabs.dart';
+import '../widgets/smooth_scroll.dart';
 import '../widgets/state_views.dart';
 import '../../core/format.dart';
 
@@ -143,19 +144,22 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       // Índice 2 do menu = "Filmes e séries" (ordem em shell.dart).
                       onAction: () => AppScope.read(context).setShellIndex(2),
                     )
-                  : CustomScrollView(
-                      slivers: [
-                        if (titles.isNotEmpty)
-                          TitleGrid.sliver(
-                            titles: titles,
-                            onOpen: (t) => showTitleDetails(context, t),
-                          ),
-                        if (titles.isNotEmpty && shownChannels.isNotEmpty)
-                          const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                        if (shownChannels.isNotEmpty) _channelGrid(shownChannels),
-                        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                      ],
+                  : SmoothScroll(
+                    builder: (_, smooth) => CustomScrollView(
+                      controller: smooth,
+                        slivers: [
+                          if (titles.isNotEmpty)
+                            TitleGrid.sliver(
+                              titles: titles,
+                              onOpen: (t) => showTitleDetails(context, t),
+                            ),
+                          if (titles.isNotEmpty && shownChannels.isNotEmpty)
+                            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                          if (shownChannels.isNotEmpty) _channelGrid(shownChannels),
+                          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                        ],
                     ),
+                  ),
         ),
       ],
     );

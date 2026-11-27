@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../state/app_scope.dart';
 import '../../data/catalog_models.dart';
 import '../widgets/shimmer.dart';
+import '../widgets/smooth_scroll.dart';
 import '../widgets/split_text.dart';
 import '../widgets/carousel_arrows.dart';
 import '../widgets/full_name_tooltip.dart';
@@ -192,8 +193,8 @@ class _PosterRating extends StatelessWidget {
 }
 
 /// Fileira horizontal com título, "Ver tudo" e setas fixas em colunas
-/// laterais: os pôsteres ficam só entre elas e somem em degradê nas pontas.
-/// Podem ser arrastados com o mouse. Os dados vêm de um Future em cache do
+/// laterais: os pôsteres ficam só entre elas, sem máscara nas pontas (ela
+/// custava quadros na rolagem da página). Podem ser arrastados com o mouse. Os dados vêm de um Future em cache do
 /// controller (não consulta o banco de novo a cada reconstrução). Com
 /// [loadMore] a fileira não tem fim. Fileira vazia não ocupa espaço.
 class TitleRow extends StatefulWidget {
@@ -220,9 +221,6 @@ class TitleRow extends StatefulWidget {
 
   /// Largura de cada coluna lateral de setas. A seta (36 px) fica no meio dela.
   static const double arrowColumn = 44;
-
-  /// Largura do degradê em cada ponta da lista.
-  static const double fadeWidth = 48;
 
   @override
   State<TitleRow> createState() => _TitleRowState();
@@ -304,7 +302,7 @@ class _TitleRowState extends State<TitleRow> {
                     // Folga em cima e embaixo: o cartão cresce ao passar o mouse
                     // e a borda não pode ser cortada.
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
+                      horizontal: RowMetrics.pad,
                       vertical: 12,
                     ),
                     itemCount: loop ? null : endless.loaded(list),
@@ -324,10 +322,22 @@ class _TitleRowState extends State<TitleRow> {
                   ),
                 );
           final setaEsq = comSetas
-              ? CarouselArrow(controller: _scroll, left: true, passo: passo)
+              // Na coluna das setas não passa nada por baixo: o vidro não
+              // precisa de desfoque ao vivo.
+              ? CarouselArrow(
+                  controller: _scroll,
+                  left: true,
+                  passo: passo,
+                  liveBlur: false,
+                )
               : null;
           final setaDir = comSetas
-              ? CarouselArrow(controller: _scroll, left: false, passo: passo)
+              ? CarouselArrow(
+                  controller: _scroll,
+                  left: false,
+                  passo: passo,
+                  liveBlur: false,
+                )
               : null;
           return Padding(
             padding: const EdgeInsets.only(bottom: 20),
@@ -362,9 +372,7 @@ class _TitleRowState extends State<TitleRow> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _colunaDeSetas(setaEsq, yCentro),
-                      Expanded(
-                        child: comSetas ? _fade(miolo, larguraLista) : miolo,
-                      ),
+                      Expanded(child: miolo),
                       _colunaDeSetas(setaDir, yCentro),
                     ],
                   ),
@@ -374,24 +382,6 @@ class _TitleRowState extends State<TitleRow> {
           );
         });
       },
-    );
-  }
-
-  /// Os pôsteres das pontas somem em degradê antes das setas.
-  Widget _fade(Widget child, double width) {
-    final stop = (TitleRow.fadeWidth / width).clamp(0.0, 0.5);
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (rect) => LinearGradient(
-        colors: const [
-          Color(0x00000000),
-          Color(0xFF000000),
-          Color(0xFF000000),
-          Color(0x00000000),
-        ],
-        stops: [0, stop, 1 - stop, 1],
-      ).createShader(rect),
-      child: child,
     );
   }
 
@@ -586,21 +576,24 @@ class TitleGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-          sliver: _grid(titles, onOpen),
-        ),
-        if (extra.isNotEmpty) ...[
-          SliverToBoxAdapter(child: SearchDivider(label: extraLabel)),
+    return SmoothScroll(
+      builder: (_, smooth) => CustomScrollView(
+        controller: smooth,
+        slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            sliver: _grid(extra, onOpen),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+            sliver: _grid(titles, onOpen),
           ),
-        ] else
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
-      ],
+          if (extra.isNotEmpty) ...[
+            SliverToBoxAdapter(child: SearchDivider(label: extraLabel)),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              sliver: _grid(extra, onOpen),
+            ),
+          ] else
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        ],
+      ),
     );
   }
 }

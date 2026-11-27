@@ -14,6 +14,7 @@ import '../widgets/common.dart';
 import '../widgets/glass.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/sliding_tabs.dart';
+import '../widgets/smooth_scroll.dart';
 
 /// "Dados anteriores" (aba temporária da barra lateral): o que foi guardado na
 /// troca de Xtream do mesmo provedor e não achou par seguro no catálogo novo.
@@ -117,16 +118,19 @@ class _CarryoverPageState extends State<CarryoverPage> {
                     style: TextStyle(color: AppColors.textMuted),
                   ),
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) => _EntryRow(
-                    key: ValueKey('${tab!.name}:$i:${items[i]['name']}'),
-                    group: tab,
-                    entry: items[i],
-                  ),
+              : SmoothScroll(
+                builder: (_, smooth) => ListView.separated(
+                  controller: smooth,
+                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, i) => _EntryRow(
+                      key: ValueKey('${tab!.name}:$i:${items[i]['name']}'),
+                      group: tab,
+                      entry: items[i],
+                    ),
                 ),
+              ),
         ),
       ],
     );
@@ -571,20 +575,23 @@ class _RelinkDialogState<T> extends State<_RelinkDialog<T>> {
                             style: TextStyle(color: AppColors.textMuted),
                           ),
                         )
-                      : ListView.builder(
-                          itemCount: _results.length,
-                          itemBuilder: (context, i) => InkWell(
-                            borderRadius: AppShape.card,
-                            onTap: () => Navigator.of(context).pop(_results[i]),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 5,
+                      : SmoothScroll(
+                        builder: (_, smooth) => ListView.builder(
+                          controller: smooth,
+                            itemCount: _results.length,
+                            itemBuilder: (context, i) => InkWell(
+                              borderRadius: AppShape.card,
+                              onTap: () => Navigator.of(context).pop(_results[i]),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 5,
+                                ),
+                                child: widget.tile(_results[i]),
                               ),
-                              child: widget.tile(_results[i]),
                             ),
-                          ),
                         ),
+                      ),
             ),
           ],
         ),

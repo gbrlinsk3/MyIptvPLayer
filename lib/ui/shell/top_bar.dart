@@ -7,6 +7,7 @@ import '../../state/app_scope.dart';
 import '../profiles/profile_avatar.dart';
 import '../widgets/glass.dart';
 import '../widgets/text_type.dart';
+import '../window/title_bar.dart';
 
 /// Conteúdo do topo: busca global à esquerda, área de arrastar a janela e o
 /// perfil ativo à direita (com menu). Os botões da janela ficam no TitleBar.
@@ -92,8 +93,16 @@ class _SearchField extends StatelessWidget {
           borderRadius: radius,
           borderSide: BorderSide.none,
         );
-        return GlassSurface(
-          radius: radius,
+        // No tema claro, sobre o banner em tela cheia, o vidro fecha mais
+        // para a dica cinza continuar legível.
+        return ValueListenableBuilder<bool>(
+          valueListenable: WindowChrome.overMedia,
+          builder: (context, overMedia, field) => GlassSurface(
+            group: GlassGroups.bars,
+            radius: radius,
+            fill: overMedia && !AppColors.isDark ? AppGlass.dialog : null,
+            child: field!,
+          ),
           child: TextField(
             controller: controller,
             focusNode: focus,
@@ -222,16 +231,40 @@ class _ProfileMenuState extends State<_ProfileMenu> {
               child: ProfileAvatar.of(profile, size: 32),
             ),
             const SizedBox(width: 10),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 140),
-              child: Text(
-                profile.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
+            // Sobre o banner em tela cheia, nome e seta ficam brancos.
+            ValueListenableBuilder<bool>(
+              valueListenable: WindowChrome.overMedia,
+              builder: (context, overMedia, _) {
+                final shadows = overMedia
+                    ? const [Shadow(color: Color(0xCC000000), blurRadius: 6)]
+                    : null;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 140),
+                      child: Text(
+                        profile.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: overMedia ? Colors.white : null,
+                          shadows: shadows,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.expand_more,
+                      size: 18,
+                      color: overMedia ? Colors.white : AppColors.textMuted,
+                      shadows: shadows,
+                    ),
+                  ],
+                );
+              },
             ),
-            Icon(Icons.expand_more, size: 18, color: AppColors.textMuted),
           ],
         ),
       ),

@@ -46,9 +46,17 @@ class CarouselArrowButton extends StatelessWidget {
     required this.left,
     required this.enabled,
     required this.onTap,
+    this.liveBlur = true,
+    this.group,
   });
 
   static const double size = 36;
+
+  /// Ver [GlassSurface.group].
+  final BackdropKey? group;
+
+  /// Ver [GlassSurface.liveBlur].
+  final bool liveBlur;
 
   final bool left;
   final bool enabled;
@@ -64,6 +72,8 @@ class CarouselArrowButton extends StatelessWidget {
         enabled: enabled,
         label: label,
         child: GlassSurface(
+          group: group,
+          liveBlur: liveBlur,
           radius: AppShape.control,
           child: Material(
             type: MaterialType.transparency,
@@ -98,7 +108,15 @@ class CarouselArrow extends StatefulWidget {
     required this.controller,
     required this.left,
     required this.passo,
+    this.liveBlur = true,
+    this.group,
   });
+
+  /// Ver [GlassSurface.group].
+  final BackdropKey? group;
+
+  /// Ver [GlassSurface.liveBlur].
+  final bool liveBlur;
 
   final ScrollController controller;
   final bool left;
@@ -162,6 +180,8 @@ class _CarouselArrowState extends State<CarouselArrow> {
     _ativa = ativa;
     return CarouselArrowButton(
       left: widget.left,
+      liveBlur: widget.liveBlur,
+      group: widget.group,
       enabled: ativa,
       onTap: () =>
           carrossel.scrollBy(widget.left ? -widget.passo : widget.passo),

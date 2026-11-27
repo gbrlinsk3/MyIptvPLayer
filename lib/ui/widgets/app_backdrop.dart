@@ -80,6 +80,14 @@ class BackdropRender {
   /// não deixa a tela sem fundo.
   static final Map<String, ui.Image> _cache = {};
 
+  /// Solta os fundos prontos (hibernação). Quem está na tela tem cópia própria.
+  static void releaseCache() {
+    for (final image in _cache.values) {
+      image.dispose();
+    }
+    _cache.clear();
+  }
+
   /// Na ordem de preferência: a escolhida e a do app.
   static List<BackdropCandidate> candidates(String chosen) {
     BackdropCandidate? file(String path) {

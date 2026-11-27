@@ -17,6 +17,7 @@ import '../widgets/app_popup_menu.dart';
 import '../widgets/common.dart';
 import '../widgets/glass.dart';
 import '../widgets/sliding_tabs.dart';
+import '../widgets/smooth_scroll.dart';
 import '../widgets/state_views.dart';
 import 'history_view.dart';
 import 'import_editor.dart';
@@ -81,54 +82,57 @@ class _LibraryPageState extends State<LibraryPage> {
                 if (downloads.usedBytes > 0) formatBytes(downloads.usedBytes),
               ].join('  ·  ');
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          children: [
-            Row(
-              children: [
-                Text('MINHA BIBLIOTECA', style: AppFonts.title(30, spacing: 1.2)),
-                const Spacer(),
-                FilledButton.tonalIcon(
-                  onPressed: () => showImportEditor(context),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Adicionar arquivo'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => downloads.openFolder(),
-                  icon: const Icon(Icons.folder_open_outlined, size: 18),
-                  label: const Text('Abrir pasta'),
+        return SmoothScroll(
+          builder: (_, smooth) => ListView(
+            controller: smooth,
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            children: [
+              Row(
+                children: [
+                  Text('MINHA BIBLIOTECA', style: AppFonts.title(30, spacing: 1.2)),
+                  const Spacer(),
+                  FilledButton.tonalIcon(
+                    onPressed: () => showImportEditor(context),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Adicionar arquivo'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => downloads.openFolder(),
+                    icon: const Icon(Icons.folder_open_outlined, size: 18),
+                    label: const Text('Abrir pasta'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _tabs(),
+              if (summary.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  summary,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
               ],
-            ),
-            const SizedBox(height: 10),
-            _tabs(),
-            if (summary.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                summary,
-                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-              ),
+              const SizedBox(height: 24),
+              if (queue.isEmpty && done.isEmpty && mine.isEmpty && recordings.isEmpty) const _Empty(),
+              if (queue.isNotEmpty) ...[
+                _SectionTitle('Em andamento'),
+                for (final e in queue) _QueueRow(entry: e),
+                const SizedBox(height: 20),
+              ],
+              if (movies.isNotEmpty)
+                _LibRow(
+                  label: 'Filmes',
+                  info: '${movies.length}  ·  ${formatBytes(movies.fold<int>(0, (a, e) => a + e.doneBytes))}',
+                  entries: movies,
+                  playList: movies,
+                ),
+              for (final g in groups.values) _SeriesRow(episodes: g),
+              if (mine.isNotEmpty) _ImportRow(items: mine, label: 'Meus arquivos'),
+              if (recordings.isNotEmpty)
+                _ImportRow(items: recordings, label: 'Gravações'),
             ],
-            const SizedBox(height: 24),
-            if (queue.isEmpty && done.isEmpty && mine.isEmpty && recordings.isEmpty) const _Empty(),
-            if (queue.isNotEmpty) ...[
-              _SectionTitle('Em andamento'),
-              for (final e in queue) _QueueRow(entry: e),
-              const SizedBox(height: 20),
-            ],
-            if (movies.isNotEmpty)
-              _LibRow(
-                label: 'Filmes',
-                info: '${movies.length}  ·  ${formatBytes(movies.fold<int>(0, (a, e) => a + e.doneBytes))}',
-                entries: movies,
-                playList: movies,
-              ),
-            for (final g in groups.values) _SeriesRow(episodes: g),
-            if (mine.isNotEmpty) _ImportRow(items: mine, label: 'Meus arquivos'),
-            if (recordings.isNotEmpty)
-              _ImportRow(items: recordings, label: 'Gravações'),
-          ],
+          ),
         );
       },
     );

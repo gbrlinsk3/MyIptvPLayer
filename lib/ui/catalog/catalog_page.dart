@@ -11,6 +11,7 @@ import '../live_tv/manage_categories_panel.dart';
 import '../widgets/manage_categories_button.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/sliding_tabs.dart';
+import '../widgets/smooth_scroll.dart';
 import 'title_details_panel.dart';
 import 'title_widgets.dart';
 import '../../core/format.dart';
@@ -275,28 +276,31 @@ class _KindViewState extends State<_KindView> {
           if (!ready) return const SizedBox.shrink();
           final hasRecent = (recent.data ?? const []).isNotEmpty;
           final special = [if (hasRecent) 1];
-          return ListView.builder(
-            padding: const EdgeInsets.only(top: 16, bottom: 24),
-            itemCount: special.length + rows.length,
-            itemBuilder: (context, i) {
-              if (i < special.length) {
+          return SmoothScroll(
+            builder: (_, smooth) => ListView.builder(
+              controller: smooth,
+              padding: const EdgeInsets.only(top: 16, bottom: 24),
+              itemCount: special.length + rows.length,
+              itemBuilder: (context, i) {
+                if (i < special.length) {
+                  return TitleRow(
+                    key: ValueKey('${kind.key}:recent'),
+                    label: 'Adicionados recentemente',
+                    future: catalog.recentTitles(kind),
+                    loadMore: (offset) => catalog.recentPage(kind, offset),
+                    onOpen: _open,
+                  );
+                }
+                final cat = rows[i - special.length];
                 return TitleRow(
-                  key: ValueKey('${kind.key}:recent'),
-                  label: 'Adicionados recentemente',
-                  future: catalog.recentTitles(kind),
-                  loadMore: (offset) => catalog.recentPage(kind, offset),
+                  key: ValueKey('${kind.key}:row:${cat.id}'),
+                  label: '${cat.name}  ·  ${formatCount(section.counts[cat.id] ?? 0)}',
+                  future: catalog.rowTitles(kind, cat.id),
                   onOpen: _open,
+                  onSeeAll: () => setState(() => _openCategory = cat),
                 );
-              }
-              final cat = rows[i - special.length];
-              return TitleRow(
-                key: ValueKey('${kind.key}:row:${cat.id}'),
-                label: '${cat.name}  ·  ${formatCount(section.counts[cat.id] ?? 0)}',
-                future: catalog.rowTitles(kind, cat.id),
-                onOpen: _open,
-                onSeeAll: () => setState(() => _openCategory = cat),
-              );
-            },
+              },
+            ),
           );
       },
     );

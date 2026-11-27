@@ -62,6 +62,9 @@ class _ShellState extends State<Shell> {
 
   static const double _railWidth = 68;
 
+  /// Altura da barra do topo.
+  static const double _topHeight = 64;
+
   /// Folgas da barra flutuante (recolhida: 6 + 56 + 6 = trilho de 68).
   static const double _barLeft = 6;
   static const double _barGap = 8;
@@ -145,21 +148,28 @@ class _ShellState extends State<Shell> {
               blur: c.backgroundBlur,
               enabled: !c.minimalTheme || c.minimalBackground,
             )),
-          // O conteúdo fica sempre ao lado do trilho de 68 px; a barra expandida
-          // abre POR CIMA dele. Assim o conteúdo não é recalculado a cada quadro
-          // da animação (era uma das causas de engasgo).
+          // O conteúdo ocupa a janela inteira e cada página se põe ao lado do
+          // trilho de 68 px; a barra expandida abre POR CIMA dele. Assim o
+          // conteúdo não é recalculado a cada quadro da animação (era uma das
+          // causas de engasgo).
           Positioned.fill(
-            left: _railWidth,
-            child: Column(
-              children: [
-                // Com vídeo tocando na TV ao vivo a barra some e o player
-                // ocupa esse espaço.
-                ValueListenableBuilder<bool>(
-                  valueListenable: WindowChrome.hidden,
-                  builder: (context, hidden, _) => hidden
-                      ? const SizedBox.shrink()
+            // Com vídeo tocando na TV ao vivo a barra do topo some e o player
+            // ocupa esse espaço.
+            child: ValueListenableBuilder<bool>(
+              valueListenable: WindowChrome.hidden,
+              // "Largura do catálogo": coluna centralizada (ou preenchida).
+              builder: (context, hidden, _) => RevealScope(
+                child: ContentFrame(
+                  recuo: EdgeInsets.only(
+                    left: _railWidth,
+                    top: hidden ? 0 : _topHeight,
+                  ),
+                  // O Início usa a janela toda (banner em tela cheia).
+                  sangra: index == 0 && !searching,
+                  barra: hidden
+                      ? null
                       : TitleBar(
-                          height: 64,
+                          height: _topHeight,
                           child: TopBarContent(
                             search: _search,
                             focus: _searchFocus,
@@ -170,17 +180,13 @@ class _ShellState extends State<Shell> {
                             },
                           ),
                         ),
-                ),
-                Expanded(
-                  // "Largura do catálogo": coluna centralizada (ou preenchida).
-                  child: RevealScope(
-                  child: ContentFrame(
                   child: Stack(
                     children: [
-                      // Só a página aberta é construída; as visitadas ficam vivas
-                      // por 6 s e depois são descartadas (memória e animações).
-                      // Com a busca aberta a página some: os resultados não
-                      // têm fundo sólido e a imagem continua aparecendo.
+                      // Só a página aberta é construída; as visitadas ficam
+                      // vivas por 6 s e depois são descartadas (memória e
+                      // animações). Com a busca aberta a página some: os
+                      // resultados não têm fundo sólido e a imagem continua
+                      // aparecendo.
                       IgnorePointer(
                         ignoring: searching,
                         child: ExcludeFocus(
@@ -192,43 +198,56 @@ class _ShellState extends State<Shell> {
                             child: LazyPages(
                               index: index,
                               onDrop: () => c.catalog.trimCache(),
-                              // Início, TV ao vivo, Filmes e séries, Favoritos e
-                              // Minha biblioteca: entrada suave na primeira abertura.
+                              // Início, TV ao vivo, Filmes e séries, Favoritos
+                              // e Minha biblioteca: entrada suave na primeira
+                              // abertura.
                               revealFirstOpen: const {0, 1, 2, 3, 4},
                               builders: [
                                 (_) => DashboardPage(
                                       onOpenCatalog: c.requestCatalog,
+                                      active: c.shellIndex == 0,
+                                      covered: searching,
                                     ),
-                                (_) => LiveTvPage(active: c.shellIndex == 1),
-                                (_) => CatalogPage(active: c.shellIndex == 2),
-                                (_) => const FavoritesPage(),
-                                (_) => const LibraryPage(),
-                                (_) => const AccountPage(),
-                                (_) => const CarryoverPage(),
+                                (_) => PageFrame(
+                                      child: LiveTvPage(
+                                        active: c.shellIndex == 1,
+                                      ),
+                                    ),
+                                (_) => PageFrame(
+                                      child: CatalogPage(
+                                        active: c.shellIndex == 2,
+                                      ),
+                                    ),
+                                (_) => const PageFrame(child: FavoritesPage()),
+                                (_) => const PageFrame(child: LibraryPage()),
+                                (_) => const PageFrame(child: AccountPage()),
+                                (_) => const PageFrame(child: CarryoverPage()),
                               ],
                             ),
                           ),
                         ),
                       ),
                       Positioned.fill(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          switchInCurve: Curves.easeOutCubic,
-                          child: searching
-                              ? SearchOverlay(
-                                  key: const ValueKey('search'),
-                                  query: _query,
-                                  onClose: _clearSearch,
-                                )
-                              : const SizedBox.shrink(key: ValueKey('nosearch')),
+                        child: PageFrame(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            switchInCurve: Curves.easeOutCubic,
+                            child: searching
+                                ? SearchOverlay(
+                                    key: const ValueKey('search'),
+                                    query: _query,
+                                    onClose: _clearSearch,
+                                  )
+                                : const SizedBox.shrink(
+                                    key: ValueKey('nosearch'),
+                                  ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  ),
-                  ),
                 ),
-              ],
+              ),
             ),
           ),
           // Toque fora da barra expandida recolhe.
@@ -584,27 +603,45 @@ class _GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(end: open ? 1 : 0),
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      child: Material(type: MaterialType.transparency, child: child),
-      builder: (context, t, child) => GlassSurface(
-        radius: AppShape.panel,
-        shadow: true,
-        fill: Color.lerp(
-          AppGlass.fill(open: false),
-          AppGlass.fill(open: true),
-          t,
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+    // No tema claro, sobre o banner em tela cheia (imagem escura), o vidro
+    // fecha mais para os ícones escuros continuarem visíveis.
+    return ValueListenableBuilder<bool>(
+      valueListenable: WindowChrome.overMedia,
+      builder: (context, overMedia, _) => TweenAnimationBuilder<double>(
+        tween: Tween(end: overMedia && !AppColors.isDark ? 1 : 0),
+        duration: duration,
+        curve: Curves.easeOutCubic,
+        builder: (context, media, _) => TweenAnimationBuilder<double>(
+          tween: Tween(end: open ? 1 : 0),
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          child: Material(type: MaterialType.transparency, child: child),
+          builder: (context, t, child) => GlassSurface(
+            // Só recolhida: aberta, ela cobre a busca e o véu, e precisa de
+            // uma cópia própria do fundo.
+            group: !open && t == 0 ? GlassGroups.bars : null,
+            radius: AppShape.panel,
+            shadow: true,
+            fill: Color.lerp(
+              Color.lerp(
+                AppGlass.fill(open: false),
+                AppGlass.dialog,
+                media,
+              ),
+              AppGlass.fill(open: true),
+              t,
+            ),
+            blur: ui.lerpDouble(
+              AppGlass.blur(open: false),
+              AppGlass.blur(open: true),
+              t,
+            ),
+            child: child!,
+          ),
         ),
-        blur: ui.lerpDouble(
-          AppGlass.blur(open: false),
-          AppGlass.blur(open: true),
-          t,
-        ),
-        child: child!,
       ),
     );
   }

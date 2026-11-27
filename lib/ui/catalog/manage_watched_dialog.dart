@@ -6,6 +6,7 @@ import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../widgets/animated_counter.dart';
 import '../widgets/glass.dart';
+import '../widgets/smooth_scroll.dart';
 
 /// Painel "Gerenciar assistidos" de uma série: temporada (menu), ações para a
 /// temporada inteira fixas no alto e, abaixo do divisor, a lista de episódios
@@ -159,30 +160,33 @@ class _ManageWatchedDialogState extends State<ManageWatchedDialog> {
             ),
             Divider(height: 1, color: AppColors.border),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                itemCount: episodes.length,
-                itemBuilder: (context, i) {
-                  final e = episodes[i];
-                  final watched = _progress[e.id]?.watched ?? false;
-                  return ListTile(
-                    dense: true,
-                    enabled: !_busy,
-                    onTap: () => _set([e], !watched),
-                    leading: Icon(
-                      watched ? Icons.check_circle : Icons.check_circle_outline,
-                      color: watched ? AppColors.accentInk : AppColors.textMuted,
-                    ),
-                    title: Text(
-                      '${e.code} — ${e.title}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: watched ? AppColors.textMuted : AppColors.text,
+              child: SmoothScroll(
+                builder: (_, smooth) => ListView.builder(
+                  controller: smooth,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  itemCount: episodes.length,
+                  itemBuilder: (context, i) {
+                    final e = episodes[i];
+                    final watched = _progress[e.id]?.watched ?? false;
+                    return ListTile(
+                      dense: true,
+                      enabled: !_busy,
+                      onTap: () => _set([e], !watched),
+                      leading: Icon(
+                        watched ? Icons.check_circle : Icons.check_circle_outline,
+                        color: watched ? AppColors.accentInk : AppColors.textMuted,
                       ),
-                    ),
-                  );
-                },
+                      title: Text(
+                        '${e.code} — ${e.title}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: watched ? AppColors.textMuted : AppColors.text,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],

@@ -1,4 +1,3 @@
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
@@ -10,6 +9,7 @@ import '../widgets/click_spark.dart';
 import '../widgets/full_name_tooltip.dart';
 import '../widgets/press_scale.dart';
 import '../widgets/spotlight.dart';
+import 'blurred_logo.dart';
 import 'live_logo.dart';
 
 /// Cartão de um canal agrupado: imagem larga (logo sobre o próprio logo
@@ -453,18 +453,11 @@ class _WideImage extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        RepaintBoundary(
-          child: ClipRect(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-              child: LiveLogo(
-                url: u,
-                fit: BoxFit.cover,
-                memCacheHeight: 64,
-                fallback: placeholderBg,
-              ),
-            ),
-          ),
+        BlurredLogo(
+          url: u,
+          sigma: 24,
+          memCacheHeight: 64,
+          fallback: AppColors.hover,
         ),
         const ColoredBox(color: Color(0x73000000)),
         Center(

@@ -13,6 +13,7 @@ import '../live_tv/channel_card.dart';
 import '../live_tv/live_player_page.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/sliding_tabs.dart';
+import '../widgets/smooth_scroll.dart';
 import 'search_result_card.dart';
 import '../../core/format.dart';
 
@@ -394,94 +395,97 @@ class _SearchOverlayState extends State<SearchOverlay> {
     // Transparente, mas ainda recebe os cliques da área inteira.
     return ColoredBox(
       color: Colors.transparent,
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      'RESULTADOS PARA “$_active”',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppFonts.title(22, spacing: 1),
+      child: SmoothScroll(
+        builder: (_, smooth) => CustomScrollView(
+          controller: smooth,
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'RESULTADOS PARA “$_active”',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppFonts.title(22, spacing: 1),
+                      ),
                     ),
-                  ),
-                  if (_loading) ...[
-                    const SizedBox(width: 12),
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
+                    if (_loading) ...[
+                      const SizedBox(width: 12),
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: SlidingTabs(
-                labels: [
-                  for (final (i, label) in const [
-                    (0, 'Todos'),
-                    (1, 'Filmes'),
-                    (2, 'Séries'),
-                    (3, 'Canais'),
-                  ])
-                    '$label · ${formatCount(switch (i) {
-                      0 => views[0].shown.length + views[0].channels.length,
-                      3 => views[0].channels.length,
-                      _ => views[i].shown.length,
-                    })}',
-                ],
-                selected: _tab,
-                onChanged: (i) => setState(() => _tab = i),
-              ),
-            ),
-          ),
-          if (_empty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Nada encontrado no catálogo carregado. Tente outro nome.',
-                  style: TextStyle(color: AppColors.textMuted),
                 ),
               ),
-            )
-          else if (channelsTab && views[3].channels.isEmpty)
+            ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                child: Text(
-                  'Nenhum canal encontrado.',
-                  style: TextStyle(color: AppColors.textMuted),
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: SlidingTabs(
+                  labels: [
+                    for (final (i, label) in const [
+                      (0, 'Todos'),
+                      (1, 'Filmes'),
+                      (2, 'Séries'),
+                      (3, 'Canais'),
+                    ])
+                      '$label · ${formatCount(switch (i) {
+                        0 => views[0].shown.length + views[0].channels.length,
+                        3 => views[0].channels.length,
+                        _ => views[i].shown.length,
+                      })}',
+                  ],
+                  selected: _tab,
+                  onChanged: (i) => setState(() => _tab = i),
                 ),
               ),
-            )
-          else if (channelsTab)
-            _channelGrid(views[3].channels, views[3].channels, openChannel)
-          else ...[
-            // Aba Todos: resultados, depois relacionados. Abas Filmes e Séries:
-            // relacionados primeiro, depois os resultados.
-            if (relatedFirst) ...related(),
-            if (relatedFirst && hasRelated)
-              const SliverToBoxAdapter(child: SearchDivider(label: 'Resultados')),
-            results(),
-            if (_tab == 0) ...channelSection(),
-            if (!relatedFirst && hasRelated) ...[
-              const SliverToBoxAdapter(
-                child: SearchDivider(label: 'Também pode interessar'),
-              ),
-              ...related(),
+            ),
+            if (_empty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Nada encontrado no catálogo carregado. Tente outro nome.',
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
+                ),
+              )
+            else if (channelsTab && views[3].channels.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                  child: Text(
+                    'Nenhum canal encontrado.',
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
+                ),
+              )
+            else if (channelsTab)
+              _channelGrid(views[3].channels, views[3].channels, openChannel)
+            else ...[
+              // Aba Todos: resultados, depois relacionados. Abas Filmes e Séries:
+              // relacionados primeiro, depois os resultados.
+              if (relatedFirst) ...related(),
+              if (relatedFirst && hasRelated)
+                const SliverToBoxAdapter(child: SearchDivider(label: 'Resultados')),
+              results(),
+              if (_tab == 0) ...channelSection(),
+              if (!relatedFirst && hasRelated) ...[
+                const SliverToBoxAdapter(
+                  child: SearchDivider(label: 'Também pode interessar'),
+                ),
+                ...related(),
+              ],
             ],
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-        ],
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../library/library_import.dart';
 import '../../state/app_scope.dart';
 import '../widgets/glass.dart';
+import '../widgets/smooth_scroll.dart';
 
 /// Adiciona (ou edita) um arquivo de vídeo na biblioteca. Devolve true se salvou.
 Future<bool> showImportEditor(BuildContext context, {LibraryImport? existing}) async {
@@ -150,61 +151,64 @@ class _ImportEditorState extends State<_ImportEditor> {
       title: Text(editing ? 'Editar item' : 'Adicionar à biblioteca'),
       content: SizedBox(
         width: 560,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _pathField(_file, 'Arquivo de vídeo', _pickFile),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _title,
-                decoration: fieldDecoration(label: 'Título'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _year,
-                decoration: fieldDecoration(label: 'Ano (opcional)'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _plot,
-                minLines: 3,
-                maxLines: 6,
-                decoration: fieldDecoration(
-                  label: 'Sinopse (opcional)',
-                  multiline: true,
+        child: SmoothScroll(
+          builder: (_, smooth) => SingleChildScrollView(
+            controller: smooth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _pathField(_file, 'Arquivo de vídeo', _pickFile),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _title,
+                  decoration: fieldDecoration(label: 'Título'),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _pathField(
-                _image,
-                'Pôster (opcional)',
-                () => _pickImage(_image),
-                hint: 'arquivo ou endereço https://…',
-              ),
-              const SizedBox(height: 12),
-              _pathField(
-                _backdrop,
-                'Banner horizontal (opcional)',
-                () => _pickImage(_backdrop),
-                hint: 'arquivo ou endereço https://…',
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Este item aparece só em Minha biblioteca. O arquivo não é '
-                'copiado nem alterado.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(color: AppColors.danger, fontSize: 12),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _year,
+                  decoration: fieldDecoration(label: 'Ano (opcional)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _plot,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: fieldDecoration(
+                    label: 'Sinopse (opcional)',
+                    multiline: true,
                   ),
                 ),
-            ],
+                const SizedBox(height: 12),
+                _pathField(
+                  _image,
+                  'Pôster (opcional)',
+                  () => _pickImage(_image),
+                  hint: 'arquivo ou endereço https://…',
+                ),
+                const SizedBox(height: 12),
+                _pathField(
+                  _backdrop,
+                  'Banner horizontal (opcional)',
+                  () => _pickImage(_backdrop),
+                  hint: 'arquivo ou endereço https://…',
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Este item aparece só em Minha biblioteca. O arquivo não é '
+                  'copiado nem alterado.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(color: AppColors.danger, fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

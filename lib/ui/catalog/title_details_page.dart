@@ -11,6 +11,7 @@ import '../downloads/download_button.dart';
 import '../home/hero_buttons.dart';
 import '../widgets/glass.dart';
 import '../widgets/shimmer.dart';
+import '../widgets/smooth_scroll.dart';
 import '../window/title_bar.dart';
 import 'favorite_button.dart';
 import 'manage_watched_dialog.dart';
@@ -372,9 +373,12 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
                 // Sem a barra de rolagem visível ao lado do texto.
                 child: ScrollConfiguration(
                   behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-                  child: SingleChildScrollView(
-                    reverse: true,
-                    child: _info(d, progress, map),
+                  child: SmoothScroll(
+                    builder: (_, smooth) => SingleChildScrollView(
+                      controller: smooth,
+                      reverse: true,
+                      child: _info(d, progress, map),
+                    ),
                   ),
                 ),
               ),
@@ -427,17 +431,20 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
                 bottom: 232,
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        for (final s in seasons)
-                          _SeasonTab(
-                            label: 'Temporada ${s.toString().padLeft(2, '0')}',
-                            selected: s == season,
-                            onTap: () => _selectSeason(s),
-                          ),
-                      ],
+                  child: SmoothScroll(
+                    builder: (_, smooth) => SingleChildScrollView(
+                      controller: smooth,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          for (final s in seasons)
+                            _SeasonTab(
+                              label: 'Temporada ${s.toString().padLeft(2, '0')}',
+                              selected: s == season,
+                              onTap: () => _selectSeason(s),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

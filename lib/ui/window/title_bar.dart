@@ -8,6 +8,10 @@ import '../../core/theme.dart';
 /// passar o mouse no canto superior direito.
 class WindowChrome {
   static final ValueNotifier<bool> hidden = ValueNotifier(false);
+
+  /// A barra está sobre o banner em tela cheia do Início: perfil e botões da
+  /// janela ficam brancos nos dois temas.
+  static final ValueNotifier<bool> overMedia = ValueNotifier(false);
 }
 
 /// Barra de título própria (a do Windows fica oculta em main.dart).
@@ -268,16 +272,27 @@ class _WindowButtonState extends State<_WindowButton> {
 
   @override
   Widget build(BuildContext context) {
+    final button = ValueListenableBuilder<bool>(
+      valueListenable: WindowChrome.overMedia,
+      builder: (context, overMedia, _) => _body(
+        overMedia ? Colors.white : AppColors.text,
+        shadow: overMedia,
+      ),
+    );
+    return widget.tooltips
+        ? Tooltip(message: widget.tooltip, child: button)
+        : button;
+  }
+
+  Widget _body(Color ink, {required bool shadow}) {
     final Color background = _hover
         // Fundo claro e translúcido ao passar o mouse (antes ficava escuro).
         ? (widget.danger
               ? const Color(0xFFE81123)
-              : AppColors.text.withValues(alpha: 0.14))
+              : ink.withValues(alpha: 0.14))
         : Colors.transparent;
-    final Color foreground = _hover && widget.danger
-        ? Colors.white
-        : AppColors.text;
-    final button = MouseRegion(
+    final Color foreground = _hover && widget.danger ? Colors.white : ink;
+    return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
@@ -288,13 +303,17 @@ class _WindowButtonState extends State<_WindowButton> {
           height: 36,
           color: background,
           alignment: Alignment.center,
-          child: Icon(widget.icon, size: widget.iconSize, color: foreground),
+          child: Icon(
+            widget.icon,
+            size: widget.iconSize,
+            color: foreground,
+            shadows: shadow
+                ? const [Shadow(color: Color(0xCC000000), blurRadius: 6)]
+                : null,
+          ),
         ),
       ),
     );
-    return widget.tooltips
-        ? Tooltip(message: widget.tooltip, child: button)
-        : button;
   }
 }
 

@@ -10,6 +10,7 @@ import '../../downloads/download_models.dart';
 import '../downloads/download_button.dart';
 import '../widgets/glass.dart';
 import '../widgets/shimmer.dart';
+import '../widgets/smooth_scroll.dart';
 import 'favorite_button.dart';
 import 'poster_image.dart';
 import 'title_details_page.dart';
@@ -412,47 +413,50 @@ class _DetailsPanelState extends State<_DetailsPanel> {
         ),
         // ---- corpo rolável ------------------------------------------------------
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            children: [
-              Text(
-                t.name,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-              ),
-              if (meta.isNotEmpty) ...[
-                const SizedBox(height: 6),
+          child: SmoothScroll(
+            builder: (_, smooth) => ListView(
+              controller: smooth,
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              children: [
                 Text(
-                  meta.join('  •  '),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textMuted,
-                  ),
+                  t.name,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                 ),
-              ],
-              const SizedBox(height: 16),
-              if (loading)
-                _DetailsSkeleton(movie: _isMovie)
-              else if (error != null)
-                _errorBox(error)
-              else ...[
-                _actions(dd, progress),
+                if (meta.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    meta.join('  •  '),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
-                if (plot != null)
-                  Text(plot, style: const TextStyle(fontSize: 13.5, height: 1.45)),
-                if (dd.cast != null) ...[
-                  const SizedBox(height: 12),
-                  _labeled('Elenco', uniqueNames(dd.cast!)),
-                ],
-                if (dd.director != null) ...[
-                  const SizedBox(height: 8),
-                  _labeled('Direção', uniqueNames(dd.director!)),
-                ],
-                if (!_isMovie) ...[
-                  const SizedBox(height: 20),
-                  _episodes(dd, progress is Map<int, WatchProgress> ? progress : const {}),
+                if (loading)
+                  _DetailsSkeleton(movie: _isMovie)
+                else if (error != null)
+                  _errorBox(error)
+                else ...[
+                  _actions(dd, progress),
+                  const SizedBox(height: 16),
+                  if (plot != null)
+                    Text(plot, style: const TextStyle(fontSize: 13.5, height: 1.45)),
+                  if (dd.cast != null) ...[
+                    const SizedBox(height: 12),
+                    _labeled('Elenco', uniqueNames(dd.cast!)),
+                  ],
+                  if (dd.director != null) ...[
+                    const SizedBox(height: 8),
+                    _labeled('Direção', uniqueNames(dd.director!)),
+                  ],
+                  if (!_isMovie) ...[
+                    const SizedBox(height: 20),
+                    _episodes(dd, progress is Map<int, WatchProgress> ? progress : const {}),
+                  ],
                 ],
               ],
-            ],
+            ),
           ),
         ),
       ],

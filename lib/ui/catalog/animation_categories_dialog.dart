@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../widgets/glass.dart';
+import '../widgets/smooth_scroll.dart';
 
 /// Escolhe categorias (de filmes `m:<id>` e de séries `s:<id>`) para um banner
 /// do Início. Devolve null se cancelar.
@@ -119,15 +120,18 @@ class _DialogState extends State<_Dialog> {
                           style: TextStyle(color: AppColors.textMuted),
                         ),
                       )
-                    : SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            group(CatalogKind.movies, 'm'),
-                            group(CatalogKind.series, 's'),
-                          ],
-                        ),
+                    : SmoothScroll(
+                      builder: (_, smooth) => SingleChildScrollView(
+                        controller: smooth,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              group(CatalogKind.movies, 'm'),
+                              group(CatalogKind.series, 's'),
+                            ],
+                          ),
                       ),
+                    ),
               ),
               const SizedBox(height: 16),
               Row(

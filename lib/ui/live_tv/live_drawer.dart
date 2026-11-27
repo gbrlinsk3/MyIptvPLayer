@@ -10,6 +10,7 @@ import '../../state/app_scope.dart';
 import '../widgets/carousel_arrows.dart';
 import '../widgets/manage_categories_button.dart';
 import '../widgets/shimmer.dart';
+import '../widgets/smooth_scroll.dart';
 import '../widgets/split_text.dart';
 import '../widgets/spotlight.dart';
 import 'channel_group_card.dart';
@@ -203,7 +204,7 @@ class _LiveDrawerState extends State<LiveDrawer>
       _titleHeight + _categoryRowHeight + _sectionBottom;
   static const int _maxRecentGroups = 24;
 
-  final ScrollController _scroll = ScrollController();
+  final ScrollController _scroll = SmoothScrollController();
   final GlobalKey _bannerKey = GlobalKey();
   late final AnimationController _banner = AnimationController(
     vsync: this,
@@ -688,6 +689,11 @@ class _SectionRow extends StatefulWidget {
 class _SectionRowState extends State<_SectionRow> {
   final ScrollController _scroll = ScrollController();
 
+  /// As duas setas da fileira dividem uma cópia do fundo: não se sobrepõem e
+  /// nada é desenhado entre uma e outra. Entre fileiras isso não vale (os
+  /// cartões da de baixo vêm depois das setas da de cima).
+  final BackdropKey _arrowGlass = BackdropKey();
+
   /// Índice do cartão de "Recentes e favoritos" sob o mouse (só nessa seção).
   int? _hover;
 
@@ -853,6 +859,7 @@ class _SectionRowState extends State<_SectionRow> {
                         controller: _scroll,
                         left: true,
                         passo: passo,
+                        group: _arrowGlass,
                       ),
                     ),
                   if (comSetas)
@@ -863,6 +870,7 @@ class _SectionRowState extends State<_SectionRow> {
                         controller: _scroll,
                         left: false,
                         passo: passo,
+                        group: _arrowGlass,
                       ),
                     ),
                 ],

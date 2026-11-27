@@ -29,6 +29,7 @@ class SlingArrowButton extends StatefulWidget {
     required this.left,
     required this.enabled,
     required this.onFire,
+    this.glassGroup,
     this.size = 44,
     this.maxPull = 36,
     this.armAt = 18,
@@ -39,6 +40,9 @@ class SlingArrowButton extends StatefulWidget {
   final bool enabled;
   final VoidCallback onFire;
   final double size;
+
+  /// Ver [GlassSurface.group].
+  final BackdropKey? glassGroup;
 
   /// Quanto o botão pode se afastar do lugar ao ser puxado (visual).
   final double maxPull;
@@ -346,6 +350,7 @@ class _SlingArrowButtonState extends State<SlingArrowButton>
       builder: (context, child) =>
           Transform.translate(offset: _off, child: child),
       child: GlassSurface(
+        group: widget.glassGroup,
         radius: AppShape.control,
         fill: enabled && _hover ? AppGlass.surfaceHover : null,
         edge: contorno ? AppColors.accent : null,

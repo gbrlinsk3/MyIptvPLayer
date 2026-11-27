@@ -11,15 +11,19 @@ import 'profiles/profiles_controller.dart';
 import 'profiles/profiles_scope.dart';
 import 'state/app_controller.dart';
 import 'state/app_scope.dart';
+import 'ui/home/hero_art.dart';
+import 'ui/live_tv/blurred_logo.dart';
 import 'ui/login_page.dart';
 import 'ui/profiles/profile_picker_page.dart';
 import 'ui/shell.dart';
 import 'ui/update/update_toast.dart';
+import 'ui/widgets/app_backdrop.dart';
 import 'ui/widgets/intro_sound.dart';
 import 'ui/widgets/morph_reveal.dart';
 import 'ui/widgets/profile_intro.dart';
 import 'ui/widgets/rebuild_on_change.dart';
 import 'ui/widgets/ui_scale.dart';
+import 'ui/window/hibernator.dart';
 import 'ui/window/title_bar.dart';
 import 'update/app_updater.dart';
 
@@ -33,6 +37,7 @@ class IptvApp extends StatefulWidget {
 class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
   late final PlaybackController _playback;
   late final ProfilesController _profiles;
+  late final Hibernator _hibernator;
 
   @override
   void initState() {
@@ -40,6 +45,10 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
     _playback = PlaybackController();
     _profiles = ProfilesController(_playback)..load();
     WidgetsBinding.instance.addObserver(this);
+    // Minimizado: para de desenhar e, sem nada tocando ou gravando, hiberna.
+    _hibernator = Hibernator(
+      busy: () => _playback.isPlaying || _playback.recState != RecState.idle,
+    )..attach();
     // Tema "Automático" (por horário): confere a hora de tempos em tempos e só
     // reconstrói a interface quando o claro/escuro muda de fato.
     _themeTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -95,6 +104,7 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _themeTimer?.cancel();
+    _hibernator.dispose();
     _profiles.dispose();
     _playback.dispose();
     super.dispose();
@@ -214,12 +224,64 @@ class _RootState extends State<_Root> {
   final _pageKey = GlobalKey();
   final _introSound = IntroSound();
 
+  /// A tela principal foi desmontada pela hibernação.
+  bool _slept = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Hibernator.asleep.addListener(_onHibernate);
+  }
+
   @override
   void dispose() {
+    Hibernator.asleep.removeListener(_onHibernate);
     _introSound.dispose();
     _fromImage?.dispose();
     _toImage?.dispose();
     super.dispose();
+  }
+
+  void _onHibernate() {
+    if (!mounted) return;
+    if (Hibernator.asleep.value) {
+      unawaited(_sleep());
+      return;
+    }
+    unawaited(MemoryRelease.wake());
+    if (!_slept) return;
+    // De volta: a mesma abertura de quando se entra no perfil cobre a tela
+    // enquanto ela é montada e as imagens são lidas de novo.
+    _introSound.dispose();
+    setState(() {
+      _slept = false;
+      _intro = true;
+      _sceneDone = false;
+      _morphStarted = false;
+    });
+  }
+
+  /// Solta a memória. A tela principal só é desmontada se estiver à vista: com
+  /// algo aberto por cima (diálogo, detalhes, filme em pausa), nada se perde e
+  /// saem só os caches.
+  Future<void> _sleep() async {
+    final controller = AppScope.read(context);
+    final onTop = ModalRoute.of(context)?.isCurrent ?? true;
+    var unmounted = false;
+    if (onTop && !_intro && controller.phase == AppPhase.ready) {
+      setState(() => _slept = true);
+      // Um quadro, para a tela ser de fato desmontada.
+      unmounted = await MemoryRelease.forceFrame();
+    }
+    if (!Hibernator.asleep.value) return; // o usuário já voltou
+    if (unmounted) {
+      // Só com a tela fora: estas imagens são usadas direto por ela.
+      HeroArt.release();
+      BlurredLogo.release();
+      BackdropRender.releaseCache();
+      controller.catalog.trimCache();
+    }
+    await MemoryRelease.run();
   }
 
   Future<ui.Image?> _capture(GlobalKey key) async {
@@ -301,7 +363,7 @@ class _RootState extends State<_Root> {
       case AppPhase.loggedOut:
         page = const PlainFrame(child: LoginPage());
       case AppPhase.ready:
-        page = const Shell();
+        page = _slept ? const SizedBox.expand() : const Shell();
     }
     if (_intro && _sceneDone && !_morphStarted && controller.phase != AppPhase.booting) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -1,4 +1,3 @@
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
@@ -9,6 +8,8 @@ import '../../data/models.dart';
 import '../../state/app_scope.dart';
 import '../widgets/glass.dart';
 import '../widgets/magnet.dart';
+import '../widgets/smooth_scroll.dart';
+import 'blurred_logo.dart';
 import 'live_logo.dart';
 import '../../core/format.dart';
 
@@ -599,19 +600,7 @@ class _TileState extends State<_Tile> {
                 children: [
                   // Fundo: o próprio pôster do canal, ampliado e desfocado.
                   if (url != null && url.isNotEmpty)
-                    RepaintBoundary(
-                      child: ClipRect(
-                        child: ImageFiltered(
-                          imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                          child: LiveLogo(
-                            url: url,
-                            fit: BoxFit.cover,
-                            memCacheWidth: 96,
-                            fallback: const SizedBox.shrink(),
-                          ),
-                        ),
-                      ),
-                    ),
+                    BlurredLogo(url: url, sigma: 14, memCacheWidth: 96),
                   const ColoredBox(color: Color(0x66000000)),
                   Column(
                     children: [
@@ -941,25 +930,28 @@ class _CategoryPickerState extends State<_CategoryPicker> {
                         style: TextStyle(color: AppColors.textMuted),
                       ),
                     )
-                  : ListView.builder(
-                      itemCount: list.length,
-                      itemBuilder: (context, i) => ListTile(
-                        dense: true,
-                        title: Text(
-                          list[i].name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: Text(
-                          formatCount(widget.counts[list[i].id] ?? 0),
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 12,
+                  : SmoothScroll(
+                    builder: (_, smooth) => ListView.builder(
+                      controller: smooth,
+                        itemCount: list.length,
+                        itemBuilder: (context, i) => ListTile(
+                          dense: true,
+                          title: Text(
+                            list[i].name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                          trailing: Text(
+                            formatCount(widget.counts[list[i].id] ?? 0),
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                          onTap: () => Navigator.of(context).pop(list[i].id),
                         ),
-                        onTap: () => Navigator.of(context).pop(list[i].id),
-                      ),
                     ),
+                  ),
             ),
           ],
         ),
@@ -999,15 +991,18 @@ Future<String?> showSeeCategoryDialog(
               ),
               const SizedBox(height: 12),
               Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: [
-                    for (final c in categories)
-                      _CategoryOption(
-                        name: c.name,
-                        onTap: () => Navigator.of(ctx).pop(c.id),
-                      ),
-                  ],
+                child: SmoothScroll(
+                  builder: (_, smooth) => ListView(
+                    controller: smooth,
+                    shrinkWrap: true,
+                    children: [
+                      for (final c in categories)
+                        _CategoryOption(
+                          name: c.name,
+                          onTap: () => Navigator.of(ctx).pop(c.id),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 8),

@@ -6,6 +6,7 @@ import '../../data/catalog_models.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../../core/format.dart';
+import '../widgets/smooth_scroll.dart';
 
 /// De onde o painel lê e para onde grava as categorias (TV ao vivo, filmes ou séries).
 abstract class ManageSource {
@@ -221,56 +222,59 @@ class _ManagePanelState extends State<_ManagePanel> {
                             ),
                           ),
                         )
-                      : ListView.builder(
-                          itemExtent: 44,
-                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final cat = filtered[i];
-                            final on = c.isVisible(cat.id);
-                            return InkWell(
-                              borderRadius: AppShape.control,
-                              onTap: () => c.setVisible([cat.id], !on),
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                                child: Row(
-                                  children: [
-                                    Checkbox(
-                                      value: on,
-                                      onChanged: (v) => c.setVisible(
-                                        [cat.id],
-                                        v ?? false,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        cat.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: on
-                                              ? AppColors.text
-                                              : AppColors.textMuted,
+                      : SmoothScroll(
+                        builder: (_, smooth) => ListView.builder(
+                          controller: smooth,
+                            itemExtent: 44,
+                            padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final cat = filtered[i];
+                              final on = c.isVisible(cat.id);
+                              return InkWell(
+                                borderRadius: AppShape.control,
+                                onTap: () => c.setVisible([cat.id], !on),
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 12),
+                                  child: Row(
+                                    children: [
+                                      Checkbox(
+                                        value: on,
+                                        onChanged: (v) => c.setVisible(
+                                          [cat.id],
+                                          v ?? false,
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      formatCount(c.rawCount(cat.id)),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textMuted,
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          cat.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: on
+                                                ? AppColors.text
+                                                : AppColors.textMuted,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        formatCount(c.rawCount(cat.id)),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
                         ),
+                      ),
                 ),
               ],
             ),

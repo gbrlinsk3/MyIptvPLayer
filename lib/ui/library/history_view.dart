@@ -8,6 +8,7 @@ import '../catalog/title_details_panel.dart';
 import '../widgets/app_popup_menu.dart';
 import '../widgets/glass.dart';
 import '../widgets/shimmer.dart';
+import '../widgets/smooth_scroll.dart';
 
 /// Histórico: tudo que já foi assistido ou começado, agrupado por data.
 /// Mostra só a **última** vez de cada filme/episódio.
@@ -141,28 +142,31 @@ class _HistoryViewState extends State<HistoryView> {
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            itemCount: _items.length,
-            itemBuilder: (context, i) {
-              final it = _items[i];
-              if (it.label != null) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 14, bottom: 8),
-                  child: Text(
-                    it.label!.toUpperCase(),
-                    style: AppFonts.title(18, spacing: 1.2),
-                  ),
+          child: SmoothScroll(
+            builder: (_, smooth) => ListView.builder(
+              controller: smooth,
+              itemCount: _items.length,
+              itemBuilder: (context, i) {
+                final it = _items[i];
+                if (it.label != null) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 14, bottom: 8),
+                    child: Text(
+                      it.label!.toUpperCase(),
+                      style: AppFonts.title(18, spacing: 1.2),
+                    ),
+                  );
+                }
+                final r = it.row!;
+                return _HistoryTile(
+                  key: ValueKey('${r.progressKind}:${r.itemId}'),
+                  row: r,
+                  onOpen: () => showTitleDetails(context, r.toTitle()),
+                  onToggleWatched: () => catalog.setHistoryWatched(r, !r.watched),
+                  onRemove: () => catalog.removeHistory(r),
                 );
-              }
-              final r = it.row!;
-              return _HistoryTile(
-                key: ValueKey('${r.progressKind}:${r.itemId}'),
-                row: r,
-                onOpen: () => showTitleDetails(context, r.toTitle()),
-                onToggleWatched: () => catalog.setHistoryWatched(r, !r.watched),
-                onRemove: () => catalog.removeHistory(r),
-              );
-            },
+              },
+            ),
           ),
         ),
       ],

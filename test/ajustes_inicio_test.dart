@@ -143,9 +143,10 @@ void main() {
     final lista = find.byType(ListView);
     expect(tester.getRect(lista).left, TitleRow.arrowColumn);
     expect(tester.getRect(lista).right, 1200 - TitleRow.arrowColumn);
+    // Sem máscara na fileira: ela pesava na rolagem da página.
     expect(
       find.ancestor(of: lista, matching: find.byType(ShaderMask)),
-      findsOneWidget,
+      findsNothing,
     );
 
     final posicao = tester

@@ -8,10 +8,29 @@ import 'edge_scroll_marks.dart';
 /// "Largura do catálogo": com uma largura fixa (1200/1440/1600 px lógicos) o
 /// conteúdo das telas fica numa coluna centralizada; em "preenchido" usa a
 /// largura toda. Aplicado uma vez em volta da área de páginas do `Shell`.
+///
+/// A área cobre a janela inteira, por baixo das barras. Cada página se põe na
+/// coluna com [PageFrame]; o Início fica sem ele para o banner poder ocupar a
+/// janela toda.
 class ContentFrame extends StatelessWidget {
-  const ContentFrame({super.key, required this.child});
+  const ContentFrame({
+    super.key,
+    required this.child,
+    this.recuo = EdgeInsets.zero,
+    this.sangra = false,
+    this.barra,
+  });
 
   final Widget child;
+
+  /// Espaço das barras: à esquerda a lateral, em cima a do topo.
+  final EdgeInsets recuo;
+
+  /// A página aberta usa a janela inteira (Início, sem a busca por cima).
+  final bool sangra;
+
+  /// Barra do topo, por cima das páginas.
+  final Widget? barra;
 
   @override
   Widget build(BuildContext context) {
@@ -21,12 +40,16 @@ class ContentFrame extends StatelessWidget {
       builder: (context, box) {
         // TV ao vivo com vídeo tocando: o player usa a largura toda.
         final fullBleed = c.liveFullBleed && c.shellIndex == 1;
+        final livre = box.maxWidth - recuo.left;
         final framed =
-            !fullBleed && fixed != CatalogWidth.fill && fixed < box.maxWidth;
+            !fullBleed && fixed != CatalogWidth.fill && fixed < livre;
         return ContentFrameLayout(
-          largura: framed ? fixed.toDouble() : box.maxWidth,
+          largura: framed ? fixed.toDouble() : livre,
           framed: framed,
           pagina: c.shellIndex,
+          recuo: recuo,
+          sangra: sangra,
+          barra: barra,
           child: child,
         );
       },
@@ -52,12 +75,18 @@ class ContentFrameLayout extends StatefulWidget {
     required this.framed,
     required this.pagina,
     required this.child,
+    this.recuo = EdgeInsets.zero,
+    this.sangra = false,
+    this.barra,
   });
 
   final double largura;
   final bool framed;
   final int pagina;
   final Widget child;
+  final EdgeInsets recuo;
+  final bool sangra;
+  final Widget? barra;
 
   @override
   State<ContentFrameLayout> createState() => _ContentFrameLayoutState();
@@ -116,31 +145,53 @@ class _ContentFrameLayoutState extends State<ContentFrameLayout> {
     return false;
   }
 
+  /// Onde fica a coluna dentro de uma área de largura [w].
+  EdgeInsets _margens(double w) {
+    final livre = (w - widget.recuo.left).clamp(0.0, double.infinity);
+    final cw = widget.largura.clamp(0.0, livre).toDouble();
+    final sobra = (livre - cw) / 2;
+    return EdgeInsets.fromLTRB(
+      widget.recuo.left + sobra,
+      widget.recuo.top,
+      sobra,
+      0,
+    );
+  }
+
   /// Roda do mouse fora da coluna: reenvia a mesma rolagem para o centro dela.
   /// Dentro da coluna a página já recebe a roda, exceto na faixa de traços
   /// quando ela está visível (a faixa bloqueia o acerto e é tratada aqui).
+  /// Numa página que usa a janela inteira, só a barra do topo e a faixa de
+  /// traços ficam no caminho.
   void _aoRodaDoMouse(PointerSignalEvent e) {
     if (e is! PointerScrollEvent) return;
     final rb = context.findRenderObject();
     if (rb is! RenderBox || !rb.hasSize) return;
     final w = rb.size.width;
-    final cw = widget.largura.clamp(0.0, w).toDouble();
-    final esquerda = rb.localToGlobal(Offset((w - cw) / 2, 0)).dx;
-    final direita = rb.localToGlobal(Offset((w + cw) / 2, 0)).dx;
+    final m = _margens(w);
+    final esquerda = rb.localToGlobal(Offset(m.left, 0)).dx;
+    final direita = rb.localToGlobal(Offset(w - m.right, 0)).dx;
+    final topo = rb.localToGlobal(Offset(0, m.top)).dy;
     final x = e.position.dx;
-    if (x >= esquerda && x <= direita) {
+    final naBarra = e.position.dy < topo;
+    // A barra do topo só repassa a roda quando a página está por baixo dela.
+    if (naBarra && !widget.sangra) return;
+    if (!naBarra && (widget.sangra || (x >= esquerda && x <= direita))) {
       final faixaVisivel = _posicao.value?.rolavel ?? false;
       final inicioFaixa =
           rb.localToGlobal(Offset(w - EdgeScrollMarks.largura, 0)).dx;
       if (!faixaVisivel || x < inicioFaixa) return;
     }
-    final centroX = rb.localToGlobal(Offset(w / 2, 0)).dx;
+    final centroX =
+        rb.localToGlobal(Offset((m.left + w - m.right) / 2, 0)).dx;
+    final centroY =
+        rb.localToGlobal(Offset(0, (m.top + rb.size.height) / 2)).dy;
     GestureBinding.instance.handlePointerEvent(
       PointerScrollEvent(
         timeStamp: e.timeStamp,
         kind: e.kind,
         device: e.device,
-        position: Offset(centroX, e.position.dy),
+        position: Offset(centroX, naBarra ? centroY : e.position.dy),
         scrollDelta: e.scrollDelta,
       ),
     );
@@ -150,8 +201,13 @@ class _ContentFrameLayoutState extends State<ContentFrameLayout> {
   void _rolarPagina(double dy) {
     final rb = context.findRenderObject();
     if (rb is! RenderBox || !rb.hasSize) return;
-    final centro =
-        rb.localToGlobal(Offset(rb.size.width / 2, rb.size.height / 2));
+    final m = _margens(rb.size.width);
+    final centro = rb.localToGlobal(
+      Offset(
+        (m.left + rb.size.width - m.right) / 2,
+        (m.top + rb.size.height) / 2,
+      ),
+    );
     GestureBinding.instance.handlePointerEvent(
       PointerScrollEvent(
         kind: PointerDeviceKind.mouse,
@@ -166,36 +222,57 @@ class _ContentFrameLayoutState extends State<ContentFrameLayout> {
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerSignal: _aoRodaDoMouse,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: widget.largura,
-              height: double.infinity,
-              child: ContentFrameScope(
-                framed: widget.framed,
-                child: NotificationListener<Notification>(
-                  onNotification: _aoNotificar,
-                  child: widget.child,
+      child: LayoutBuilder(
+        builder: (context, box) => Stack(
+          fit: StackFit.expand,
+          children: [
+            ContentFrameScope(
+              framed: widget.framed,
+              margens: _margens(box.maxWidth),
+              child: NotificationListener<Notification>(
+                onNotification: _aoNotificar,
+                child: widget.child,
+              ),
+            ),
+            Positioned.fill(
+              top: widget.recuo.top,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: EdgeScrollMarks(
+                  posicao: _posicao,
+                  aoRolar: _rolarPagina,
                 ),
               ),
             ),
-          ),
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: EdgeScrollMarks(
-                posicao: _posicao,
-                aoRolar: _rolarPagina,
+            if (widget.barra != null)
+              Positioned(
+                left: widget.recuo.left,
+                top: 0,
+                right: 0,
+                // Opaca: a roda não chega à página por trás (é reenviada).
+                child: Listener(
+                  behavior: HitTestBehavior.opaque,
+                  child: widget.barra,
+                ),
               ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Põe a página na coluna do conteúdo, ao lado e abaixo das barras.
+class PageFrame extends StatelessWidget {
+  const PageFrame({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: ContentFrameScope.margensOf(context),
+        child: child,
+      );
 }
 
 /// Diz às telas se o conteúdo está numa coluna estreita (e não de borda a
@@ -205,14 +282,25 @@ class ContentFrameScope extends InheritedWidget {
     super.key,
     required this.framed,
     required super.child,
+    this.margens = EdgeInsets.zero,
   });
 
   final bool framed;
+
+  /// Onde fica a coluna do conteúdo dentro da área das páginas.
+  final EdgeInsets margens;
+
+  static EdgeInsets margensOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<ContentFrameScope>()
+          ?.margens ??
+      EdgeInsets.zero;
 
   static bool framedOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<ContentFrameScope>()?.framed ??
       false;
 
   @override
-  bool updateShouldNotify(ContentFrameScope old) => framed != old.framed;
+  bool updateShouldNotify(ContentFrameScope old) =>
+      framed != old.framed || margens != old.margens;
 }

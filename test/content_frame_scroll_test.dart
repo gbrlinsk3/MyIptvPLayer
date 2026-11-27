@@ -40,12 +40,14 @@ void main() {
             largura: 1000,
             framed: true,
             pagina: 0,
-            child: ListView.builder(
-              controller: controller,
-              itemCount: 100,
-              itemBuilder: (_, i) => SizedBox(
-                height: 100,
-                child: Text('item $i'),
+            child: PageFrame(
+              child: ListView.builder(
+                controller: controller,
+                itemCount: 100,
+                itemBuilder: (_, i) => SizedBox(
+                  height: 100,
+                  child: Text('item $i'),
+                ),
               ),
             ),
           ),
@@ -68,15 +70,19 @@ void main() {
           child: LazyPages(
             index: pagina,
             builders: [
-              (_) => ListView.builder(
-                    controller: longa,
-                    itemCount: 100,
-                    itemBuilder: (_, i) => SizedBox(
-                      height: 100,
-                      child: Text('item $i'),
+              (_) => PageFrame(
+                    child: ListView.builder(
+                      controller: longa,
+                      itemCount: 100,
+                      itemBuilder: (_, i) => SizedBox(
+                        height: 100,
+                        child: Text('item $i'),
+                      ),
                     ),
                   ),
-              (_) => const Center(child: Text('sem rolagem')),
+              (_) => const PageFrame(
+                    child: Center(child: Text('sem rolagem')),
+                  ),
             ],
           ),
         ),
@@ -144,6 +150,75 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(controller.offset, 100);
+  });
+
+  /// Como no Shell: trilho à esquerda e barra do topo por cima das páginas.
+  Future<ScrollController> montarComBarras(
+    WidgetTester tester, {
+    required bool sangra,
+  }) async {
+    tester.view.physicalSize = const Size(1600, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final lista = ListView.builder(
+      controller: controller,
+      itemCount: 100,
+      itemBuilder: (_, i) => SizedBox(height: 100, child: Text('item $i')),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ContentFrameLayout(
+            largura: 1000,
+            framed: true,
+            pagina: 0,
+            recuo: const EdgeInsets.only(left: 68, top: 64),
+            sangra: sangra,
+            barra: const SizedBox(height: 64),
+            child: sangra ? lista : PageFrame(child: lista),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    return controller;
+  }
+
+  Future<void> rodaEm(WidgetTester tester, Offset ponto) async {
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: ponto,
+        scrollDelta: const Offset(0, 100),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('página que usa a janela toda rola uma vez só em qualquer ponto',
+      (tester) async {
+    final controller = await montarComBarras(tester, sangra: true);
+    expect(tester.getRect(find.byType(ListView)).topLeft, Offset.zero);
+    await rodaEm(tester, const Offset(100, 450)); // fora da coluna
+    expect(controller.offset, 100);
+    await rodaEm(tester, const Offset(800, 450));
+    expect(controller.offset, 200);
+    await rodaEm(tester, const Offset(800, 30)); // sobre a barra do topo
+    expect(controller.offset, 300);
+  });
+
+  testWidgets('nas outras páginas a coluna fica ao lado e abaixo das barras',
+      (tester) async {
+    final controller = await montarComBarras(tester, sangra: false);
+    expect(
+      tester.getRect(find.byType(ListView)),
+      const Rect.fromLTRB(334, 64, 1334, 900),
+    );
+    await rodaEm(tester, const Offset(100, 450));
+    expect(controller.offset, 100);
+    await rodaEm(tester, const Offset(800, 30)); // barra: como antes, não rola
     expect(controller.offset, 100);
   });
 
@@ -234,16 +309,18 @@ void main() {
           child: MaterialApp(
             home: Scaffold(
               body: ContentFrame(
-                child: Builder(
-                  builder: (context) {
-                    emoldurado = ContentFrameScope.framedOf(context);
-                    return LayoutBuilder(
-                      builder: (_, box) {
-                        recebida = box.maxWidth;
-                        return const SizedBox.expand();
-                      },
-                    );
-                  },
+                child: PageFrame(
+                  child: Builder(
+                    builder: (context) {
+                      emoldurado = ContentFrameScope.framedOf(context);
+                      return LayoutBuilder(
+                        builder: (_, box) {
+                          recebida = box.maxWidth;
+                          return const SizedBox.expand();
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

@@ -10,6 +10,7 @@ import '../../state/app_scope.dart';
 import '../catalog/animation_categories_dialog.dart';
 import '../../core/format.dart';
 import '../widgets/glass.dart';
+import '../widgets/smooth_scroll.dart';
 
 /// Gerenciador dos banners do Início: "Continue de onde parou" é fixo (só
 /// aparece quando há algo em andamento); dá para ter de 1 a 4 banners, com
@@ -117,101 +118,104 @@ class _ManagerDialogState extends State<_ManagerDialog> {
               ),
               const SizedBox(height: 12),
               Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _card(
-                        child: Row(
-                          children: [
-                            Icon(Icons.lock_outline,
-                                size: 18, color: AppColors.textMuted),
-                            const SizedBox(width: 10),
-                            const Expanded(
-                              child: Text(
-                                'Continue de onde parou  ·  fixo (só com algo em andamento)',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      for (var i = 0; i < _list.length; i++)
+                child: SmoothScroll(
+                  builder: (_, smooth) => SingleChildScrollView(
+                    controller: smooth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         _card(
-                          key: _keys[i],
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextFormField(
-                                      initialValue: _list[i].name,
-                                      maxLength: 28,
-                                      onChanged: (v) => _list[i].name = v,
-                                      decoration: fieldDecoration(
-                                        label: 'Nome do banner',
-                                      ).copyWith(counterText: ''),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    tooltip: 'Subir',
-                                    onPressed: i == 0 ? null : () => _move(i, -1),
-                                    icon: const Icon(Icons.arrow_upward, size: 18),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Descer',
-                                    onPressed: i == _list.length - 1
-                                        ? null
-                                        : () => _move(i, 1),
-                                    icon: const Icon(Icons.arrow_downward, size: 18),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Remover',
-                                    onPressed:
-                                        _list.length <= 1 ? null : () => _remove(i),
-                                    icon: const Icon(Icons.delete_outline, size: 18),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  GlassMenuButton<BannerSource>(
-                                    tooltip: 'Conteúdo do banner',
-                                    menuWidth: 248,
-                                    options: BannerSource.values,
-                                    labelOf: (s) => s.label,
-                                    selected: _list[i].source,
-                                    onSelected: (v) =>
-                                        setState(() => _list[i].source = v),
-                                    child: _SourceTrigger(_list[i].source.label),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  if (_list[i].source == BannerSource.categories ||
-                                      _list[i].source == BannerSource.titles)
-                                    OutlinedButton(
-                                      onPressed: () => _choose(_list[i]),
-                                      child: Text(
-                                        _list[i].source == BannerSource.titles
-                                            ? 'Escolher títulos'
-                                            : 'Escolher categorias',
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _summary(_list[i]),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: muted,
+                              Icon(Icons.lock_outline,
+                                  size: 18, color: AppColors.textMuted),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  'Continue de onde parou  ·  fixo (só com algo em andamento)',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
                               ),
                             ],
                           ),
                         ),
-                    ],
+                        for (var i = 0; i < _list.length; i++)
+                          _card(
+                            key: _keys[i],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        initialValue: _list[i].name,
+                                        maxLength: 28,
+                                        onChanged: (v) => _list[i].name = v,
+                                        decoration: fieldDecoration(
+                                          label: 'Nome do banner',
+                                        ).copyWith(counterText: ''),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      tooltip: 'Subir',
+                                      onPressed: i == 0 ? null : () => _move(i, -1),
+                                      icon: const Icon(Icons.arrow_upward, size: 18),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Descer',
+                                      onPressed: i == _list.length - 1
+                                          ? null
+                                          : () => _move(i, 1),
+                                      icon: const Icon(Icons.arrow_downward, size: 18),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Remover',
+                                      onPressed:
+                                          _list.length <= 1 ? null : () => _remove(i),
+                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    GlassMenuButton<BannerSource>(
+                                      tooltip: 'Conteúdo do banner',
+                                      menuWidth: 248,
+                                      options: BannerSource.values,
+                                      labelOf: (s) => s.label,
+                                      selected: _list[i].source,
+                                      onSelected: (v) =>
+                                          setState(() => _list[i].source = v),
+                                      child: _SourceTrigger(_list[i].source.label),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    if (_list[i].source == BannerSource.categories ||
+                                        _list[i].source == BannerSource.titles)
+                                      OutlinedButton(
+                                        onPressed: () => _choose(_list[i]),
+                                        child: Text(
+                                          _list[i].source == BannerSource.titles
+                                              ? 'Escolher títulos'
+                                              : 'Escolher categorias',
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _summary(_list[i]),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: muted,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -393,27 +397,30 @@ class _TitlePickerState extends State<_TitlePicker> {
                 ),
               const SizedBox(height: 8),
               Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: [
-                    for (final t in _results)
-                      CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: AppColors.accent,
-                        value: _has(t),
-                        title: Text(t.name, style: const TextStyle(fontSize: 13)),
-                        subtitle: Text(
-                          [
-                            t.kind == CatalogKind.movies ? 'Filme' : 'Série',
-                            if (t.year != null && t.year!.isNotEmpty) t.year!,
-                          ].join(' · '),
-                          style: const TextStyle(fontSize: 11),
+                child: SmoothScroll(
+                  builder: (_, smooth) => ListView(
+                    controller: smooth,
+                    shrinkWrap: true,
+                    children: [
+                      for (final t in _results)
+                        CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          activeColor: AppColors.accent,
+                          value: _has(t),
+                          title: Text(t.name, style: const TextStyle(fontSize: 13)),
+                          subtitle: Text(
+                            [
+                              t.kind == CatalogKind.movies ? 'Filme' : 'Série',
+                              if (t.year != null && t.year!.isNotEmpty) t.year!,
+                            ].join(' · '),
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          onChanged: (_) => _toggle(t),
                         ),
-                        onChanged: (_) => _toggle(t),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../profiles/profile.dart';
 import '../../profiles/profiles_scope.dart';
+import '../widgets/smooth_scroll.dart';
 import 'profile_avatar.dart';
 import 'profile_editor_dialog.dart';
 
@@ -56,93 +57,96 @@ class _ProfilePickerPageState extends State<ProfilePickerPage> {
       body: Stack(
         children: [
           Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    managing ? 'Gerenciar perfis' : 'Quem está assistindo?',
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w600,
+            child: SmoothScroll(
+              builder: (_, smooth) => SingleChildScrollView(
+                controller: smooth,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      managing ? 'Gerenciar perfis' : 'Quem está assistindo?',
+                      style: const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 40),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 28,
-                    runSpacing: 28,
-                    children: [
-                      for (var i = 0; i < profiles.length; i++)
-                        _Entrance(
-                          index: i,
-                          child: _ProfileTile(
-                            profile: profiles[i],
-                            managing: managing,
-                            onTap: c.entering
-                                ? null
-                                : () async {
-                                    if (managing) {
-                                      await showProfileEditor(
-                                        context,
-                                        existing: profiles[i],
-                                      );
-                                    } else {
-                                      await c.enter(profiles[i]);
-                                    }
-                                  },
+                    const SizedBox(height: 40),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 28,
+                      runSpacing: 28,
+                      children: [
+                        for (var i = 0; i < profiles.length; i++)
+                          _Entrance(
+                            index: i,
+                            child: _ProfileTile(
+                              profile: profiles[i],
+                              managing: managing,
+                              onTap: c.entering
+                                  ? null
+                                  : () async {
+                                      if (managing) {
+                                        await showProfileEditor(
+                                          context,
+                                          existing: profiles[i],
+                                        );
+                                      } else {
+                                        await c.enter(profiles[i]);
+                                      }
+                                    },
+                            ),
+                          ),
+                        if (canAdd)
+                          _Entrance(
+                            index: profiles.length,
+                            child: _AddTile(onTap: c.entering ? null : _add),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                    if (profiles.isNotEmpty)
+                      OutlinedButton(
+                        onPressed: () => setState(() => _manage = !_manage),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          shape: AppShape.button,
+                        ),
+                        child: Text(managing ? 'Concluído' : 'Gerenciar perfis'),
+                      ),
+                    if (c.error != null) ...[
+                      const SizedBox(height: 16),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
+                        child: Text(
+                          c.error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 13,
                           ),
                         ),
-                      if (canAdd)
-                        _Entrance(
-                          index: profiles.length,
-                          child: _AddTile(onTap: c.entering ? null : _add),
-                        ),
+                      ),
                     ],
-                  ),
-                  const SizedBox(height: 40),
-                  if (profiles.isNotEmpty)
-                    OutlinedButton(
-                      onPressed: () => setState(() => _manage = !_manage),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 40),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        shape: AppShape.button,
-                      ),
-                      child: Text(managing ? 'Concluído' : 'Gerenciar perfis'),
-                    ),
-                  if (c.error != null) ...[
-                    const SizedBox(height: 16),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 480),
-                      child: Text(
-                        c.error!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 13,
+                    if (c.indexRecovered) ...[
+                      const SizedBox(height: 16),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
+                        child: Text(
+                          'A lista de perfis estava ilegível e foi recriada. Perfis '
+                          'encontrados em disco voltaram como "Perfil N"; edite o '
+                          'nome e o avatar em Gerenciar perfis.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                  if (c.indexRecovered) ...[
-                    const SizedBox(height: 16),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 480),
-                      child: Text(
-                        'A lista de perfis estava ilegível e foi recriada. Perfis '
-                        'encontrados em disco voltaram como "Perfil N"; edite o '
-                        'nome e o avatar em Gerenciar perfis.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
           ),

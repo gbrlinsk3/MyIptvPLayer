@@ -19,6 +19,7 @@ import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../widgets/swipe_toast.dart';
 import '../widgets/wake_slider.dart';
+import '../window/hibernator.dart';
 import '../window/title_bar.dart';
 import 'player_episodes_strip.dart';
 import 'player_scrub.dart';
@@ -175,11 +176,16 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     _saveTimer = Timer.periodic(const Duration(seconds: 10), (_) => _save());
     _tick = Timer.periodic(const Duration(seconds: 1), (_) => _watch());
     _poke();
+    Hibernator.holds.add(_isPlaying);
     unawaited(_openCurrent(widget.startAt));
   }
 
+  /// Tocando agora: o app minimizado não hiberna.
+  bool _isPlaying() => _player.state.playing;
+
   @override
   void dispose() {
+    Hibernator.holds.remove(_isPlaying);
     _hideTimer?.cancel();
     _saveTimer?.cancel();
     _nextTimer?.cancel();

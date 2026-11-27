@@ -5,6 +5,7 @@ import '../../profiles/profile.dart';
 import '../../profiles/profiles_scope.dart';
 import '../widgets/common.dart';
 import '../widgets/glass.dart';
+import '../widgets/smooth_scroll.dart';
 import 'profile_avatar.dart';
 
 /// Criar ou editar um perfil: nome, avatar e cor de destaque.
@@ -127,80 +128,83 @@ class _ProfileEditorState extends State<_ProfileEditor> {
               ),
               const SizedBox(height: 16),
               Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 180),
-                            child: ProfileAvatar(
-                              key: ValueKey(_avatar),
-                              avatar: _avatar,
-                              name: _name.text,
-                              accent: accent,
-                              size: 80,
+                child: SmoothScroll(
+                  builder: (_, smooth) => SingleChildScrollView(
+                    controller: smooth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              child: ProfileAvatar(
+                                key: ValueKey(_avatar),
+                                avatar: _avatar,
+                                name: _name.text,
+                                accent: accent,
+                                size: 80,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextField(
-                              controller: _name,
-                              enabled: !_busy,
-                              autofocus: !editing,
-                              maxLength: 24,
-                              onChanged: (_) => setState(() {}),
-                              onSubmitted: (_) => _save(),
-                              decoration: fieldDecoration(label: 'Nome do perfil')
-                                  .copyWith(counterText: ''),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextField(
+                                controller: _name,
+                                enabled: !_busy,
+                                autofocus: !editing,
+                                maxLength: 24,
+                                onChanged: (_) => setState(() {}),
+                                onSubmitted: (_) => _save(),
+                                decoration: fieldDecoration(label: 'Nome do perfil')
+                                    .copyWith(counterText: ''),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Avatar',
-                        style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final key in avatarKeys)
-                            _AvatarChoice(
-                              avatar: key,
-                              name: _name.text,
-                              accent: accent,
-                              selected: key == _avatar,
-                              onTap: _busy
-                                  ? null
-                                  : () => setState(() => _avatar = key),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Cor de destaque',
-                        style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          for (final value in profileAccents)
-                            _AccentChoice(
-                              color: Color(value),
-                              selected: value == _accent,
-                              onTap: _busy
-                                  ? null
-                                  : () => setState(() => _accent = value),
-                            ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Avatar',
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final key in avatarKeys)
+                              _AvatarChoice(
+                                avatar: key,
+                                name: _name.text,
+                                accent: accent,
+                                selected: key == _avatar,
+                                onTap: _busy
+                                    ? null
+                                    : () => setState(() => _avatar = key),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Cor de destaque',
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            for (final value in profileAccents)
+                              _AccentChoice(
+                                color: Color(value),
+                                selected: value == _accent,
+                                onTap: _busy
+                                    ? null
+                                    : () => setState(() => _accent = value),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

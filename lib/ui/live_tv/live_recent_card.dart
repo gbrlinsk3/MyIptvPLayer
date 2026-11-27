@@ -1,4 +1,3 @@
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
@@ -6,6 +5,7 @@ import '../../core/theme.dart';
 import '../../data/channel_groups.dart';
 import '../widgets/full_name_tooltip.dart';
 import '../widgets/press_scale.dart';
+import 'blurred_logo.dart';
 import 'live_logo.dart';
 
 /// Cartão de "Recentes e favoritos" da TV ao vivo, no visual do cartão do
@@ -332,18 +332,11 @@ class _Backdrop extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        RepaintBoundary(
-          child: ClipRect(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-              child: LiveLogo(
-                url: u,
-                fit: BoxFit.cover,
-                memCacheHeight: 64,
-                fallback: bg,
-              ),
-            ),
-          ),
+        BlurredLogo(
+          url: u,
+          sigma: 24,
+          memCacheHeight: 64,
+          fallback: AppColors.hover,
         ),
         const ColoredBox(color: Color(0x73000000)),
         AnimatedPositioned(

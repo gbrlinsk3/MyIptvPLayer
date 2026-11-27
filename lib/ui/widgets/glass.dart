@@ -5,6 +5,16 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import 'app_backdrop.dart';
 
+/// Peças de vidro que ficam na tela sobre um fundo que muda a cada quadro (o
+/// banner do Início). Ver [GlassSurface.group].
+abstract final class GlassGroups {
+  /// A barra lateral recolhida e a busca do topo.
+  static final bars = BackdropKey();
+
+  /// As duas setas do banner do Início.
+  static final bannerArrows = BackdropKey();
+}
+
 /// O vidro do app (o mesmo da barra lateral flutuante): desfoca o que está
 /// atrás, aviva as cores e põe um preenchimento translúcido, um filete de luz
 /// no topo e a borda. Barras, painéis, menus e botões usam esta casca; só os
@@ -18,6 +28,7 @@ class GlassSurface extends StatelessWidget {
   const GlassSurface({
     super.key,
     required this.child,
+    this.group,
     this.radius,
     this.fill,
     this.blur,
@@ -25,9 +36,21 @@ class GlassSurface extends StatelessWidget {
     this.edgeWidth = 1,
     this.shadow = false,
     this.halo = false,
+    this.liveBlur = true,
   });
 
   final Widget child;
+
+  /// Falso para a peça que só tem o fundo parado do app atrás: mantém o
+  /// preenchimento, o filete e a borda, sem refazer o desfoque a cada quadro.
+  final bool liveBlur;
+
+  /// Grupo de desfoque ([GlassGroups]): as peças de um grupo dividem uma
+  /// única cópia do fundo, o que poupa trabalho da placa de vídeo a cada
+  /// quadro. A cópia é a do momento da primeira peça desenhada: só vale para
+  /// peças que não se sobrepõem e sem nada desenhado por baixo delas entre
+  /// uma e outra.
+  final BackdropKey? group;
 
   /// Padrão: o canto de cartão ([AppShape.card]).
   final BorderRadius? radius;
@@ -62,8 +85,9 @@ class GlassSurface extends StatelessWidget {
       child: ClipRRect(
         borderRadius: radius,
         child: BackdropFilter(
+          backdropGroupKey: group,
           // Desligado, não desfoca; a estrutura da tela continua a mesma.
-          enabled: !AppColors.minimal,
+          enabled: liveBlur && !AppColors.minimal,
           filter: ui.ImageFilter.compose(
             outer: saturationFilter(AppGlass.saturation),
             inner: ui.ImageFilter.blur(
