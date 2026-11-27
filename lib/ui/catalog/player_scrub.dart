@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../core/format.dart';
+import '../../core/slider_shapes.dart';
 import '../../core/theme.dart';
 import '../../core/app_log.dart';
 
@@ -169,12 +170,12 @@ class _ScrubBarState extends State<ScrubBar> {
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: f == null ? 3 : 5,
-                      activeTrackColor: AppColors.accent,
+                      activeTrackColor: AppColors.accentOnMedia,
                       inactiveTrackColor: Colors.white30,
                       thumbColor: Colors.white,
                       overlayShape: SliderComponentShape.noOverlay,
-                      thumbShape: RoundSliderThumbShape(
-                        enabledThumbRadius: f == null ? 5 : 7,
+                      thumbShape: AppSliderThumbShape(
+                        radius: f == null ? 5 : 7,
                       ),
                     ),
                     child: Slider(
@@ -219,7 +220,7 @@ class _ScrubBarState extends State<ScrubBar> {
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: Colors.black,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppShape.card,
                   border: Border.all(color: Colors.white24),
                   boxShadow: const [
                     BoxShadow(color: Color(0x88000000), blurRadius: 16),
@@ -250,8 +251,8 @@ class _ScrubBarState extends State<ScrubBar> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.accentOnMedia,
+                borderRadius: AppShape.control,
               ),
               child: Text(
                 time,

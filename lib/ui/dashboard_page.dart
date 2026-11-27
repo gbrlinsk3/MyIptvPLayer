@@ -16,7 +16,7 @@ class DashboardPage extends StatefulWidget {
     required this.onOpenCatalog,
   });
 
-  final VoidCallback onOpenCatalog;
+  final ValueChanged<CatalogKind> onOpenCatalog;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -82,15 +82,17 @@ class _DashboardPageState extends State<DashboardPage> {
           key: const ValueKey('home:movies:recent'),
           label: 'Filmes adicionados recentemente',
           future: catalog.recentTitles(CatalogKind.movies),
+          loadMore: (offset) => catalog.recentPage(CatalogKind.movies, offset),
           onOpen: open,
-          onSeeAll: widget.onOpenCatalog,
+          onSeeAll: () => widget.onOpenCatalog(CatalogKind.movies),
         ),
         TitleRow(
           key: const ValueKey('home:series:recent'),
           label: 'Séries adicionadas recentemente',
           future: catalog.recentTitles(CatalogKind.series),
+          loadMore: (offset) => catalog.recentPage(CatalogKind.series, offset),
           onOpen: open,
-          onSeeAll: widget.onOpenCatalog,
+          onSeeAll: () => widget.onOpenCatalog(CatalogKind.series),
         ),
       ],
       ),
@@ -120,7 +122,7 @@ class _EmptyHero extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppShape.panel,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(

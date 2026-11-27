@@ -9,6 +9,7 @@ import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../downloads/download_button.dart';
 import '../home/hero_buttons.dart';
+import '../widgets/glass.dart';
 import '../widgets/shimmer.dart';
 import '../window/title_bar.dart';
 import 'favorite_button.dart';
@@ -334,8 +335,11 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
               label: 'Tentar de novo',
               onTap: () {
                 final app = AppScope.read(context);
-                setState(() => _details =
-                    app.catalog.details(widget.title.kind, widget.title.id));
+                // Corpo em bloco: com `=>` o setState receberia o Future de volta.
+                setState(() {
+                  _details =
+                      app.catalog.details(widget.title.kind, widget.title.id);
+                });
               },
             ),
           ],
@@ -488,12 +492,12 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppShape.control,
                 ),
                 child: Text(
                   '★ ${rating.toStringAsFixed(1)}',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppColors.onAccent,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -504,7 +508,7 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.white38),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppShape.control,
                 ),
                 child: Text(
                   c,
@@ -670,14 +674,12 @@ class _TitleDetailsPageState extends State<TitleDetailsPage> {
               const SizedBox(width: 12),
               // Janela estreita: sem a lista à direita, as temporadas viram menu.
               if (!wide && seasons.length > 1)
-                PopupMenuButton<int>(
+                GlassMenuButton<int>(
                   tooltip: 'Temporada',
-                  color: AppColors.surface,
+                  options: seasons,
+                  labelOf: (s) => 'Temporada $s',
+                  selected: season,
                   onSelected: _selectSeason,
-                  itemBuilder: (context) => [
-                    for (final s in seasons)
-                      PopupMenuItem<int>(value: s, child: Text('Temporada $s')),
-                  ],
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -816,7 +818,7 @@ class _DetailsSkeleton extends StatelessWidget {
                         child: const _Bone(height: 12),
                       ),
                       const SizedBox(height: 22),
-                      _Bone(width: 170, height: 40, radius: AppShape.radius),
+                      _Bone(width: 170, height: 40),
                       const SizedBox(height: 28),
                     ],
                   ),
@@ -878,7 +880,7 @@ class _EpisodeBone extends StatelessWidget {
           width: 240,
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: _Bone(radius: 8),
+            child: _Bone(),
           ),
         ),
         SizedBox(height: 8),
@@ -890,11 +892,10 @@ class _EpisodeBone extends StatelessWidget {
 
 /// Bloco do esqueleto sobre fundo escuro.
 class _Bone extends StatelessWidget {
-  const _Bone({this.width, this.height, this.radius = 6});
+  const _Bone({this.width, this.height});
 
   final double? width;
   final double? height;
-  final double radius;
 
   @override
   Widget build(BuildContext context) {
@@ -903,7 +904,7 @@ class _Bone extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: const Color(0x14FFFFFF),
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: AppShape.skeleton(height),
       ),
     );
   }
@@ -1010,7 +1011,7 @@ class _SeasonTabState extends State<_SeasonTab> {
                 margin: const EdgeInsets.only(left: 12),
                 width: sel ? 38 : 0,
                 height: 2,
-                color: AppColors.accent,
+                color: AppColors.accentOnMedia,
               ),
             ],
           ),
@@ -1029,13 +1030,13 @@ class _RoundArrow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      customBorder: const CircleBorder(),
+      customBorder: AppShape.button,
       onTap: onTap,
       child: Container(
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
+          borderRadius: AppShape.control,
           border: Border.all(color: Colors.white54),
         ),
         child: Icon(icon, color: Colors.white, size: 20),
@@ -1096,9 +1097,9 @@ class _EpisodeCardState extends State<_EpisodeCard> {
                 child: Container(
                   height: 120,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppShape.card,
                     border: Border.all(
-                      color: _hover ? AppColors.accent : Colors.white12,
+                      color: _hover ? AppColors.accentOnMedia : Colors.white12,
                       width: _hover ? 2 : 1,
                     ),
                   ),
@@ -1123,7 +1124,7 @@ class _EpisodeCardState extends State<_EpisodeCard> {
                           child: Icon(
                             Icons.check_circle,
                             size: 22,
-                            color: AppColors.accent,
+                            color: AppColors.accentOnMedia,
                           ),
                         ),
                       ],
@@ -1163,7 +1164,7 @@ class _EpisodeCardState extends State<_EpisodeCard> {
                                         : Icons.check_circle_outline,
                                     size: 20,
                                     color:
-                                        watched ? AppColors.accent : Colors.white,
+                                        watched ? AppColors.accentOnMedia : Colors.white,
                                   ),
                                 ),
                               ],
@@ -1180,7 +1181,7 @@ class _EpisodeCardState extends State<_EpisodeCard> {
                             value: p.fraction,
                             minHeight: 4,
                             backgroundColor: const Color(0x99000000),
-                            color: AppColors.accent,
+                            color: AppColors.accentOnMedia,
                           ),
                         )
                       else if (watched)

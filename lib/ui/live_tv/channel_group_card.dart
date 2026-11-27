@@ -60,7 +60,7 @@ class _ChannelGroupCardState extends State<ChannelGroupCard> {
   bool _hover = false;
   bool _focus = false;
 
-  static const double _radius = 12;
+  static double get _radius => AppShape.cardRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -302,7 +302,7 @@ class _NowLine extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         ClipRRect(
-          borderRadius: BorderRadius.circular(2),
+          borderRadius: AppShape.control,
           child: LinearProgressIndicator(
             value: length <= 0 ? 0 : (passed / length).clamp(0.0, 1.0),
             minHeight: 2,
@@ -358,7 +358,7 @@ class _FavoriteButtonState extends State<_FavoriteButton> {
     final favorite = widget.favorite;
     final onPressed = widget.onPressed;
     final name = widget.name;
-    final color = favorite ? AppColors.accent : Colors.white;
+    final color = favorite ? AppColors.accentOnMedia : Colors.white;
     final tip = favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
     return Semantics(
       container: true,
@@ -374,14 +374,14 @@ class _FavoriteButtonState extends State<_FavoriteButton> {
             type: MaterialType.transparency,
             child: InkWell(
               onTap: onPressed == null ? null : _alternar,
-              customBorder: const CircleBorder(),
+              customBorder: AppShape.button,
               child: Container(
                 width: 32,
                 height: 32,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0x99000000),
+                decoration: BoxDecoration(
+                  borderRadius: AppShape.control,
+                  color: const Color(0x99000000),
                 ),
                 child: Icon(
                   favorite ? Icons.favorite : Icons.favorite_border,
@@ -411,7 +411,7 @@ class _Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(3),
+        borderRadius: AppShape.control,
         border: Border.all(color: AppColors.border),
       ),
       child: Text(

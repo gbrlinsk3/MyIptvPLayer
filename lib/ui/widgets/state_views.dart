@@ -100,7 +100,7 @@ class _StateView extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: AppColors.hover,
-                    shape: BoxShape.circle,
+                    borderRadius: AppShape.control,
                   ),
                   child: Icon(icon, size: 48, color: iconColor),
                 ),

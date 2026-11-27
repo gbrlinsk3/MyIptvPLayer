@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/theme.dart';
+
 /// Controle deslizante de barras finas, sem bolinha, feito para volume.
 ///
 /// As barras até o valor ficam acesas ([fillColor]) e as demais apagadas
@@ -406,7 +408,10 @@ class _WakePainter extends CustomPainter {
       final x = i * (barW + w.gap);
       final rect = Rect.fromLTWH(x, (size.height - bh) / 2, barW, bh);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(math.min(barW, bh) / 2)),
+        RRect.fromRectAndRadius(
+          rect,
+          Radius.circular(AppShape.r(math.min(barW, bh) / 2)),
+        ),
         i <= lit ? paintOn : paintOff,
       );
     }

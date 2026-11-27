@@ -9,6 +9,8 @@ import '../catalog/home_banners.dart' show BannerConfig;
 import 'home/banner_manager_dialog.dart';
 import 'downloads/downloads_settings_card.dart';
 import 'account_xtream_card.dart';
+import 'background_settings_card.dart';
+import 'theme_settings_card.dart';
 import 'diagnostics_card.dart';
 import 'catalog_settings_card.dart';
 import 'epg_settings_card.dart';
@@ -173,35 +175,13 @@ class _AccountPageState extends State<AccountPage> {
             const DiagnosticsCard(),
             const CatalogSettingsCard(),
             ] else ...[
+            const ThemeSettingsCard(),
             SectionCard(
               title: 'Aparência',
               children: [
-                SegmentedButton<ThemePref>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(
-                      value: ThemePref.light,
-                      icon: Icon(Icons.light_mode_outlined, size: 18),
-                      label: Text('Claro'),
-                    ),
-                    ButtonSegment(
-                      value: ThemePref.dark,
-                      icon: Icon(Icons.dark_mode_outlined, size: 18),
-                      label: Text('Escuro'),
-                    ),
-                    ButtonSegment(
-                      value: ThemePref.system,
-                      icon: Icon(Icons.desktop_windows_outlined, size: 18),
-                      label: Text('Sistema'),
-                    ),
-                    ButtonSegment(
-                      value: ThemePref.auto,
-                      icon: Icon(Icons.schedule_outlined, size: 18),
-                      label: Text('Automático'),
-                    ),
-                  ],
-                  selected: {c.themePref},
-                  onSelectionChanged: (v) => c.setThemePref(v.first),
+                AppearanceSelector(
+                  selected: c.themePref,
+                  onChanged: c.setThemePref,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -211,8 +191,9 @@ class _AccountPageState extends State<AccountPage> {
                 ),
               ],
             ),
+            const BackgroundSettingsCard(),
             SectionCard(
-              title: 'Formato dos botões',
+              title: 'Formato da interface',
               children: [
                 SegmentedButton<String>(
                   showSelectedIcon: false,
@@ -233,7 +214,8 @@ class _AccountPageState extends State<AccountPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Vale para os botões de todo o programa.',
+                  'Quadrados deixa os cantos retos. Arredondados usa botões em '
+                  'pílula e cantos suaves.',
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ],
@@ -254,7 +236,10 @@ class _AccountPageState extends State<AccountPage> {
                 Text(
                   'Amplia o programa inteiro (menus, botões, janelas). 100 % é o '
                   'tamanho de antes; o padrão é ${UiSizes.defaultPercent} %. '
-                  'Também define quantos pôsteres cabem por linha.',
+                  'Também define quantos pôsteres cabem por linha. Em janelas '
+                  'maiores que 1920 × 1100, tudo cresce junto com a janela. Em '
+                  'janelas perto de Full HD ou maiores, a escala do Windows não '
+                  'é somada.',
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ],
@@ -281,7 +266,8 @@ class _AccountPageState extends State<AccountPage> {
                   'Largura máxima do conteúdo das telas, centralizado. '
                   'Preenchido usa a janela inteira (padrão). Os pixels contam '
                   'já com o tamanho da interface: a ${UiSizes.defaultPercent} %, '
-                  '1440 ocupa cerca de ${(1440 * UiSizes.defaultPercent / 100).round()} px na tela.',
+                  '1440 ocupa cerca de ${(1440 * UiSizes.defaultPercent / 100).round()} px '
+                  'numa janela de até 1920 × 1100.',
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ],

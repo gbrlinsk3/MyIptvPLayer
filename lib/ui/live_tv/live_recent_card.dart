@@ -86,17 +86,17 @@ class _LiveRecentCardState extends State<LiveRecentCard> {
     if (!expanded) {
       // Compacto: só um indicador (sem ação) de que é favorito.
       action = widget.favorite
-          ? Icon(Icons.favorite, size: 16, color: AppColors.accent)
+          ? Icon(Icons.favorite, size: 16, color: AppColors.accentOnMedia)
           : null;
     } else if (widget.favorite) {
-      action = _CornerButton(
+      action = CornerButton(
         icon: Icons.favorite,
-        iconColor: AppColors.accent,
+        iconColor: AppColors.accentOnMedia,
         tooltip: 'Remover dos favoritos',
         onPressed: widget.onToggleFavorite,
       );
     } else if (widget.recent) {
-      action = _CornerButton(
+      action = CornerButton(
         icon: Icons.close,
         iconColor: Colors.white,
         tooltip: 'Tirar dos recentes',
@@ -148,15 +148,15 @@ class _LiveRecentCardState extends State<LiveRecentCard> {
                     : LiveRecentCard.collapsedWidth,
                 height: LiveRecentCard.height,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppShape.card,
                   border: Border.all(
-                    color: strong ? AppColors.accent : AppColors.border,
+                    color: strong ? AppColors.accentOnMedia : AppColors.border,
                     width: strong ? 2 : 1,
                   ),
                   boxShadow: expanded
                       ? [
                           BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.25),
+                            color: AppColors.accentOnMedia.withValues(alpha: 0.25),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -164,7 +164,7 @@ class _LiveRecentCardState extends State<LiveRecentCard> {
                       : const [],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: AppShape.inset(2),
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -243,9 +243,11 @@ class _LiveRecentCardState extends State<LiveRecentCard> {
   }
 }
 
-/// Botão redondo (28 px, fundo preto translúcido) com alvo de 32 px.
-class _CornerButton extends StatelessWidget {
-  const _CornerButton({
+/// Botão redondo (28 px, fundo preto translúcido) com alvo de 32 px. Usado
+/// também no "Continuar assistindo" do Início.
+class CornerButton extends StatelessWidget {
+  const CornerButton({
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.tooltip,
@@ -276,14 +278,14 @@ class _CornerButton extends StatelessWidget {
               type: MaterialType.transparency,
               child: InkWell(
                 onTap: onPressed,
-                customBorder: const CircleBorder(),
+                customBorder: AppShape.button,
                 child: Center(
                   child: Container(
                     width: 28,
                     height: 28,
-                    decoration: const BoxDecoration(
-                      color: Color(0x99000000),
-                      shape: BoxShape.circle,
+                    decoration: BoxDecoration(
+                      color: const Color(0x99000000),
+                      borderRadius: AppShape.control,
                     ),
                     child: Icon(icon, size: 16, color: iconColor),
                   ),

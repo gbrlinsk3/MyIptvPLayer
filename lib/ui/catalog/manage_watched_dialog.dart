@@ -5,6 +5,7 @@ import '../widgets/click_spark.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../widgets/animated_counter.dart';
+import '../widgets/glass.dart';
 
 /// Painel "Gerenciar assistidos" de uma série: temporada (menu), ações para a
 /// temporada inteira fixas no alto e, abaixo do divisor, a lista de episódios
@@ -67,9 +68,7 @@ class _ManageWatchedDialogState extends State<ManageWatchedDialog> {
     final seasons = widget.seasons.keys.toList();
     final episodes = _episodes;
     final done = episodes.where((e) => _progress[e.id]?.watched ?? false).length;
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
+    return GlassDialog(
       insetPadding: const EdgeInsets.all(24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520, maxHeight: 640),
@@ -99,24 +98,25 @@ class _ManageWatchedDialogState extends State<ManageWatchedDialog> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.border),
-                        borderRadius: BorderRadius.circular(AppShape.rounded ? 8 : 2),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<int>(
-                          value: _season,
-                          isExpanded: true,
-                          dropdownColor: AppColors.surface,
-                          items: [
-                            for (final s in seasons)
-                              DropdownMenuItem(value: s, child: Text('Temporada $s')),
+                    child: GlassMenuButton<int>(
+                      tooltip: 'Temporada',
+                      options: seasons,
+                      labelOf: (s) => 'Temporada $s',
+                      selected: _season,
+                      onSelected: (s) => setState(() => _season = s),
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: AppGlass.field,
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: AppShape.control,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text('Temporada $_season')),
+                            const Icon(Icons.arrow_drop_down),
                           ],
-                          onChanged: (s) {
-                            if (s != null) setState(() => _season = s);
-                          },
                         ),
                       ),
                     ),
@@ -171,7 +171,7 @@ class _ManageWatchedDialogState extends State<ManageWatchedDialog> {
                     onTap: () => _set([e], !watched),
                     leading: Icon(
                       watched ? Icons.check_circle : Icons.check_circle_outline,
-                      color: watched ? AppColors.accent : AppColors.textMuted,
+                      color: watched ? AppColors.accentInk : AppColors.textMuted,
                     ),
                     title: Text(
                       '${e.code} — ${e.title}',

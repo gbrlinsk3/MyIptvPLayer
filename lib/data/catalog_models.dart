@@ -1,3 +1,4 @@
+import '../core/format.dart';
 import 'models.dart' show foldText;
 
 /// Tipos de conteúdo sob demanda (VOD) do catálogo.
@@ -122,6 +123,13 @@ class CatalogTitle {
     final d = durationMs;
     if (p == null || d == null || d <= 0) return null;
     return (p / d).clamp(0.0, 1.0).toDouble();
+  }
+
+  /// Linha abaixo do nome em "continuar assistindo": o [subtitle] (código do
+  /// episódio) e quanto falta. Filme mostra só o que falta.
+  String? get continueLabel {
+    final parts = [?subtitle, ?formatRemaining(positionMs, durationMs)];
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 }
 

@@ -62,12 +62,15 @@ class SkeletonBox extends StatelessWidget {
     super.key,
     this.width,
     this.height,
-    this.radius = 6,
+    this.radius,
   });
 
   final double? width;
   final double? height;
-  final double radius;
+
+  /// Medida própria (some no formato quadrado). Sem ela, o canto sai da altura:
+  /// ver [AppShape.skeleton].
+  final double? radius;
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +79,9 @@ class SkeletonBox extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: AppColors.hover,
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: radius == null
+            ? AppShape.skeleton(height)
+            : BorderRadius.circular(AppShape.r(radius!)),
       ),
     );
   }

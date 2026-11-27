@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import 'glass.dart';
 
 /// Linha clicável com destaque de hover/seleção (usada em categorias e canais).
 class HoverRow extends StatefulWidget {
@@ -40,7 +41,7 @@ class _HoverRowState extends State<HoverRow> {
           padding: widget.padding,
           decoration: BoxDecoration(
             color: background,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppShape.control,
           ),
           child: widget.child,
         ),
@@ -83,24 +84,28 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GlassSurface(
+        radius: AppShape.panel,
+        child: Padding(
+          // 16 + 1 da borda.
+          padding: const EdgeInsets.all(17),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...children,
+            ],
           ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
+        ),
       ),
     );
   }
@@ -143,9 +148,7 @@ Future<bool> confirmDialog(
 }) async {
   final result = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
+    builder: (ctx) => GlassAlertDialog(
       title: Text(title, style: const TextStyle(fontSize: 16)),
       content: Text(message),
       actions: [

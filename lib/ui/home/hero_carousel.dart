@@ -12,12 +12,14 @@ import '../../state/app_scope.dart';
 import '../catalog/play_actions.dart';
 import '../catalog/poster_image.dart';
 import '../catalog/title_details_panel.dart';
+import '../widgets/more_button.dart';
 import '../widgets/content_frame.dart';
 import '../widgets/magnet.dart';
 import '../widgets/morph_image_switcher.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/shiny_text.dart';
 import '../widgets/sling_arrow.dart';
+import '../widgets/timed_switcher.dart';
 import 'hero_buttons.dart';
 import '../../core/format.dart';
 
@@ -34,7 +36,7 @@ class HeroCarousel extends StatefulWidget {
   });
 
   final Future<List<HeroSlide>> future;
-  final VoidCallback onOpenCatalog;
+  final ValueChanged<CatalogKind> onOpenCatalog;
 
   /// Altura do banner: 440 como sempre; em telas altas (1440p) cresce
   /// (40 % da altura útil, até 640) e os banners da direita acompanham.
@@ -56,10 +58,18 @@ class HeroCarousel extends StatefulWidget {
 
 class _HeroCarouselState extends State<HeroCarousel>
     with SingleTickerProviderStateMixin {
-  static const _interval = Duration(seconds: 6);
+  static const _interval = Duration(seconds: 8);
+
+  /// Trocas pedidas pelo usuário respondem rápido; a automática é lenta.
+  static const _quick = Duration(milliseconds: 350);
 
   late final AnimationController _timer =
-      AnimationController(vsync: this, duration: _interval)
+      AnimationController(
+        vsync: this,
+        duration: _interval,
+        // Sem isto, "reduzir animações" encurtaria o intervalo para 5 %.
+        animationBehavior: AnimationBehavior.preserve,
+      )
         ..addStatusListener((s) {
           if (s == AnimationStatus.completed) _advance();
         });
@@ -70,6 +80,7 @@ class _HeroCarouselState extends State<HeroCarousel>
   int _titleCount = 1; // títulos do slide atual
   bool _hover = false;
   bool _prefetched = false;
+  bool _clicked = false; // a última troca veio de um clique
 
   /// Mouse sobre o banner grande (o título só brilha enquanto isso).
   final ValueNotifier<bool> _bigHover = ValueNotifier(false);
@@ -82,10 +93,11 @@ class _HeroCarouselState extends State<HeroCarousel>
   }
 
   /// Vai para o slide [i] (começando pelo primeiro título dele).
-  void _go(int i) {
+  void _go(int i, {bool clicked = true}) {
     if (_count == 0) return;
     final target = ((i % _count) + _count) % _count;
     setState(() {
+      _clicked = clicked;
       _slide = target;
       _picked.remove(target);
     });
@@ -98,10 +110,13 @@ class _HeroCarouselState extends State<HeroCarousel>
     if (_count == 0) return;
     final pick = _picked[_slide] ?? 0;
     if (pick + 1 < _titleCount) {
-      setState(() => _picked[_slide] = pick + 1);
+      setState(() {
+        _clicked = false;
+        _picked[_slide] = pick + 1;
+      });
       _timer.forward(from: 0);
     } else {
-      _go(_slide + 1);
+      _go(_slide + 1, clicked: false);
     }
   }
 
@@ -145,6 +160,7 @@ class _HeroCarouselState extends State<HeroCarousel>
         _titleCount = slide.titles.length;
         final pick = (_picked[_slide] ?? 0).clamp(0, slide.titles.length - 1);
         final title = slide.titles[pick];
+        final quick = _clicked ? _quick : null;
 
         return MouseRegion(
           onEnter: (_) {
@@ -172,14 +188,14 @@ class _HeroCarouselState extends State<HeroCarousel>
                 // banner também arredondam; de borda a borda ficam retos.
                 final framed = ContentFrameScope.framedOf(context);
                 return ClipRRect(
-                  borderRadius: BorderRadius.circular(framed ? 22 : 0),
+                  borderRadius: BorderRadius.circular(framed ? AppShape.r(22) : 0),
                   child: Row(
                   children: [
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.only(
-                          bottomRight: const Radius.circular(28),
-                          bottomLeft: Radius.circular(side ? 0 : 28),
+                          bottomRight: Radius.circular(AppShape.r(28)),
+                          bottomLeft: Radius.circular(side ? 0 : AppShape.r(28)),
                         ),
                         child: MouseRegion(
                           onEnter: (_) => _bigHover.value = true,
@@ -189,10 +205,11 @@ class _HeroCarouselState extends State<HeroCarousel>
                           children: [
                             // O fundo troca por conta própria ("derretendo" de
                             // uma imagem para a outra); o texto só aparece e some.
-                            _HeroBackground(title: title),
+                            _HeroBackground(title: title, quick: quick),
                             const _HeroShade(),
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 750),
+                            TimedSwitcher(
+                              duration:
+                                  quick ?? const Duration(milliseconds: 750),
                               switchInCurve: Curves.easeInOutCubic,
                               switchOutCurve: Curves.easeInOutCubic,
                               transitionBuilder: (child, anim) =>
@@ -205,8 +222,13 @@ class _HeroCarouselState extends State<HeroCarousel>
                                 slide: slide,
                                 title: title,
                                 pick: pick,
+                                bannerHeight: height,
+                                quick: quick,
                                 onPick: (i) {
-                                  setState(() => _picked[_slide] = i);
+                                  setState(() {
+                                    _clicked = true;
+                                    _picked[_slide] = i;
+                                  });
                                   _timer.forward(from: 0);
                                 },
                                 onOpenCatalog: widget.onOpenCatalog,
@@ -268,13 +290,20 @@ class _HeroCarouselState extends State<HeroCarousel>
                               child: _SideBanner(
                                 slide: topSlide,
                                 slot: 0,
+                                quick: quick,
                                 onTap: () => _go(topIndex),
                               ),
                             ),
                             const SizedBox(height: 12),
                             // De baixo: um título relacionado ao do banner
                             // grande; clicar abre o card expandido dele.
-                            Expanded(child: _RelatedSide(title: title, resume: slide.resume)),
+                            Expanded(
+                              child: _RelatedSide(
+                                title: title,
+                                resume: slide.resume,
+                                quick: quick,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -312,14 +341,14 @@ class HeroSkeleton extends StatelessWidget {
             final sideWidth =
                 (box.maxWidth * 0.30).clamp(240.0, HeroMetrics.sideMax(height));
             return ClipRRect(
-              borderRadius: BorderRadius.circular(framed ? 22 : 0),
+              borderRadius: BorderRadius.circular(framed ? AppShape.r(22) : 0),
               child: Row(
                 children: [
                   Expanded(
                     child: ClipRRect(
                       borderRadius: BorderRadius.only(
-                        bottomRight: const Radius.circular(28),
-                        bottomLeft: Radius.circular(side ? 0 : 28),
+                        bottomRight: Radius.circular(AppShape.r(28)),
+                        bottomLeft: Radius.circular(side ? 0 : AppShape.r(28)),
                       ),
                       child: Stack(
                         fit: StackFit.expand,
@@ -337,23 +366,22 @@ class HeroSkeleton extends StatelessWidget {
                                   children: [
                                     FractionallySizedBox(
                                       widthFactor: 0.7,
-                                      child: SkeletonBox(height: 40, radius: 4),
+                                      child: SkeletonBox(height: 40),
                                     ),
                                     const SizedBox(height: 14),
                                     FractionallySizedBox(
                                       widthFactor: 0.9,
-                                      child: SkeletonBox(height: 12, radius: 4),
+                                      child: SkeletonBox(height: 12),
                                     ),
                                     const SizedBox(height: 8),
                                     FractionallySizedBox(
                                       widthFactor: 0.75,
-                                      child: SkeletonBox(height: 12, radius: 4),
+                                      child: SkeletonBox(height: 12),
                                     ),
                                     const SizedBox(height: 22),
                                     SkeletonBox(
                                       width: 160,
                                       height: 40,
-                                      radius: AppShape.radius,
                                     ),
                                   ],
                                 ),
@@ -370,9 +398,9 @@ class HeroSkeleton extends StatelessWidget {
                       width: sideWidth,
                       child: const Column(
                         children: [
-                          Expanded(child: SkeletonBox(radius: 14)),
+                          Expanded(child: SkeletonBox()),
                           SizedBox(height: 12),
-                          Expanded(child: SkeletonBox(radius: 14)),
+                          Expanded(child: SkeletonBox()),
                         ],
                       ),
                     ),
@@ -418,6 +446,17 @@ class _HeroShade extends StatelessWidget {
             ),
           ),
         ),
+        // No alto: segura a categoria e o "Ver catálogo" em imagem clara.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x99000000), Color(0x00000000)],
+              stops: [0, 0.24],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -430,9 +469,12 @@ class _HeroShade extends StatelessWidget {
 /// [_Backdrop] de antes (pôster nítido sobre o pôster borrado). Mantém o zoom
 /// lento; ao trocar de título o zoom volta ao início suavemente.
 class _HeroBackground extends StatefulWidget {
-  const _HeroBackground({required this.title});
+  const _HeroBackground({required this.title, this.quick});
 
   final CatalogTitle title;
+
+  /// Duração da troca feita por clique; nula na troca automática.
+  final Duration? quick;
 
   @override
   State<_HeroBackground> createState() => _HeroBackgroundState();
@@ -468,7 +510,7 @@ class _HeroBackgroundState extends State<_HeroBackground>
       _zoom
           .animateTo(
             0,
-            duration: const Duration(milliseconds: 900),
+            duration: widget.quick ?? const Duration(milliseconds: 900),
             curve: Curves.easeInOut,
           )
           .whenComplete(() {
@@ -538,10 +580,10 @@ class _HeroBackgroundState extends State<_HeroBackground>
           fit: StackFit.expand,
           children: [
             // Base: pôster desfocado do título atual (dissolve ao trocar).
-            AnimatedSwitcher(
+            TimedSwitcher(
               duration: reduzir
                   ? Duration.zero
-                  : const Duration(milliseconds: 600),
+                  : widget.quick ?? const Duration(milliseconds: 600),
               child: Stack(
                 key: ValueKey('${widget.title.kind.key}:${widget.title.id}'),
                 fit: StackFit.expand,
@@ -557,11 +599,14 @@ class _HeroBackgroundState extends State<_HeroBackground>
               opacity: _mostrar ? 1 : 0,
               duration: reduzir
                   ? Duration.zero
-                  : const Duration(milliseconds: 600),
-              child: MorphImageSwitcher(image: _image),
+                  : widget.quick ?? const Duration(milliseconds: 600),
+              child: MorphImageSwitcher(
+                image: _image,
+                duration: widget.quick ?? const Duration(milliseconds: 1100),
+              ),
             ),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 600),
+            TimedSwitcher(
+              duration: widget.quick ?? const Duration(milliseconds: 600),
               child: _semImagem
                   ? _Backdrop(
                       key: ValueKey('${widget.title.kind.key}:${widget.title.id}'),
@@ -581,9 +626,22 @@ class _HeroBackgroundState extends State<_HeroBackground>
 /// fade quando carrega; tenta a versão grande do TMDB e cai para o endereço
 /// original) e, se não houver imagem horizontal, o pôster nítido na frente.
 class _Backdrop extends StatefulWidget {
-  const _Backdrop({super.key, required this.title, this.size = 'w1280', this.cache = 1920});
+  const _Backdrop({
+    super.key,
+    required this.title,
+    this.size = 'w1280',
+    this.cache = 1920,
+    this.posterAside,
+  });
 
   final CatalogTitle title;
+
+  /// Banners menores: o pôster da frente vai para a borda direita, e este
+  /// aviso diz se ele está na tela (para o texto não passar por cima).
+  final ValueNotifier<bool>? posterAside;
+
+  static const double asideMargin = 14;
+  static const double posterHeightFactor = 0.7;
   final String size;
   final int cache;
 
@@ -607,6 +665,12 @@ class _BackdropState extends State<_Backdrop> {
         final poster = title.image ?? snap.data?.poster;
         // Pôster nítido na frente até a imagem horizontal chegar (ou se não houver).
         final showPoster = poster != null && (!done || !hasBackdrop || _failed);
+        final aside = widget.posterAside;
+        if (aside != null && aside.value != showPoster) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) aside.value = showPoster;
+          });
+        }
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -630,15 +694,21 @@ class _BackdropState extends State<_Backdrop> {
               AnimatedOpacity(
                 opacity: showPoster ? 1 : 0,
                 duration: const Duration(milliseconds: 600),
+                child: Padding(
+                padding: EdgeInsets.only(
+                  right: aside == null ? 0 : _Backdrop.asideMargin,
+                ),
                 child: Align(
-                alignment: const Alignment(0.55, -0.15),
+                alignment: aside == null
+                    ? const Alignment(0.55, -0.15)
+                    : Alignment.centerRight,
                 child: FractionallySizedBox(
-                  heightFactor: 0.7,
+                  heightFactor: _Backdrop.posterHeightFactor,
                   child: AspectRatio(
                     aspectRatio: 2 / 3,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: AppShape.card,
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x88000000),
@@ -648,7 +718,7 @@ class _BackdropState extends State<_Backdrop> {
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: AppShape.card,
                         child: PosterImage(
                           url: tmdbSize(poster, 'w780'),
                           name: title.name,
@@ -657,6 +727,7 @@ class _BackdropState extends State<_Backdrop> {
                       ),
                     ),
                   ),
+                ),
                 ),
                 ),
               ),
@@ -674,9 +745,17 @@ class _SlideView extends StatelessWidget {
     required this.slide,
     required this.title,
     required this.pick,
+    required this.bannerHeight,
     required this.onPick,
     required this.onOpenCatalog,
+    this.quick,
   });
+
+  /// Altura do banner grande: define o tamanho dos três pôsteres.
+  final double bannerHeight;
+
+  /// Duração da entrada do texto quando a troca veio de um clique.
+  final Duration? quick;
 
   /// Mouse sobre o banner grande (o título brilha enquanto isso).
   final ValueListenable<bool> hover;
@@ -684,7 +763,7 @@ class _SlideView extends StatelessWidget {
   final CatalogTitle title;
   final int pick;
   final ValueChanged<int> onPick;
-  final VoidCallback onOpenCatalog;
+  final ValueChanged<CatalogKind> onOpenCatalog;
 
   @override
   Widget build(BuildContext context) {
@@ -710,7 +789,8 @@ class _SlideView extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(84, 28, 84, 56),
+              // Em cima fica a faixa da categoria e do "Ver catálogo".
+              padding: const EdgeInsets.fromLTRB(84, 64, 84, 56),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -722,9 +802,10 @@ class _SlideView extends StatelessWidget {
                         // Texto entra subindo e aparecendo, um instante depois da imagem.
                         child: TweenAnimationBuilder<double>(
                           tween: Tween(begin: 0, end: 1),
-                          duration: const Duration(milliseconds: 1000),
-                          curve: const Interval(
-                            0.3,
+                          duration:
+                              quick ?? const Duration(milliseconds: 1000),
+                          curve: Interval(
+                            quick == null ? 0.3 : 0.15,
                             1,
                             curve: Curves.easeOutCubic,
                           ),
@@ -750,7 +831,6 @@ class _SlideView extends StatelessWidget {
                                   meta: meta,
                                   plot: plot,
                                   progress: progress,
-                                  onOpenCatalog: onOpenCatalog,
                                 ),
                               ),
                             ),
@@ -760,13 +840,72 @@ class _SlideView extends StatelessWidget {
                     ),
                   ),
                   if (slide.titles.length > 1)
-                    _Thumbs(titles: slide.titles, selected: pick, onPick: onPick),
+                    Padding(
+                      padding: EdgeInsets.only(
+                        right: HeroMetrics.thumbShift(bannerHeight),
+                      ),
+                      child: _Thumbs(
+                        titles: slide.titles,
+                        selected: pick,
+                        scale: HeroMetrics.thumbScale(bannerHeight),
+                        onPick: onPick,
+                      ),
+                    ),
                 ],
               ),
             ),
+            Positioned(
+              left: 84,
+              // Reserva o lado direito para o "Ver catálogo".
+              right: 200,
+              top: 24,
+              child: _Kicker(slide.kicker),
+            ),
+            if (slide.opensCatalog)
+              Positioned(
+                right: 20,
+                top: 14,
+                child: MoreButton(
+                  label: 'Ver catálogo',
+                  icon: Icons.grid_view_rounded,
+                  color: Colors.white,
+                  onPressed: () => onOpenCatalog(title.kind),
+                ),
+              ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Categoria do banner grande, no alto à esquerda.
+class _Kicker extends StatelessWidget {
+  const _Kicker(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(width: 28, height: 2, color: AppColors.accentOnMedia),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            text.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              letterSpacing: 2,
+              fontWeight: FontWeight.w700,
+              color: Color.lerp(AppColors.accentOnMedia, Colors.white, 0.35),
+              shadows: const [Shadow(color: Color(0xCC000000), blurRadius: 6)],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -779,7 +918,6 @@ class _Info extends StatelessWidget {
     required this.meta,
     required this.plot,
     required this.progress,
-    required this.onOpenCatalog,
   });
 
   final ValueListenable<bool> hover;
@@ -788,31 +926,14 @@ class _Info extends StatelessWidget {
   final String meta;
   final String? plot;
   final double? progress;
-  final VoidCallback onOpenCatalog;
 
   @override
   Widget build(BuildContext context) {
+    final hasPlot = plot != null && plot!.isNotEmpty;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 28, height: 2, color: AppColors.accent),
-            const SizedBox(width: 10),
-            Text(
-              slide.kicker.toUpperCase(),
-              style: TextStyle(
-                fontSize: 11,
-                letterSpacing: 2,
-                fontWeight: FontWeight.w700,
-                color: Color.lerp(AppColors.accent, Colors.white, 0.35),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
         // O brilho passa só com o mouse sobre o banner.
         ValueListenableBuilder<bool>(
           valueListenable: hover,
@@ -826,14 +947,27 @@ class _Info extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
+        if (hasPlot) ...[
+          Text(
+            plot!,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              color: Color(0xE6FFFFFF),
+            ),
+          ),
+          const SizedBox(height: 32),
+        ],
         Text(
           meta,
           style: const TextStyle(fontSize: 12.5, color: Color(0xCCFFFFFF)),
         ),
-        if (slide.resume && title.subtitle != null) ...[
+        if (slide.resume && title.continueLabel != null) ...[
           const SizedBox(height: 6),
           Text(
-            title.subtitle!,
+            title.continueLabel!,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -851,24 +985,11 @@ class _Info extends StatelessWidget {
               value: progress,
               minHeight: 4,
               backgroundColor: const Color(0x55FFFFFF),
-              color: AppColors.accent,
+              color: AppColors.accentOnMedia,
             ),
           ),
         ],
-        if (plot != null && plot!.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text(
-            plot!,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.5,
-              color: Color(0xE6FFFFFF),
-            ),
-          ),
-        ],
-        const SizedBox(height: 22),
+        const SizedBox(height: 16),
         Wrap(
           spacing: 12,
           runSpacing: 10,
@@ -877,17 +998,18 @@ class _Info extends StatelessWidget {
               label: slide.resume ? 'Continuar' : 'Assistir',
               onTap: () => watchTitle(context, title),
             ),
-            HeroGhostButton(
-              label: 'Mais informações',
-              icon: Icons.info_outline,
-              onTap: () => showTitleDetails(context, title),
-            ),
-            if (slide.opensCatalog)
-              HeroGhostButton(
-                label: 'Ver catálogo',
-                icon: Icons.grid_view_rounded,
-                onTap: onOpenCatalog,
+            TextButton.icon(
+              onPressed: () => showTitleDetails(context, title),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                shape: AppShape.button,
+                textStyle: AppFonts.title(15, spacing: 2),
               ),
+              icon: const Icon(Icons.info_outline, size: 18),
+              label: const Text('MAIS INFORMAÇÕES'),
+            ),
           ],
         ),
       ],
@@ -898,9 +1020,14 @@ class _Info extends StatelessWidget {
 /// Banner menor de baixo: título da mesma categoria do que está no banner
 /// grande. Sem relacionado disponível, fica vazio.
 class _RelatedSide extends StatelessWidget {
-  const _RelatedSide({required this.title, required this.resume});
+  const _RelatedSide({
+    required this.title,
+    required this.resume,
+    this.quick,
+  });
 
   final CatalogTitle title;
+  final Duration? quick;
 
   /// O banner grande é um "Continue de onde parou": o de baixo mostra **outro**
   /// título em andamento (diferente do grande) e clicar retoma a reprodução.
@@ -928,6 +1055,7 @@ class _RelatedSide extends StatelessWidget {
             titles: [rel],
           ),
           slot: 1,
+          quick: quick,
           hint: resume ? 'Clique aqui para assistir' : null,
           onTap: () => resume
               ? watchTitle(context, rel)
@@ -946,11 +1074,15 @@ class _SideBanner extends StatefulWidget {
     required this.slot,
     required this.onTap,
     this.hint,
+    this.quick,
   });
 
   final HeroSlide slide;
   final int slot;
   final VoidCallback onTap;
+
+  /// Duração da troca feita por clique; nula na troca automática.
+  final Duration? quick;
 
   /// Texto pequeno embaixo do nome (no lugar dos nomes dos outros títulos).
   final String? hint;
@@ -972,8 +1104,8 @@ class _SideBannerState extends State<_SideBanner> {
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         onTap: widget.onTap,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 650),
+        child: TimedSwitcher(
+          duration: widget.quick ?? const Duration(milliseconds: 650),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeInCubic,
           transitionBuilder: (child, anim) => FadeTransition(
@@ -986,112 +1118,180 @@ class _SideBannerState extends State<_SideBanner> {
               child: child,
             ),
           ),
-          child: KeyedSubtree(
+          child: _SideContent(
             key: ValueKey('${slide.kicker}:${t.kind.key}:${t.id}'),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(22),
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  AnimatedScale(
-                    scale: _hover ? 1.06 : 1,
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOutCubic,
-                    child: _Backdrop(title: t, size: 'w780', cache: 900),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          const Color(0x33000000),
-                          Color(_hover ? 0xCC000000 : 0xB0000000),
-                        ],
-                        stops: const [0.2, 1],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 14,
-                    left: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        slide.kicker.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10.5,
-                          letterSpacing: 1.2,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 14,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ShinyText(
-                          text: t.name.toUpperCase(),
-                          active: _hover,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          shineColor: Color.lerp(AppColors.accent, Colors.white, 0.45),
-                          style: AppFonts.title(
-                            24,
-                            color: Colors.white,
-                            spacing: 0.8,
-                          ),
-                        ),
-                        if (widget.hint != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              widget.hint!,
-                              style: const TextStyle(
-                                color: Color(0xCCFFFFFF),
-                                fontSize: 11,
-                              ),
-                            ),
-                          )
-                        else if (slide.titles.length > 1)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              slide.titles.skip(1).map((e) => e.name).join('  ·  '),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xCCFFFFFF),
-                                fontSize: 11,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            slide: slide,
+            hover: _hover,
+            hint: widget.hint,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Conteúdo de um banner menor. Cada um guarda se o próprio pôster está na
+/// frente, porque na troca o que sai e o que entra aparecem juntos.
+class _SideContent extends StatefulWidget {
+  const _SideContent({
+    super.key,
+    required this.slide,
+    required this.hover,
+    this.hint,
+  });
+
+  final HeroSlide slide;
+  final bool hover;
+  final String? hint;
+
+  @override
+  State<_SideContent> createState() => _SideContentState();
+}
+
+class _SideContentState extends State<_SideContent> {
+  final ValueNotifier<bool> _posterAside = ValueNotifier(false);
+
+  @override
+  void dispose() {
+    _posterAside.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final slide = widget.slide;
+    final t = slide.titles.first;
+    final hover = widget.hover;
+    return ClipRRect(
+      borderRadius: BorderRadius.horizontal(
+        left: Radius.circular(AppShape.r(22)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final posterWidth =
+              box.maxHeight * _Backdrop.posterHeightFactor * 2 / 3;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              AnimatedScale(
+                scale: hover ? 1.06 : 1,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOutCubic,
+                child: _Backdrop(
+                  title: t,
+                  size: 'w780',
+                  cache: 900,
+                  posterAside: _posterAside,
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      // Escuro no alto: a categoria não tem fundo próprio.
+                      const Color(0x8C000000),
+                      const Color(0x33000000),
+                      Color(hover ? 0xCC000000 : 0xB0000000),
+                    ],
+                    stops: const [0, 0.32, 1],
+                  ),
+                ),
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: _posterAside,
+                builder: (context, aside, _) {
+                  // Com o pôster à direita, o texto fica à esquerda dele.
+                  final right = aside
+                      ? posterWidth + _Backdrop.asideMargin + 12
+                      : 16.0;
+                  return Stack(
+                    children: [
+                      Positioned(
+                        top: 14,
+                        left: 16,
+                        right: right,
+                        child: Align(
+                          alignment: Alignment.topLeft,
+                          child: Text(
+                            slide.kicker.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10.5,
+                              letterSpacing: 1.2,
+                              fontWeight: FontWeight.w700,
+                              shadows: [
+                                Shadow(color: Color(0xE6000000), blurRadius: 6),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 16,
+                        right: right,
+                        bottom: 14,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ShinyText(
+                              text: t.name.toUpperCase(),
+                              active: hover,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              shineColor: Color.lerp(
+                                AppColors.accent,
+                                Colors.white,
+                                0.45,
+                              ),
+                              style: AppFonts.title(
+                                24,
+                                color: Colors.white,
+                                spacing: 0.8,
+                              ),
+                            ),
+                            if (widget.hint != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  widget.hint!,
+                                  style: const TextStyle(
+                                    color: Color(0xCCFFFFFF),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              )
+                            else if (slide.titles.length > 1)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  slide.titles
+                                      .skip(1)
+                                      .map((e) => e.name)
+                                      .join('  ·  '),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xCCFFFFFF),
+                                    fontSize: 11,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1102,11 +1302,13 @@ class _Thumbs extends StatelessWidget {
   const _Thumbs({
     required this.titles,
     required this.selected,
+    required this.scale,
     required this.onPick,
   });
 
   final List<CatalogTitle> titles;
   final int selected;
+  final double scale;
   final ValueChanged<int> onPick;
 
   @override
@@ -1125,6 +1327,7 @@ class _Thumbs extends StatelessWidget {
               child: _Thumb(
                 title: titles[i],
                 selected: i == selected,
+                scale: scale,
                 onTap: () => onPick(i),
               ),
             ),
@@ -1138,11 +1341,13 @@ class _Thumb extends StatefulWidget {
   const _Thumb({
     required this.title,
     required this.selected,
+    required this.scale,
     required this.onTap,
   });
 
   final CatalogTitle title;
   final bool selected;
+  final double scale;
   final VoidCallback onTap;
 
   @override
@@ -1170,7 +1375,7 @@ class _ThumbState extends State<_Thumb> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: AppColors.accent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppShape.card,
             boxShadow: [
               BoxShadow(
                 color: AppColors.accent.withValues(alpha: 0.4),
@@ -1179,21 +1384,21 @@ class _ThumbState extends State<_Thumb> {
               ),
             ],
           ),
-          textStyle: const TextStyle(
-            color: Colors.white,
+          textStyle: TextStyle(
+            color: AppColors.onAccent,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            width: sel ? 84 : 66,
-            height: sel ? 124 : 98,
+            width: (sel ? 84 : 66) * widget.scale,
+            height: (sel ? 124 : 98) * widget.scale,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppShape.card,
               border: Border.all(
                 color: sel
-                    ? AppColors.accent
+                    ? AppColors.accentOnMedia
                     : Colors.white.withValues(alpha: _hover ? 0.8 : 0.3),
                 width: sel ? 2.5 : 1,
               ),
@@ -1206,11 +1411,11 @@ class _ThumbState extends State<_Thumb> {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppShape.inset(2),
               child: PosterImage(
                 url: widget.title.image,
                 name: widget.title.name,
-                cacheWidth: 240,
+                cacheWidth: 360,
               ),
             ),
           ),
@@ -1221,7 +1426,7 @@ class _ThumbState extends State<_Thumb> {
 }
 
 /// Indicadores do carrossel: o atual é uma pílula que vai enchendo enquanto o
-/// banner passa pelos seus títulos ([step] de [steps], 12 s cada).
+/// banner passa pelos seus títulos ([step] de [steps], 8 s cada).
 class _Dots extends StatelessWidget {
   const _Dots({
     required this.count,
@@ -1259,7 +1464,7 @@ class _Dots extends StatelessWidget {
                   height: 6,
                   decoration: BoxDecoration(
                     color: const Color(0x66FFFFFF),
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: AppShape.control,
                   ),
                   clipBehavior: Clip.antiAlias,
                   alignment: Alignment.centerLeft,
@@ -1269,7 +1474,7 @@ class _Dots extends StatelessWidget {
                           builder: (context, _) => FractionallySizedBox(
                             widthFactor:
                                 ((step + progress.value) / steps).clamp(0.0, 1.0),
-                            child: ColoredBox(color: AppColors.accent),
+                            child: ColoredBox(color: AppColors.accentOnMedia),
                           ),
                         )
                       : null,

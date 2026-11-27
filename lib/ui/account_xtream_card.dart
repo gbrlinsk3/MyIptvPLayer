@@ -4,6 +4,7 @@ import '../core/format.dart';
 import '../core/theme.dart';
 import '../state/app_scope.dart';
 import 'widgets/common.dart';
+import 'widgets/glass.dart';
 
 /// Conta Xtream: mostra o status e permite ver/editar servidor, usuário e senha.
 class XtreamCard extends StatefulWidget {
@@ -99,9 +100,7 @@ class _XtreamCardState extends State<XtreamCard> {
   Future<bool?> _askSameProvider() {
     return showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        surfaceTintColor: Colors.transparent,
+      builder: (ctx) => GlassAlertDialog(
         title: const Text(
           'O Xtream novo é do mesmo provedor?',
           style: TextStyle(fontSize: 16),

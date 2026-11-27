@@ -314,10 +314,10 @@ class _SparkPainter extends CustomPainter {
                 ).createShader(Rect.fromPoints(cauda, cabeca)),
             );
           }
-          canvas.drawCircle(cabeca, largura * 0.5, tinta..style = PaintingStyle.fill);
+          _bolinha(canvas, cabeca, largura * 0.5, tinta);
         case SparkShape.dots:
           final r = espessura * f.escala * 1.25 * (1 - 0.5 * e);
-          canvas.drawCircle(_pos(f, distancia), r, tinta..style = PaintingStyle.fill);
+          _bolinha(canvas, _pos(f, distancia), r, tinta);
         case SparkShape.stars:
           final brilho = math.pow(math.sin(math.pi * (p * 1.1).clamp(0.0, 1.0)), 0.7).toDouble();
           final r = size * 0.6 * f.escala * brilho;
@@ -327,6 +327,16 @@ class _SparkPainter extends CustomPainter {
             tinta..style = PaintingStyle.fill,
           );
       }
+    }
+  }
+
+  /// Ponta redonda ou quadrada, conforme o formato da interface.
+  static void _bolinha(Canvas canvas, Offset c, double r, Paint tinta) {
+    tinta.style = PaintingStyle.fill;
+    if (AppShape.rounded) {
+      canvas.drawCircle(c, r, tinta);
+    } else {
+      canvas.drawRect(Rect.fromCircle(center: c, radius: r), tinta);
     }
   }
 

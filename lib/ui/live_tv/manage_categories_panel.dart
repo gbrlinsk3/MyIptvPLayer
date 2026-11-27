@@ -138,7 +138,7 @@ class _ManagePanelState extends State<_ManagePanel> {
             elevation: 8,
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppShape.panel,
               side: BorderSide(color: AppColors.border),
             ),
             child: Column(
@@ -186,16 +186,9 @@ class _ManagePanelState extends State<_ManagePanel> {
                         child: TextField(
                           controller: _search,
                           onChanged: (_) => setState(() {}),
-                          decoration: InputDecoration(
-                            hintText: 'Buscar categoria',
-                            isDense: true,
+                          decoration: fieldDecoration(
+                            hint: 'Buscar categoria',
                             prefixIcon: const Icon(Icons.search, size: 18),
-                            enabledBorder: UnderlineInputBorder(
-                              borderSide: BorderSide(color: AppColors.border),
-                            ),
-                            focusedBorder: UnderlineInputBorder(
-                              borderSide: BorderSide(color: AppColors.accent),
-                            ),
                           ),
                         ),
                       ),
@@ -236,7 +229,7 @@ class _ManagePanelState extends State<_ManagePanel> {
                             final cat = filtered[i];
                             final on = c.isVisible(cat.id);
                             return InkWell(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: AppShape.control,
                               onTap: () => c.setVisible([cat.id], !on),
                               child: Padding(
                                 padding:

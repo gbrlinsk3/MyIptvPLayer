@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -259,6 +260,7 @@ class CatalogController extends ChangeNotifier {
     };
     // Sempre há ao menos 1 banner: sem nada salvo (ou lista vazia/inválida),
     // valem os padrões (Filmes novos, Séries novas, Adicionados recentemente).
+    _loadDismissed(await _db.getSetting('continue_dismissed'));
     final rawBanners = await _db.getSetting('home_banners');
     final saved =
         rawBanners == null ? const <BannerConfig>[] : BannerConfig.decode(rawBanners);
@@ -571,13 +573,75 @@ class CatalogController extends ChangeNotifier {
     );
   }
 
+  /// Blocos seguintes de [recentTitles], para as fileiras sem fim.
+  Future<({List<CatalogTitle> titles, int lidos})> recentPage(
+    CatalogKind kind,
+    int offset,
+  ) =>
+      _db.catalog.recentPage(kind, section(kind).hidden, offset: offset);
+
   Future<List<CatalogTitle>> continueTitles(CatalogKind kind) {
     return _rows.putIfAbsent(
       '${kind.key}:continue:$progressRevision',
-      () => kind == CatalogKind.series
-          ? _continueSeries()
-          : _db.catalog.continueMovies(),
+      () => kind == CatalogKind.series ? _continueSeries() : _continueMovies(),
     );
+  }
+
+  Future<List<CatalogTitle>> _continueMovies() async {
+    final movies = await _db.catalog.continueMovies();
+    return [
+      for (final m in movies)
+        if (!_isDismissed(m.kind, m.id, m.updatedAt)) m,
+    ];
+  }
+
+  // ---- títulos tirados do "continuar assistindo" ------------------------------
+
+  /// Chave "tipo:id" -> data do progresso quando o título foi tirado da lista.
+  /// Nada é apagado: assistir de novo grava uma data maior e ele volta.
+  final Map<String, int> _dismissed = {};
+
+  bool _isDismissed(CatalogKind kind, int id, int? updatedAt) {
+    final at = _dismissed['${kind.key}:$id'];
+    return at != null && (updatedAt ?? 0) <= at;
+  }
+
+  /// Tira [t] da lista e dos banners de continuar. Devolve o valor anterior,
+  /// para [restoreContinue] desfazer.
+  int? dismissContinue(CatalogTitle t) {
+    final key = '${t.kind.key}:${t.id}';
+    final before = _dismissed[key];
+    _dismissed[key] = t.updatedAt ?? DateTime.now().millisecondsSinceEpoch;
+    _saveDismissed();
+    return before;
+  }
+
+  void restoreContinue(CatalogTitle t, int? before) {
+    final key = '${t.kind.key}:${t.id}';
+    if (before == null) {
+      _dismissed.remove(key);
+    } else {
+      _dismissed[key] = before;
+    }
+    _saveDismissed();
+  }
+
+  void _saveDismissed() {
+    unawaited(_db.setSetting('continue_dismissed', jsonEncode(_dismissed)));
+    bumpProgress();
+  }
+
+  void _loadDismissed(String? raw) {
+    _dismissed.clear();
+    if (raw == null) return;
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      for (final e in map.entries) {
+        if (e.value is int) _dismissed[e.key] = e.value as int;
+      }
+    } on Object catch (e, st) {
+      AppLog.error('inicio.continuar', e, st);
+    }
   }
 
   /// Séries em "continuar assistindo": a que tem episódio em andamento volta
@@ -585,7 +649,14 @@ class CatalogController extends ChangeNotifier {
   /// só quando não há mais episódios).
   Future<List<CatalogTitle>> _continueSeries() async {
     // 12 bastam: o "continuar assistindo" geral mostra no máximo 12 títulos.
-    final activity = await _db.catalog.seriesActivity(limit: 12);
+    // As tiradas da lista não podem ocupar essas vagas.
+    final found = await _db.catalog.seriesActivity(
+      limit: 12 + _dismissed.length,
+    );
+    final activity = [
+      for (final a in found)
+        if (!_isDismissed(CatalogKind.series, a.seriesId, a.updatedAt)) a,
+    ].take(12);
     final titles = await Future.wait([
       for (final a in activity) _continueEntry(a),
     ]);
@@ -602,7 +673,10 @@ class CatalogController extends ChangeNotifier {
         image: a.image,
         positionMs: a.positionMs,
         durationMs: a.durationMs,
-        subtitle: a.subtitle,
+        // Só o código: o nome que o provedor dá ao episódio repete a série.
+        subtitle: a.season != null && a.episode != null
+            ? 'T${a.season} · E${a.episode}'
+            : a.subtitle?.split(' — ').first,
         updatedAt: a.updatedAt,
         resumeEpisodeId: a.episodeId,
       );
@@ -615,7 +689,7 @@ class CatalogController extends ChangeNotifier {
       name: a.title,
       categoryId: '',
       image: a.image,
-      subtitle: '${next.code} — ${next.title}',
+      subtitle: '${next.code} · Próximo episódio',
       updatedAt: a.updatedAt,
       resumeEpisodeId: next.id,
     );

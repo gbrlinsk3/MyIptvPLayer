@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
 import '../../profiles/profile.dart';
 
 /// Avatar quadrado de cantos arredondados. Se a imagem embutida não existir
@@ -53,7 +54,7 @@ class ProfileAvatar extends StatelessWidget {
               child: Text(
                 _initial,
                 style: TextStyle(
-                  color: Colors.white,
+                  color: AccentScale.on(accent),
                   fontSize: size * 0.42,
                   fontWeight: FontWeight.w600,
                 ),

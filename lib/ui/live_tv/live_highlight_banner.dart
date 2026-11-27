@@ -7,6 +7,7 @@ import '../../data/channel_groups.dart';
 import '../../data/live_highlight.dart';
 import '../../data/models.dart';
 import '../../state/app_scope.dart';
+import '../widgets/glass.dart';
 import '../widgets/magnet.dart';
 import 'live_logo.dart';
 import '../../core/format.dart';
@@ -15,6 +16,8 @@ import '../../core/format.dart';
 /// canto escuro). Os mini banners usam a mesma função para "continuar" o
 /// desvanecer do banner principal da esquerda para a direita.
 Color highlightGradientAt(double t) {
+  // No Minimalista não há degradê: a superfície neutra, como os outros cartões.
+  if (AppColors.minimal) return AppColors.surface;
   final a = Color.lerp(AppColors.bg, AppColors.accent, 0.55)!;
   final b = Color.lerp(AppColors.bg, AppColors.accent, 0.18)!;
   final c = AppColors.bg;
@@ -68,7 +71,7 @@ class _LiveHighlightBannerState extends State<LiveHighlightBanner> {
       child: SizedBox(
         height: LiveHighlightBanner.height,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppShape.r(20)),
           child: RepaintBoundary(
             child: Stack(
               fit: StackFit.expand,
@@ -116,7 +119,7 @@ class _LiveHighlightBannerState extends State<LiveHighlightBanner> {
                                         : AppColors.text.withValues(
                                             alpha: 0.35,
                                           ),
-                                    borderRadius: BorderRadius.circular(3),
+                                    borderRadius: AppShape.control,
                                   ),
                                 ),
                               ),
@@ -154,6 +157,8 @@ class _LiveHighlightBannerState extends State<LiveHighlightBanner> {
 class _NavArrow extends StatelessWidget {
   const _NavArrow({required this.left, required this.onTap});
 
+  static const double _size = 44;
+
   final bool left;
   final VoidCallback onTap;
 
@@ -162,21 +167,28 @@ class _NavArrow extends StatelessWidget {
     return Positioned(
       top: 0,
       bottom: 0,
-      left: left ? 8 : null,
-      right: left ? null : 8,
+      left: left ? 16 : null,
+      right: left ? null : 16,
       child: Center(
-        child: Material(
-          color: const Color(0x66000000),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(
-                left ? Icons.chevron_left : Icons.chevron_right,
-                color: Colors.white,
-                size: 26,
+        child: Tooltip(
+          message: left ? 'Anterior' : 'Próximo',
+          // Mesmo vidro, tamanho e ícone das setas do banner do Início.
+          child: GlassSurface(
+            radius: AppShape.control,
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                customBorder: AppShape.button,
+                hoverColor: AppGlass.hover,
+                onTap: onTap,
+                child: SizedBox.square(
+                  dimension: _size,
+                  child: Icon(
+                    left ? Icons.chevron_left : Icons.chevron_right,
+                    color: AppColors.text,
+                    size: _size * 22 / 36,
+                  ),
+                ),
               ),
             ),
           ),
@@ -260,17 +272,25 @@ class _SlideState extends State<_Slide> with SingleTickerProviderStateMixin {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.lerp(AppColors.bg, AppColors.accent, 0.55)!,
-            Color.lerp(AppColors.bg, AppColors.accent, 0.18)!,
-            AppColors.bg,
+            highlightGradientAt(0),
+            highlightGradientAt(0.55),
+            highlightGradientAt(1),
           ],
           stops: const [0, 0.55, 1],
         ),
       ),
+      // Superfície lisa pede a borda fina que separa do fundo.
+      foregroundDecoration: AppColors.minimal
+          ? BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(AppShape.r(20)),
+            )
+          : null,
       child: LayoutBuilder(
         builder: (context, box) {
-          // Quantos canais cabem no carrossel: 5 em janela larga, menos em estreita.
-          final visible = box.maxWidth >= 860 ? 5 : 3;
+          // Quantos canais cabem no carrossel: 5 em janela larga, menos em
+          // estreita. Com 5, a coluna do texto fica com a largura menos 752.
+          final visible = box.maxWidth >= 1060 ? 5 : 3;
           final shown = channels.length < visible ? channels.length : visible;
           // O cartão do meio é o principal e fica maior.
           const tile = 92.0, mainTile = 124.0, gap = 8.0;
@@ -339,7 +359,7 @@ class _SlideState extends State<_Slide> with SingleTickerProviderStateMixin {
                         fontSize: 11,
                         letterSpacing: 2,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.accent,
+                        color: AppColors.accentInk,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -364,7 +384,10 @@ class _SlideState extends State<_Slide> with SingleTickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
+                    // Wrap: em janela muito estreita "Ver todos" desce.
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
                       children: [
                         FilledButton.icon(
                           onPressed: () =>
@@ -372,7 +395,6 @@ class _SlideState extends State<_Slide> with SingleTickerProviderStateMixin {
                           icon: const Icon(Icons.play_arrow_rounded, size: 20),
                           label: const Text('Assistir'),
                         ),
-                        const SizedBox(width: 10),
                         if (h.categories.length == 1)
                           OutlinedButton(
                             onPressed: () =>
@@ -564,10 +586,10 @@ class _TileState extends State<_Tile> {
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: const Color(0xFF1F1E1D),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppShape.card,
                 border: Border.all(
                   color: _hover || widget.main
-                      ? AppColors.accent
+                      ? AppColors.accentOnMedia
                       : const Color(0x33FFFFFF),
                   width: _hover || widget.main ? 2 : 1,
                 ),
@@ -745,7 +767,7 @@ class _MiniCardState extends State<_MiniCard> {
             duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: AppShape.card,
               border: border,
             ),
             child: Center(
@@ -787,7 +809,7 @@ class _MiniCardState extends State<_MiniCard> {
             duration: const Duration(milliseconds: 150),
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: AppShape.card,
               border: border,
               // Mesma cor do banner principal naquela posição: o 1º fica azul e os
               // seguintes escurecem, como se o degradê continuasse.
@@ -834,7 +856,7 @@ class _MiniCardState extends State<_MiniCard> {
                           Padding(
                             padding: const EdgeInsets.only(left: 4),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: AppShape.thumb,
                               child: Container(
                                 width: 34,
                                 height: 34,
@@ -895,7 +917,7 @@ class _CategoryPickerState extends State<_CategoryPicker> {
       for (final c in widget.categories)
         if (f.isEmpty || foldText(c.name).contains(f)) c,
     ];
-    return AlertDialog(
+    return GlassAlertDialog(
       title: const Text('Adicionar categoria'),
       content: SizedBox(
         width: 420,
@@ -960,13 +982,7 @@ Future<String?> showSeeCategoryDialog(
 ) {
   return showDialog<String>(
     context: context,
-    builder: (ctx) => Dialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border),
-      ),
+    builder: (ctx) => GlassDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420, maxHeight: 480),
         child: Padding(
@@ -1040,7 +1056,7 @@ class _CategoryOptionState extends State<_CategoryOption> {
             color: _hover
                 ? AppColors.accent.withValues(alpha: 0.14)
                 : AppColors.bg,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppShape.control,
             border: Border.all(
               color: _hover ? AppColors.accent : AppColors.border,
             ),

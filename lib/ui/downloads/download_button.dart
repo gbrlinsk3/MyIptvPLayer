@@ -78,7 +78,7 @@ class DownloadButton extends StatelessWidget {
           }
         }
 
-        final color = accent ? AppColors.accent : AppColors.textMuted;
+        final color = accent ? AppColors.accentInk : AppColors.textMuted;
         final isActive = e?.status == DownloadStatus.downloading;
 
         final Widget iconWidget = SizedBox(
@@ -116,12 +116,12 @@ class DownloadButton extends StatelessWidget {
                   CircularProgressIndicator(
                     value: ring,
                     strokeWidth: 2,
-                    color: AppColors.accent,
+                    color: AppColors.accentOnMedia,
                   ),
                 Icon(
                   icon,
                   size: isActive ? 12 : 18,
-                  color: accent ? AppColors.accent : Colors.white,
+                  color: accent ? AppColors.accentOnMedia : Colors.white,
                 ),
               ],
             ),
@@ -133,7 +133,7 @@ class DownloadButton extends StatelessWidget {
               icon: light,
               label: Text(label),
               style: TextButton.styleFrom(
-                foregroundColor: accent ? AppColors.accent : Colors.white,
+                foregroundColor: accent ? AppColors.accentOnMedia : Colors.white,
               ),
             ),
           );
@@ -145,9 +145,9 @@ class DownloadButton extends StatelessWidget {
             icon: iconWidget,
             label: Text(label),
             style: OutlinedButton.styleFrom(
-              foregroundColor: accent ? AppColors.accent : AppColors.text,
+              foregroundColor: accent ? AppColors.accentInk : AppColors.text,
               side: BorderSide(
-                color: accent ? AppColors.accent : AppColors.border,
+                color: accent ? AppColors.accentInk : AppColors.border,
               ),
             ),
           ),

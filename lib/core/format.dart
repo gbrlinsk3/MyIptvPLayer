@@ -94,6 +94,19 @@ String cleanFileTitle(String title) {
   return out.isEmpty ? title : out;
 }
 
+/// Quanto falta para terminar: "faltam 12 min", "falta 1 h 05 min". Nulo sem
+/// duração conhecida ou sem nada começado.
+String? formatRemaining(int? positionMs, int? durationMs) {
+  if (positionMs == null || durationMs == null) return null;
+  if (positionMs <= 0 || positionMs >= durationMs) return null;
+  final minutes = ((durationMs - positionMs) / 60000).ceil();
+  if (minutes < 60) return minutes == 1 ? 'falta 1 min' : 'faltam $minutes min';
+  final h = minutes ~/ 60;
+  final min = minutes % 60;
+  final rest = min == 0 ? '' : ' ${_two(min)} min';
+  return '${h == 1 ? 'falta' : 'faltam'} $h h$rest';
+}
+
 /// Tamanho em bytes para leitura humana (ex.: 1,4 GB).
 String formatBytes(num bytes) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];

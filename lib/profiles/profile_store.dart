@@ -10,7 +10,8 @@ import '../core/app_log.dart';
 class _CorruptIndex implements Exception {}
 
 /// Índice de perfis (`profiles.db`) e caminhos dos bancos de cada perfil
-/// (`profile_<id>.db`). O índice só guarda nome, avatar e cor.
+/// (`profile_<id>.db`). O índice só guarda nome, avatar e cor de cada perfil,
+/// mais o formato do último perfil usado.
 class ProfileStore {
   ProfileStore._(this._db, this._dir, {required this.recovered});
 
@@ -23,8 +24,9 @@ class ProfileStore {
 
   static const _indexName = 'profiles.db';
 
-  static Future<ProfileStore> open() async {
-    final dir = await AppDatabase.supportDirectory();
+  /// [directory] só é informado pelos testes.
+  static Future<ProfileStore> open({Directory? directory}) async {
+    final dir = directory ?? await AppDatabase.supportDirectory();
     final path = p.join(dir.path, _indexName);
     try {
       final db = await _openAt(path);
@@ -63,10 +65,38 @@ class ProfileStore {
       await db.close();
       throw _CorruptIndex();
     }
+    // Criada fora da versão do banco: índices já existentes ganham a tabela e
+    // versões antigas do app simplesmente a ignoram.
+    await db.execute(
+      'CREATE TABLE IF NOT EXISTS app_settings '
+      '(key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+    );
     return db;
   }
 
   String pathFor(int id) => p.join(_dir.path, 'profile_$id.db');
+
+  Future<void> close() => _db.close();
+
+  // ---- ajustes do app (fora dos perfis) -------------------------------------
+
+  Future<String?> appSetting(String key) async {
+    final rows = await _db.query(
+      'app_settings',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: [key],
+    );
+    return rows.isEmpty ? null : rows.first['value'] as String?;
+  }
+
+  Future<void> setAppSetting(String key, String value) async {
+    await _db.insert(
+      'app_settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
 
   // ---- migração -----------------------------------------------------------
 

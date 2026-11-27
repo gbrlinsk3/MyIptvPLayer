@@ -7,6 +7,7 @@ import '../../core/system_dialogs.dart';
 import '../../core/theme.dart';
 import '../../library/library_import.dart';
 import '../../state/app_scope.dart';
+import '../widgets/glass.dart';
 
 /// Adiciona (ou edita) um arquivo de vídeo na biblioteca. Devolve true se salvou.
 Future<bool> showImportEditor(BuildContext context, {LibraryImport? existing}) async {
@@ -145,8 +146,7 @@ class _ImportEditorState extends State<_ImportEditor> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.existing != null;
-    return AlertDialog(
-      backgroundColor: AppColors.surface,
+    return GlassAlertDialog(
       title: Text(editing ? 'Editar item' : 'Adicionar à biblioteca'),
       content: SizedBox(
         width: 560,
@@ -171,7 +171,10 @@ class _ImportEditorState extends State<_ImportEditor> {
                 controller: _plot,
                 minLines: 3,
                 maxLines: 6,
-                decoration: fieldDecoration(label: 'Sinopse (opcional)'),
+                decoration: fieldDecoration(
+                  label: 'Sinopse (opcional)',
+                  multiline: true,
+                ),
               ),
               const SizedBox(height: 12),
               _pathField(

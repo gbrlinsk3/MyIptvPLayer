@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../profiles/profile.dart';
 import '../../profiles/profiles_scope.dart';
 import '../widgets/common.dart';
+import '../widgets/glass.dart';
 import 'profile_avatar.dart';
 
 /// Criar ou editar um perfil: nome, avatar e cor de destaque.
@@ -110,14 +111,8 @@ class _ProfileEditorState extends State<_ProfileEditor> {
   Widget build(BuildContext context) {
     final editing = widget.existing != null;
     final accent = Color(_accent);
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
+    return GlassDialog(
       insetPadding: const EdgeInsets.all(24),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border),
-      ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
         child: Padding(
@@ -237,7 +232,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
                     onPressed: _busy ? null : _save,
                     style: FilledButton.styleFrom(
                       backgroundColor: accent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: AccentScale.on(accent),
                     ),
                     child: Text(editing ? 'Salvar' : 'Criar perfil'),
                   ),
@@ -317,7 +312,7 @@ class _AccentChoice extends StatelessWidget {
           height: 32,
           decoration: BoxDecoration(
             color: color,
-            shape: BoxShape.circle,
+            borderRadius: AppShape.control,
             border: Border.all(
               color: selected ? AppColors.text : Colors.transparent,
               width: 2,

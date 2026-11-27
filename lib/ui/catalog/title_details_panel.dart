@@ -8,6 +8,7 @@ import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../../downloads/download_models.dart';
 import '../downloads/download_button.dart';
+import '../widgets/glass.dart';
 import '../widgets/shimmer.dart';
 import 'favorite_button.dart';
 import 'poster_image.dart';
@@ -56,22 +57,22 @@ class _DetailsSkeleton extends StatelessWidget {
           children: [
             Row(
               children: [
-                SkeletonBox(width: 120, height: 36, radius: 6),
+                SkeletonBox(width: 120, height: 36),
                 const SizedBox(width: 8),
-                SkeletonBox(width: 110, height: 36, radius: 6),
+                SkeletonBox(width: 110, height: 36),
               ],
             ),
             const SizedBox(height: 16),
-            SkeletonBox(height: 12, radius: 4),
+            SkeletonBox(height: 12),
             const SizedBox(height: 8),
             FractionallySizedBox(
               widthFactor: 0.9,
-              child: SkeletonBox(height: 12, radius: 4),
+              child: SkeletonBox(height: 12),
             ),
             const SizedBox(height: 8),
             FractionallySizedBox(
               widthFactor: 0.6,
-              child: SkeletonBox(height: 12, radius: 4),
+              child: SkeletonBox(height: 12),
             ),
           ],
         ),
@@ -88,7 +89,7 @@ class _DetailsSkeleton extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SkeletonBox(width: 112, height: 63, radius: 6),
+                  SkeletonBox(width: 112, height: 63),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -96,12 +97,12 @@ class _DetailsSkeleton extends StatelessWidget {
                       children: [
                         FractionallySizedBox(
                           widthFactor: 0.8,
-                          child: SkeletonBox(height: 12, radius: 4),
+                          child: SkeletonBox(height: 12),
                         ),
                         const SizedBox(height: 8),
                         FractionallySizedBox(
                           widthFactor: 0.4,
-                          child: SkeletonBox(height: 10, radius: 4),
+                          child: SkeletonBox(height: 10),
                         ),
                       ],
                     ),
@@ -162,7 +163,10 @@ class _DetailsPanelState extends State<_DetailsPanel> {
 
   void _retryDetails() {
     final app = AppScope.read(context);
-    setState(() => _details = app.catalog.details(widget.title.kind, widget.title.id));
+    // Corpo em bloco: com `=>` o setState receberia o Future de volta.
+    setState(() {
+      _details = app.catalog.details(widget.title.kind, widget.title.id);
+    });
   }
 
   // ---- reprodução -----------------------------------------------------------------
@@ -301,7 +305,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
             elevation: 8,
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppShape.panel,
               side: BorderSide(color: AppColors.border),
             ),
             child: FutureBuilder<TitleDetails>(
@@ -608,14 +612,12 @@ class _DetailsPanelState extends State<_DetailsPanel> {
               label: const Text('Baixar temporada'),
             ),
             if (seasons.length > 1)
-              PopupMenuButton<int>(
+              GlassMenuButton<int>(
                 tooltip: 'Temporada',
-                color: AppColors.surface,
+                options: seasons,
+                labelOf: (s) => 'Temporada $s',
+                selected: current,
                 onSelected: (v) => setState(() => _season = v),
-                itemBuilder: (context) => [
-                  for (final s in seasons)
-                    PopupMenuItem<int>(value: s, child: Text('Temporada $s')),
-                ],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   child: Row(
@@ -658,7 +660,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
     final watched = p?.watched ?? false;
     final minutes = e.durationSecs == null ? null : (e.durationSecs! / 60).round();
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppShape.card,
       onTap: () => _playEpisode(d, e, progress),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -669,7 +671,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
               width: 112,
               height: 63,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: AppShape.thumb,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -696,7 +698,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
                           value: p.fraction,
                           minHeight: 3,
                           backgroundColor: const Color(0x99000000),
-                          color: AppColors.accent,
+                          color: AppColors.accentOnMedia,
                         ),
                       ),
                   ],
@@ -753,7 +755,7 @@ class _DetailsPanelState extends State<_DetailsPanel> {
               icon: Icon(
                 watched ? Icons.check_circle : Icons.check_circle_outline,
                 size: 20,
-                color: watched ? AppColors.accent : AppColors.textMuted,
+                color: watched ? AppColors.accentInk : AppColors.textMuted,
               ),
             ),
           ],

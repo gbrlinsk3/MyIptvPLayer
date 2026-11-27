@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme.dart';
+import 'glass.dart';
 
 /// Seletor segmentado com a mesma aparência do `SlidingTabs` (fundo da
 /// superfície, borda, pílula `accentSoft`, texto de destaque no item ativo),
@@ -211,7 +212,6 @@ class _RubberSegmentState<T> extends State<RubberSegment<T>>
       _toR = alvo.$2;
     }
 
-    final raio = (RubberSegment._altura + 2 * RubberSegment._margem + 2) / 2;
     final contorno = _focused &&
         !_byPointer &&
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
@@ -221,71 +221,67 @@ class _RubberSegmentState<T> extends State<RubberSegment<T>>
       onKeyEvent: _onKey,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Container(
-          padding: const EdgeInsets.all(RubberSegment._margem),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border.all(
-              color: contorno ? AppColors.accent : AppColors.border,
-              width: contorno ? 2 : 1,
-            ),
-            borderRadius: BorderRadius.circular(raio),
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _anim,
-                  builder: (context, _) {
-                    final (l, r, sy) = _pose();
-                    return Stack(
-                      children: [
-                        Positioned(
-                          left: l,
-                          width: math.max(0, r - l),
-                          top: 0,
-                          bottom: 0,
-                          child: Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.diagonal3Values(1, sy, 1),
-                            child: DecoratedBox(
-                              key: const ValueKey('rubber-pill'),
-                              decoration: BoxDecoration(
-                                color: AppColors.accentSoft,
-                                borderRadius: BorderRadius.circular(
-                                  RubberSegment._altura / 2,
+        child: GlassSurface(
+          radius: AppShape.control,
+          edge: contorno ? AppColors.accent : null,
+          edgeWidth: contorno ? 2 : 1,
+          child: Padding(
+            // + 1: o espaço da borda.
+            padding: const EdgeInsets.all(RubberSegment._margem + 1),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: _anim,
+                    builder: (context, _) {
+                      final (l, r, sy) = _pose();
+                      return Stack(
+                        children: [
+                          Positioned(
+                            left: l,
+                            width: math.max(0, r - l),
+                            top: 0,
+                            bottom: 0,
+                            child: Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.diagonal3Values(1, sy, 1),
+                              child: DecoratedBox(
+                                key: const ValueKey('rubber-pill'),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentSoft,
+                                  borderRadius: AppShape.control,
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var i = 0; i < values.length; i++) ...[
-                    if (i > 0) const SizedBox(width: RubberSegment._espaco),
-                    _Item(
-                      key: ValueKey('rubber-item-$i'),
-                      label: widget.labelOf(values[i]),
-                      icon: widget.iconOf?.call(values[i]),
-                      width: widths[i],
-                      active: i == indice,
-                      onTap: () {
-                        _byPointer = true;
-                        _focus.requestFocus();
-                        _select(i);
-                      },
-                    ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < values.length; i++) ...[
+                      if (i > 0) const SizedBox(width: RubberSegment._espaco),
+                      _Item(
+                        key: ValueKey('rubber-item-$i'),
+                        label: widget.labelOf(values[i]),
+                        icon: widget.iconOf?.call(values[i]),
+                        width: widths[i],
+                        active: i == indice,
+                        onTap: () {
+                          _byPointer = true;
+                          _focus.requestFocus();
+                          _select(i);
+                        },
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+        ),
         ),
       ),
     );
@@ -310,7 +306,7 @@ class _Item extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cor = active ? AppColors.accent : AppColors.textMuted;
+    final cor = active ? AppColors.accentInk : AppColors.textMuted;
     return Semantics(
       button: true,
       selected: active,

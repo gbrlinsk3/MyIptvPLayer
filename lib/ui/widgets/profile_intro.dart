@@ -18,7 +18,15 @@ class ProfileIntro extends StatefulWidget {
     required this.onDone,
     this.boundaryKey,
     this.duration = defaultDuration,
+    this.startSound,
   });
+
+  /// Espera máxima pelo som antes de a cena começar sem ele.
+  static const soundTimeout = Duration(milliseconds: 800);
+
+  /// Liga o som e termina quando ele começa a tocar; a cena parte junto.
+  /// Sem ele a cena começa na hora.
+  final Future<void> Function()? startSound;
 
   /// Fração da linha do tempo da cena (pensada para 3 s) em que ela termina:
   /// o resto seria a saída, que agora é a transição "derreter".
@@ -44,8 +52,25 @@ class _ProfileIntroState extends State<ProfileIntro>
       AnimationController(vsync: this, duration: widget.duration)
         ..addStatusListener((s) {
           if (s == AnimationStatus.completed) widget.onDone();
-        })
-        ..forward();
+        });
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    final sound = widget.startSound;
+    if (sound != null) {
+      try {
+        await sound().timeout(ProfileIntro.soundTimeout);
+      } catch (e) {
+        debugPrint('Abertura: sem som ($e)');
+      }
+    }
+    if (mounted) _c.forward();
+  }
 
   @override
   void dispose() {

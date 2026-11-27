@@ -493,7 +493,7 @@ class _LiveDrawerState extends State<LiveDrawer>
                       height: 4,
                       decoration: BoxDecoration(
                         color: AppColors.textMuted.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: AppShape.control,
                       ),
                     ),
                   ),
@@ -559,15 +559,15 @@ class _LiveDrawerState extends State<LiveDrawer>
                 },
               ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: AppShape.control,
           borderSide: BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: AppShape.control,
           borderSide: BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: AppShape.control,
           borderSide: BorderSide(color: AppColors.accent),
         ),
       ),
@@ -898,7 +898,7 @@ class _DrawerSkeleton extends StatelessWidget {
                 ),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: SkeletonBox(width: 160, height: 16, radius: 4),
+                  child: SkeletonBox(width: 160, height: 16),
                 ),
               ),
             ),
@@ -918,7 +918,6 @@ class _DrawerSkeleton extends StatelessWidget {
                   child: SkeletonBox(
                     width: ChannelGroupCard.width,
                     height: ChannelGroupCard.height,
-                    radius: 12,
                   ),
                 ),
               ),

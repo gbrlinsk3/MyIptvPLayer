@@ -50,13 +50,13 @@ class _ResultsSkeleton extends StatelessWidget {
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(24, 16, 24, 4),
-              child: SkeletonBox(width: 260, height: 22, radius: 4),
+              child: SkeletonBox(width: 260, height: 22),
             ),
           ),
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: SkeletonBox(width: 380, height: 36, radius: 8),
+              child: SkeletonBox(width: 380, height: 36),
             ),
           ),
           SliverLayoutBuilder(
@@ -97,7 +97,7 @@ class _ResultCardSkeleton extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Expanded(child: SkeletonBox(radius: 12)),
+        const Expanded(child: SkeletonBox()),
         SizedBox(
           height: SearchResultCard.textHeight,
           child: Padding(
@@ -107,12 +107,12 @@ class _ResultCardSkeleton extends StatelessWidget {
               children: [
                 FractionallySizedBox(
                   widthFactor: 0.85,
-                  child: SkeletonBox(height: 13, radius: 4),
+                  child: SkeletonBox(height: 13),
                 ),
                 const SizedBox(height: 6),
                 FractionallySizedBox(
                   widthFactor: 0.4,
-                  child: SkeletonBox(height: 10, radius: 4),
+                  child: SkeletonBox(height: 10),
                 ),
               ],
             ),
@@ -277,10 +277,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
   Widget build(BuildContext context) {
     final views = _views;
     if (views == null) {
-      return ColoredBox(
-        color: AppColors.bg,
-        child: const _ResultsSkeleton(),
-      );
+      return const _ResultsSkeleton();
     }
     void open(CatalogTitle t) => showTitleDetails(context, t);
     final view = views[_tab];
@@ -394,8 +391,9 @@ class _SearchOverlayState extends State<SearchOverlay> {
       );
     }
 
+    // Transparente, mas ainda recebe os cliques da área inteira.
     return ColoredBox(
-      color: AppColors.bg,
+      color: Colors.transparent,
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(

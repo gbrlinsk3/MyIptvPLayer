@@ -322,7 +322,7 @@ class _AddTileState extends State<_AddTile> {
                     child: Icon(
                       Icons.add,
                       size: 44,
-                      color: _hover ? AppColors.accent : AppColors.textMuted,
+                      color: _hover ? AppColors.accentInk : AppColors.textMuted,
                     ),
                   ),
                 ),

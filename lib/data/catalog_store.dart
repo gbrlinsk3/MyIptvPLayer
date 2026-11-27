@@ -142,14 +142,27 @@ class CatalogStore {
     CatalogKind kind,
     Set<String> hidden, {
     int limit = 40,
+  }) async =>
+      (await recentPage(kind, hidden, limit: limit)).titles;
+
+  /// Bloco de [recent] a partir de [offset]. `lidos` conta as linhas do banco
+  /// antes do filtro de ocultas, para saber quando a lista acabou.
+  Future<({List<CatalogTitle> titles, int lidos})> recentPage(
+    CatalogKind kind,
+    Set<String> hidden, {
+    int limit = 40,
+    int offset = 0,
   }) async {
     final (sql, args) = _notHidden(hidden);
     final rows = await _db.rawQuery(
       'SELECT * FROM ${kind.itemsTable} WHERE added IS NOT NULL AND added > 0$sql '
-      'ORDER BY added DESC, position ASC LIMIT $limit',
+      'ORDER BY added DESC, position ASC, id ASC LIMIT $limit OFFSET $offset',
       args,
     );
-    return _filterHidden([for (final r in rows) _title(kind, r)], hidden);
+    return (
+      titles: _filterHidden([for (final r in rows) _title(kind, r)], hidden),
+      lidos: rows.length,
+    );
   }
 
   /// Índice enxuto para a busca inteligente (feita em memória, em Dart).

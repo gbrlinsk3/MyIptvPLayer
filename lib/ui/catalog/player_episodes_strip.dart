@@ -209,15 +209,15 @@ class _EpisodeCard extends StatelessWidget {
                 : _PlayerEpisodesStripState.collapsedWidth,
             height: _PlayerEpisodesStripState._cardHeight,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: AppShape.card,
               border: Border.all(
-                color: now || expanded ? AppColors.accent : Colors.white24,
+                color: now || expanded ? AppColors.accentOnMedia : Colors.white24,
                 width: now || expanded ? 2 : 1,
               ),
               boxShadow: expanded
                   ? [
                       BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.25),
+                        color: AppColors.accentOnMedia.withValues(alpha: 0.25),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -225,7 +225,7 @@ class _EpisodeCard extends StatelessWidget {
                   : const [],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: AppShape.inset(2),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -290,14 +290,14 @@ class _EpisodeCard extends StatelessWidget {
                       child: Container(
                         width: 26,
                         height: 26,
-                        decoration: const BoxDecoration(
-                          color: Color(0x99000000),
-                          shape: BoxShape.circle,
+                        decoration: BoxDecoration(
+                          color: const Color(0x99000000),
+                          borderRadius: AppShape.control,
                         ),
                         child: Icon(
                           Icons.equalizer,
                           size: 16,
-                          color: AppColors.accent,
+                          color: AppColors.accentOnMedia,
                         ),
                       ),
                     ),

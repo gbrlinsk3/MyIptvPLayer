@@ -5,6 +5,8 @@ import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/poster_image.dart';
 import '../catalog/title_details_panel.dart';
+import '../widgets/app_popup_menu.dart';
+import '../widgets/glass.dart';
 import '../widgets/shimmer.dart';
 
 /// Histórico: tudo que já foi assistido ou começado, agrupado por data.
@@ -81,7 +83,7 @@ class _HistoryViewState extends State<HistoryView> {
     final catalog = AppScope.read(context).catalog;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => GlassAlertDialog(
         title: const Text('Limpar histórico?'),
         content: const Text(
           'Isso apaga o histórico de filmes e episódios e também o '
@@ -183,9 +185,9 @@ class _HistorySkeleton extends StatelessWidget {
             padding: EdgeInsets.only(bottom: 8),
             child: Row(
               children: [
-                SkeletonBox(width: 260, height: 12, radius: 4),
+                SkeletonBox(width: 260, height: 12),
                 Spacer(),
-                SkeletonBox(width: 130, height: 14, radius: 4),
+                SkeletonBox(width: 130, height: 14),
               ],
             ),
           ),
@@ -196,7 +198,7 @@ class _HistorySkeleton extends StatelessWidget {
               itemBuilder: (context, i) => i == 0
                   ? const Padding(
                       padding: EdgeInsets.only(top: 14, bottom: 8),
-                      child: SkeletonBox(width: 110, height: 18, radius: 4),
+                      child: SkeletonBox(width: 110, height: 18),
                     )
                   : const _HistoryTileSkeleton(),
             ),
@@ -215,10 +217,11 @@ class _HistoryTileSkeleton extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: EdgeInsets.all(8),
+        // A mesma medida da linha pronta (8 + 1 da borda).
+        padding: EdgeInsets.all(9),
         child: Row(
           children: [
-            SkeletonBox(width: 56, height: 84, radius: 8),
+            SkeletonBox(width: 56, height: 84),
             SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -226,17 +229,17 @@ class _HistoryTileSkeleton extends StatelessWidget {
                 children: [
                   FractionallySizedBox(
                     widthFactor: 0.45,
-                    child: SkeletonBox(height: 14, radius: 4),
+                    child: SkeletonBox(height: 14),
                   ),
                   SizedBox(height: 8),
                   FractionallySizedBox(
                     widthFactor: 0.3,
-                    child: SkeletonBox(height: 10, radius: 4),
+                    child: SkeletonBox(height: 10),
                   ),
                   SizedBox(height: 8),
                   FractionallySizedBox(
                     widthFactor: 0.6,
-                    child: SkeletonBox(height: 10, radius: 4),
+                    child: SkeletonBox(height: 10),
                   ),
                 ],
               ),
@@ -290,22 +293,17 @@ class _HistoryTileState extends State<_HistoryTile> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onOpen,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _hover ? AppColors.accent : AppColors.border,
-              width: _hover ? 2 : 1,
-            ),
-          ),
-          child: Row(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: GlassSurface(
+            edge: _hover ? AppColors.accent : null,
+            edgeWidth: _hover ? 2 : 1,
+            child: Padding(
+              padding: const EdgeInsets.all(9),
+              child: Row(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppShape.thumb,
                 child: SizedBox(
                   width: 56,
                   height: 84,
@@ -365,15 +363,23 @@ class _HistoryTileState extends State<_HistoryTile> {
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'open', child: Text('Abrir (retomar ou reassistir)')),
-                  PopupMenuItem(
+                  AppPopupMenuItem(
+                    value: 'open',
+                    child: const Text('Abrir (retomar ou reassistir)'),
+                  ),
+                  AppPopupMenuItem(
                     value: 'watched',
                     child: Text(r.watched ? 'Marcar como não assistido' : 'Marcar como assistido'),
                   ),
-                  const PopupMenuItem(value: 'remove', child: Text('Remover do histórico')),
+                  AppPopupMenuItem(
+                    value: 'remove',
+                    child: const Text('Remover do histórico'),
+                  ),
                 ],
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

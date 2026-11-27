@@ -15,8 +15,10 @@ import 'ui/login_page.dart';
 import 'ui/profiles/profile_picker_page.dart';
 import 'ui/shell.dart';
 import 'ui/update/update_toast.dart';
+import 'ui/widgets/intro_sound.dart';
 import 'ui/widgets/morph_reveal.dart';
 import 'ui/widgets/profile_intro.dart';
+import 'ui/widgets/rebuild_on_change.dart';
 import 'ui/widgets/ui_scale.dart';
 import 'ui/window/title_bar.dart';
 import 'update/app_updater.dart';
@@ -80,7 +82,8 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
   String? _themeKey;
 
   ThemeData _themeFor(bool dark) {
-    final key = '$dark-${AppColors.accent.toARGB32()}-${AppShape.radius}';
+    final key = '$dark-${AppColors.minimal}-'
+        '${AppColors.accent.toARGB32()}-${AppShape.rounded}';
     if (_themeKey != key) {
       _themeKey = key;
       _theme = buildTheme();
@@ -117,6 +120,7 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
                 [
                   session.app.themeNotifier,
                   session.app.shapeRevision,
+                  session.app.lookRevision,
                   session.app.scaleNotifier,
                 ],
               ),
@@ -146,14 +150,18 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
       // "Tamanho da interface": tudo (telas, diálogos, botões da janela e
       // aviso de atualização) fica dentro da mesma ampliação. Antes de entrar
       // num perfil não há ajuste salvo: tamanho 100 %.
-      builder: (context, child) => UiScale(
-        scale: session?.app.uiScale ?? 1.0,
-        child: Stack(
-          children: [
-            if (child != null) Positioned.fill(child: child),
-            const WindowButtonsOverlay(),
-            const UpdateToast(),
-          ],
+      builder: (context, child) => RebuildOnChange(
+        // Valores lidos direto (sem Theme): quando mudam, redesenha tudo.
+        value: (AppShape.rounded, AppColors.minimal, AppColors.accent),
+        child: UiScale(
+          scale: session?.app.uiScale ?? 1.0,
+          child: Stack(
+            children: [
+              if (child != null) Positioned.fill(child: child),
+              const WindowButtonsOverlay(),
+              const UpdateToast(),
+            ],
+          ),
         ),
       ),
       home: AnimatedSwitcher(
@@ -204,9 +212,11 @@ class _RootState extends State<_Root> {
   ui.Image? _toImage;
   final _sceneKey = GlobalKey();
   final _pageKey = GlobalKey();
+  final _introSound = IntroSound();
 
   @override
   void dispose() {
+    _introSound.dispose();
     _fromImage?.dispose();
     _toImage?.dispose();
     super.dispose();
@@ -306,6 +316,7 @@ class _RootState extends State<_Root> {
           Positioned.fill(
             child: ProfileIntro(
               boundaryKey: _sceneKey,
+              startSound: _introSound.start,
               onDone: () => setState(() => _sceneDone = true),
             ),
           ),

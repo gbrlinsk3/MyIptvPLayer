@@ -16,12 +16,13 @@ enum PlayerControlsPart {
   /// Tudo na mesma barra (tela cheia).
   all,
 
-  /// Só volume e gravação, numa linha solta (quem usa posiciona e decide a
-  /// visibilidade).
-  audioRec,
+  /// Volume e gravação à esquerda e tela cheia à direita, numa linha sem fundo
+  /// (quem usa posiciona e decide a visibilidade).
+  row,
 
-  /// Só o botão de tela cheia (canto inferior direito) e o selo REC.
-  fullscreen,
+  /// Só o selo REC no alto do vídeo. Nada mais recebe o mouse, então pode ficar
+  /// por cima de outros controles.
+  recBadge,
 }
 
 /// Controles do ao vivo: volume/mudo, gravação e tela cheia.
@@ -268,25 +269,10 @@ class _PlayerControlsState extends State<PlayerControls> {
       ),
     );
 
-    final bar = Container(
-      padding: const EdgeInsets.fromLTRB(12, 28, 12, 8),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0x00000000), Color(0xB3000000)],
-        ),
-      ),
-      child: Row(
-        children: [
-          if (widget.part == PlayerControlsPart.all) audioChildren,
-          const Spacer(),
-          fsButton,
-        ],
-      ),
+    final row = Row(
+      children: [audioChildren, const Spacer(), fsButton],
     );
-
-    if (widget.part == PlayerControlsPart.audioRec) return audioChildren;
+    if (widget.part == PlayerControlsPart.row) return row;
 
     // Marcador "REC" sempre visível (mesmo com os controles escondidos).
     final badge = ListenableBuilder(
@@ -299,7 +285,7 @@ class _PlayerControlsState extends State<PlayerControls> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: const Color(0xB3000000),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppShape.control,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -323,6 +309,28 @@ class _PlayerControlsState extends State<PlayerControls> {
           ),
         );
       },
+    );
+
+    if (widget.part == PlayerControlsPart.recBadge) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(top: 12, left: 12, child: IgnorePointer(child: badge)),
+        ],
+      );
+    }
+
+    // Barra da tela cheia.
+    final bar = Container(
+      padding: const EdgeInsets.fromLTRB(12, 28, 12, 8),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x00000000), Color(0xB3000000)],
+        ),
+      ),
+      child: row,
     );
 
     final controlled = widget.visible;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../widgets/click_spark.dart';
 import '../widgets/full_name_tooltip.dart';
+import '../widgets/more_button.dart';
 import '../widgets/press_scale.dart';
 import '../../data/channel_groups.dart';
 import '../../data/models.dart';
@@ -85,10 +86,7 @@ class _ChannelRowState extends State<ChannelRow> {
                     style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                   ),
                   if (widget.onSeeAll != null)
-                    TextButton(
-                      onPressed: widget.onSeeAll,
-                      child: const Text('Ver tudo'),
-                    ),
+                    MoreButton(label: 'Ver tudo', onPressed: widget.onSeeAll!),
                 ],
               ),
             ),
@@ -144,9 +142,9 @@ class _Arrow extends StatelessWidget {
       child: Center(
         child: Material(
           color: const Color(0xCC1F1E1D),
-          shape: const CircleBorder(),
+          shape: AppShape.button,
           child: InkWell(
-            customBorder: const CircleBorder(),
+            customBorder: AppShape.button,
             onTap: onTap,
             child: Padding(
               padding: const EdgeInsets.all(8),
@@ -210,7 +208,7 @@ class _ChannelCardState extends State<ChannelCard> {
                 color: fav
                     ? Color.lerp(AppColors.surface, AppColors.accent, 0.14)
                     : AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppShape.card,
                 border: Border.all(
                   color: highlight ? AppColors.accent : AppColors.border,
                   width: highlight ? 2 : 1,
@@ -243,7 +241,7 @@ class _ChannelCardState extends State<ChannelCard> {
                             height: 1.25,
                             fontWeight: FontWeight.w700,
                             color: (playing || fav)
-                                ? AppColors.accent
+                                ? AppColors.accentInk
                                 : AppColors.text,
                           ),
                         ),
@@ -266,7 +264,7 @@ class _ChannelCardState extends State<ChannelCard> {
                               icon: Icon(
                                 fav ? Icons.favorite : Icons.favorite_border,
                                 size: 20,
-                                color: fav ? AppColors.accent : AppColors.textMuted,
+                                color: fav ? AppColors.accentInk : AppColors.textMuted,
                               ),
                             ),
                         )

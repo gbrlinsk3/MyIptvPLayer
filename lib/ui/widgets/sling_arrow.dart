@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme.dart';
+import 'glass.dart';
 
 /// Botão circular de seta com comportamento de estilingue, para as setas do
 /// banner. O visual base é o do `CarouselArrowButton` (fundo da superfície,
@@ -344,17 +345,11 @@ class _SlingArrowButtonState extends State<SlingArrowButton>
       animation: _repaint,
       builder: (context, child) =>
           Transform.translate(offset: _off, child: child),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: enabled && _hover
-              ? AppColors.hover
-              : AppColors.surface,
-          border: Border.all(
-            color: contorno ? AppColors.accent : AppColors.border,
-            width: contorno ? 2 : 1,
-          ),
-        ),
+      child: GlassSurface(
+        radius: AppShape.control,
+        fill: enabled && _hover ? AppGlass.surfaceHover : null,
+        edge: contorno ? AppColors.accent : null,
+        edgeWidth: contorno ? 2 : 1,
         child: SizedBox(
           width: s,
           height: s,
@@ -426,11 +421,13 @@ class _SlingPainter extends CustomPainter {
     required this.state,
     required this.accent,
     required this.muted,
-  }) : super(repaint: repaint);
+  })  : rounded = AppShape.rounded,
+        super(repaint: repaint);
 
   final _SlingArrowButtonState state;
   final Color accent;
   final Color muted;
+  final bool rounded;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -451,12 +448,30 @@ class _SlingPainter extends CustomPainter {
         ..strokeWidth = 1.5
         ..strokeCap = StrokeCap.round;
       final r = w.size / 2;
-      final dir = off / pos; // para onde o botão foi puxado
-      final perp = Offset(-dir.dy, dir.dx);
       final pad = center + off;
-      canvas.drawCircle(center, r, line);
-      for (final side in const [-1.0, 1.0]) {
-        canvas.drawLine(center + perp * (side * r), pad + perp * (side * r), line);
+      if (rounded) {
+        final dir = off / pos; // para onde o botão foi puxado
+        final perp = Offset(-dir.dy, dir.dx);
+        canvas.drawCircle(center, r, line);
+        for (final side in const [-1.0, 1.0]) {
+          canvas.drawLine(
+            center + perp * (side * r),
+            pad + perp * (side * r),
+            line,
+          );
+        }
+      } else {
+        // Quadrado: o contorno do repouso e uma ligação em cada canto.
+        final base = Rect.fromCircle(center: center, radius: r);
+        canvas.drawRect(base, line);
+        for (final corner in [
+          base.topLeft,
+          base.topRight,
+          base.bottomLeft,
+          base.bottomRight,
+        ]) {
+          canvas.drawLine(corner, corner + (pad - center), line);
+        }
       }
     }
 
@@ -470,15 +485,16 @@ class _SlingPainter extends CustomPainter {
       final at = origin +
           Offset(math.cos(p.angle), math.sin(p.angle)) * (p.distance * ease);
       final r = p.radius * (1 - 0.7 * t);
-      canvas.drawCircle(
-        at,
-        r,
-        Paint()..color = accent.withValues(alpha: 1 - t),
-      );
+      final ink = Paint()..color = accent.withValues(alpha: 1 - t);
+      if (rounded) {
+        canvas.drawCircle(at, r, ink);
+      } else {
+        canvas.drawRect(Rect.fromCircle(center: at, radius: r), ink);
+      }
     }
   }
 
   @override
   bool shouldRepaint(_SlingPainter old) =>
-      old.accent != accent || old.muted != muted;
+      old.accent != accent || old.muted != muted || old.rounded != rounded;
 }

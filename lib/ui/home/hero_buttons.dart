@@ -37,7 +37,7 @@ class _HeroPrimaryButtonState extends State<HeroPrimaryButton> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             decoration: BoxDecoration(
-              borderRadius: AppShape.borderRadius,
+              borderRadius: AppShape.control,
               boxShadow: [
                 BoxShadow(
                   color: AppColors.accent.withValues(
@@ -48,7 +48,10 @@ class _HeroPrimaryButtonState extends State<HeroPrimaryButton> {
                 ),
               ],
             ),
-            child: Row(
+            // Os dois blocos de cor acompanham o canto do botão.
+            child: ClipRRect(
+              borderRadius: AppShape.control,
+              child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
@@ -69,12 +72,13 @@ class _HeroPrimaryButtonState extends State<HeroPrimaryButton> {
                     widget.label.toUpperCase(),
                     style: AppFonts.title(
                       16,
-                      color: Colors.white,
+                      color: AppColors.onAccent,
                       spacing: 2.2,
                     ),
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ),
@@ -83,7 +87,7 @@ class _HeroPrimaryButtonState extends State<HeroPrimaryButton> {
   }
 }
 
-/// Botão secundário do banner: contorno branco, cantos retos.
+/// Botão secundário do banner: contorno branco.
 class HeroGhostButton extends StatefulWidget {
   const HeroGhostButton({
     super.key,
@@ -118,7 +122,7 @@ class _HeroGhostButtonState extends State<HeroGhostButton> {
             padding: const EdgeInsets.symmetric(horizontal: 22),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: _hover ? 0.18 : 0.08),
-              borderRadius: AppShape.borderRadius,
+              borderRadius: AppShape.control,
               border: Border.all(
                 color: Colors.white.withValues(alpha: _hover ? 0.8 : 0.45),
               ),

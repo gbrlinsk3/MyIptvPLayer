@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import 'glass.dart';
 
 /// Estado e comando de um carrossel horizontal ligado a um [ScrollController].
 class CarouselScroller {
@@ -38,8 +39,7 @@ class CarouselScroller {
   }
 }
 
-/// Botão circular de seta de carrossel: fundo da superfície, borda fina e
-/// sempre visível. Sem [enabled] fica apagado e não responde ao toque.
+/// Botão de seta de carrossel (círculo ou quadrado, conforme o formato): de vidro e sempre visível. Sem [enabled] fica apagado e não responde ao toque.
 class CarouselArrowButton extends StatelessWidget {
   const CarouselArrowButton({
     super.key,
@@ -63,22 +63,24 @@ class CarouselArrowButton extends StatelessWidget {
         button: true,
         enabled: enabled,
         label: label,
-        child: Material(
-          color: AppColors.surface,
-          shape: CircleBorder(side: BorderSide(color: AppColors.border)),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            hoverColor: AppColors.hover,
-            onTap: enabled ? onTap : null,
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: Icon(
-                left ? Icons.chevron_left : Icons.chevron_right,
-                size: 22,
-                color: enabled
-                    ? AppColors.text
-                    : AppColors.text.withAlpha(90),
+        child: GlassSurface(
+          radius: AppShape.control,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              customBorder: AppShape.button,
+              hoverColor: AppGlass.hover,
+              onTap: enabled ? onTap : null,
+              child: SizedBox(
+                width: size,
+                height: size,
+                child: Icon(
+                  left ? Icons.chevron_left : Icons.chevron_right,
+                  size: 22,
+                  color: enabled
+                      ? AppColors.text
+                      : AppColors.text.withAlpha(90),
+                ),
               ),
             ),
           ),

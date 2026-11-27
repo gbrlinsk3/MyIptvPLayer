@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../core/app_log.dart';
 import '../core/theme.dart';
 import '../data/db.dart';
 import '../epg/epg_controller.dart';
@@ -51,11 +52,34 @@ class ProfilesController extends ChangeNotifier {
       _store = store;
       indexRecovered = store.recovered;
       profiles = await store.list();
+      await _restoreShape(store);
     } catch (e) {
       error = '$e';
     }
     loading = false;
     notifyListeners();
+  }
+
+  // ---- formato da tela de perfis ------------------------------------------
+
+  static const _shapeKey = 'last_button_shape';
+
+  /// "Quem está assistindo?" repete o formato do último perfil usado (o ajuste
+  /// em si continua guardado em cada perfil).
+  Future<void> _restoreShape(ProfileStore store) async {
+    try {
+      AppShape.rounded = await store.appSetting(_shapeKey) != 'square';
+    } catch (e) {
+      AppLog.warn('perfis.formato', e);
+    }
+  }
+
+  Future<void> _rememberShape(String shape) async {
+    try {
+      await _store!.setAppSetting(_shapeKey, shape);
+    } catch (e) {
+      AppLog.warn('perfis.formato', e);
+    }
   }
 
   Future<void> _reload() async {
@@ -102,10 +126,16 @@ class ProfilesController extends ChangeNotifier {
       session = ProfileSession(profile, db, epg, app);
       notifyListeners();
       await app.init();
+      final opened = app;
+      await _rememberShape(opened.buttonShape);
+      // Trocas de formato dentro do perfil também contam.
+      opened.shapeRevision.addListener(
+        () => _rememberShape(opened.buttonShape),
+      );
     } catch (e) {
       error = 'Não foi possível abrir o perfil: $e';
       session = null;
-      AppColors.resetAccent();
+      AppColors.resetProfileLook();
       app?.dispose();
       epg?.dispose();
       await db?.close();
@@ -120,7 +150,7 @@ class ProfilesController extends ChangeNotifier {
     if (s == null) return;
     session = null;
     await playback.stop();
-    AppColors.resetAccent();
+    AppColors.resetProfileLook();
     notifyListeners();
     // Descarta depois que a interface deixou de usar os controllers.
     await WidgetsBinding.instance.endOfFrame;

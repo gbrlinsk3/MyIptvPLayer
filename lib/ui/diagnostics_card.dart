@@ -10,6 +10,7 @@ import '../data/db.dart' show DbDiagnostics, RepairReport;
 import '../downloads/download_models.dart';
 import '../state/app_scope.dart';
 import 'widgets/common.dart';
+import 'widgets/glass.dart';
 
 /// Conta e ajustes → Diagnóstico: estado do banco, do catálogo, dos downloads
 /// e do registro de erros, para investigar problemas sem abrir arquivos.
@@ -43,8 +44,7 @@ class _DiagnosticsCardState extends State<DiagnosticsCard> {
     final go = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: AppColors.surface,
+        builder: (context, setState) => GlassAlertDialog(
           title: const Text('Reparar histórico?'),
           content: SizedBox(
             width: 440,

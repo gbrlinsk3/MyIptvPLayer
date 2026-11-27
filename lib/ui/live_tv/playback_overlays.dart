@@ -104,7 +104,7 @@ class _ErrorOverlay extends StatelessWidget {
                   onPressed: controller.retryPlayback,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.onAccent,
                   ),
                   child: const Text('Tentar de novo'),
                 ),

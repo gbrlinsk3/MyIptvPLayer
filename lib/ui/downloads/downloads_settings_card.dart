@@ -6,7 +6,9 @@ import '../../core/format.dart';
 import '../../core/system_dialogs.dart';
 import '../../core/theme.dart';
 import '../../state/app_scope.dart';
+import '../widgets/app_switch.dart';
 import '../widgets/common.dart';
+import '../widgets/glass.dart';
 
 /// Conta e ajustes → Downloads: pasta de destino e espaço usado.
 class DownloadsSettingsCard extends StatefulWidget {
@@ -75,8 +77,7 @@ class _DownloadsSettingsCardState extends State<DownloadsSettingsCard> {
       barrierDismissible: false,
       builder: (_) => PopScope(
         canPop: false,
-        child: AlertDialog(
-          backgroundColor: AppColors.surface,
+        child: GlassAlertDialog(
           title: const Text('Movendo arquivos…'),
           content: ValueListenableBuilder<(int, int)>(
             valueListenable: progress,
@@ -226,7 +227,7 @@ class _DownloadsSettingsCardState extends State<DownloadsSettingsCard> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppColors.accentSoft,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: AppShape.card,
                   ),
                   child: Row(
                     children: [
@@ -248,9 +249,7 @@ class _DownloadsSettingsCardState extends State<DownloadsSettingsCard> {
                 ),
               ],
               const SizedBox(height: 4),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
+              AppSwitchTile(
                 value: downloads.pauseOnPlayback,
                 onChanged: downloads.setPauseOnPlayback,
                 title: const Text('Pausar downloads enquanto assisto'),
@@ -261,9 +260,7 @@ class _DownloadsSettingsCardState extends State<DownloadsSettingsCard> {
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                 ),
               ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
+              AppSwitchTile(
                 value: downloads.scanSubfolders,
                 onChanged: downloads.setScanSubfolders,
                 title: const Text('Procurar também nas subpastas'),

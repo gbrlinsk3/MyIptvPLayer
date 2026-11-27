@@ -30,9 +30,18 @@ class CatalogPage extends StatefulWidget {
 class _CatalogPageState extends State<CatalogPage> {
   CatalogKind _kind = CatalogKind.movies;
 
+  /// Aba pedida de fora (ex.: "Ver tudo" no Início).
+  void _takeRequest() {
+    final kind = AppScope.read(context).takeCatalogRequest();
+    if (kind == null) return;
+    _kind = kind;
+    AppScope.read(context).catalog.activeKind = kind;
+  }
+
   @override
   void initState() {
     super.initState();
+    _takeRequest();
     AppScope.read(context).catalog.activeKind = _kind;
     if (widget.active) _ensureFresh();
   }
@@ -40,7 +49,10 @@ class _CatalogPageState extends State<CatalogPage> {
   @override
   void didUpdateWidget(CatalogPage old) {
     super.didUpdateWidget(old);
-    if (widget.active && !old.active) _ensureFresh();
+    if (widget.active && !old.active) {
+      _takeRequest();
+      _ensureFresh();
+    }
   }
 
   void _ensureFresh() {
@@ -272,6 +284,7 @@ class _KindViewState extends State<_KindView> {
                   key: ValueKey('${kind.key}:recent'),
                   label: 'Adicionados recentemente',
                   future: catalog.recentTitles(kind),
+                  loadMore: (offset) => catalog.recentPage(kind, offset),
                   onOpen: _open,
                 );
               }
@@ -303,7 +316,10 @@ class _CatalogSkeleton extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, box) {
           final perRow = AppScope.of(context).portraitPerRow;
-          final posterWidth = RowMetrics.portraitWidth(box.maxWidth, perRow);
+          final posterWidth = RowMetrics.portraitWidth(
+            box.maxWidth - 2 * TitleRow.arrowColumn,
+            perRow,
+          );
           final itemWidth = posterWidth + TitleRow.gap;
           final rowHeight = posterWidth * 1.5 + 56 + 24;
           return SingleChildScrollView(
@@ -314,10 +330,13 @@ class _CatalogSkeleton extends StatelessWidget {
                 for (final titleWidth in _titleWidths) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
-                    child: SkeletonBox(width: titleWidth, height: 18, radius: 4),
+                    child: SkeletonBox(width: titleWidth, height: 18),
                   ),
-                  SizedBox(
+                  Container(
                     height: rowHeight,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TitleRow.arrowColumn,
+                    ),
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       physics: const NeverScrollableScrollPhysics(),
@@ -333,7 +352,7 @@ class _CatalogSkeleton extends StatelessWidget {
                           alignment: Alignment.topCenter,
                           child: AspectRatio(
                             aspectRatio: 2 / 3,
-                            child: SkeletonBox(radius: 10),
+                            child: SkeletonBox(),
                           ),
                         ),
                       ),

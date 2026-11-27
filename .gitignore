@@ -54,3 +54,8 @@ app.*.map.json
 # Arquivo da ferramenta AIMaster
 AIMASTER.md
 HISTORICO_DE_MUDANCAS.md
+
+# Anotacoes para assistentes de codigo e guia pessoal: ficam so no PC
+CLAUDE.md
+GITHUB.md
+.claude/

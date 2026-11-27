@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../ui/widgets/app_backdrop.dart' show BackdropBlur;
 import '../catalog/catalog_controller.dart';
 import '../core/format.dart' show formatDateTime;
 import '../data/db.dart';
@@ -17,7 +18,8 @@ import '../epg/epg_controller.dart';
 import '../playback/playback_controller.dart';
 import '../core/app_log.dart';
 import '../core/layout_metrics.dart';
-import '../core/theme.dart' show AppShape, ThemePref;
+import '../core/theme.dart'
+    show AccentScale, AppColors, AppShape, ThemePref;
 
 enum AppPhase { booting, loggedOut, ready }
 
@@ -284,6 +286,23 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  CatalogKind? _pendingCatalog;
+
+  /// Abre "Filmes e séries" na aba [kind]. A página consome o pedido com
+  /// [takeCatalogRequest].
+  void requestCatalog(CatalogKind kind) {
+    _pendingCatalog = kind;
+    shellIndex = 2;
+    notifyListeners();
+  }
+
+  /// A aba pedida por [requestCatalog], uma única vez.
+  CatalogKind? takeCatalogRequest() {
+    final kind = _pendingCatalog;
+    _pendingCatalog = null;
+    return kind;
+  }
+
   /// true uma única vez por pedido de [requestLive].
   bool takeLiveRequest() {
     final pending = _pendingLive;
@@ -374,18 +393,83 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Formato dos botões: 'square' (padrão) ou 'rounded'.
-  String buttonShape = 'square';
+  /// Imagem de fundo escolhida no PC (caminho do arquivo). Vazio = padrão: a
+  /// imagem do app (ver `AppBackdrop`).
+  String backgroundImage = '';
 
-  /// Muda quando o formato dos botões muda (o MaterialApp recria o tema).
+  Future<void> setBackgroundImage(String path) async {
+    backgroundImage = path;
+    notifyListeners();
+    await _db.setSetting('background_image', path);
+  }
+
+  /// Nível de desfoque da imagem escolhida (ver `BackdropBlur`).
+  int backgroundBlur = BackdropBlur.standard;
+
+  Future<void> setBackgroundBlur(int level) async {
+    backgroundBlur = BackdropBlur.normalize(level);
+    notifyListeners();
+    await _db.setSetting('background_blur', '$backgroundBlur');
+  }
+
+  /// Formato da interface: 'rounded' (padrão) ou 'square'. O nome salvo
+  /// continua `button_shape`, de quando o ajuste só valia para os botões.
+  String buttonShape = 'rounded';
+
+  /// Muda quando o formato muda (o MaterialApp recria o tema e redesenha tudo).
   final ValueNotifier<int> shapeRevision = ValueNotifier(0);
 
   Future<void> setButtonShape(String shape) async {
     buttonShape = shape;
-    AppShape.radius = shape == 'rounded' ? 8 : 0;
+    AppShape.rounded = shape != 'square';
     shapeRevision.value++;
     notifyListeners();
     await _db.setSetting('button_shape', shape);
+  }
+
+  /// "Tema": Liquid Glass (padrão) ou Minimalista.
+  bool minimalTheme = false;
+
+  /// No Minimalista, mostrar a imagem de fundo (o Liquid Glass sempre mostra).
+  bool minimalBackground = false;
+
+  /// Tom da cor de destaque na escala em volta da cor do perfil.
+  int accentTone = 0;
+
+  /// Muda quando o tema visual ou o tom mudam (o MaterialApp redesenha tudo).
+  final ValueNotifier<int> lookRevision = ValueNotifier(0);
+
+  void _applyLook() {
+    AppColors.applyLook(minimal: minimalTheme);
+    AppColors.applyAccentTone(accentTone);
+    lookRevision.value++;
+  }
+
+  Future<void> setMinimalTheme(bool minimal) async {
+    minimalTheme = minimal;
+    _applyLook();
+    notifyListeners();
+    await _db.setSetting('ui_theme', minimal ? 'minimal' : 'glass');
+  }
+
+  Future<void> setMinimalBackground(bool show) async {
+    minimalBackground = show;
+    notifyListeners();
+    await _db.setSetting('minimal_background', show ? '1' : '0');
+  }
+
+  /// Muda o tom na hora, sem salvar (enquanto o controle é arrastado).
+  void previewAccentTone(int tone) {
+    final next = AccentScale.clamp(tone);
+    if (next == accentTone) return;
+    accentTone = next;
+    _applyLook();
+    notifyListeners();
+  }
+
+  Future<void> setAccentTone(int tone) async {
+    previewAccentTone(tone);
+    await _db.setSetting('accent_tone', '$accentTone');
   }
 
   Future<void> setThemePref(ThemePref pref) async {
@@ -415,6 +499,7 @@ class AppController extends ChangeNotifier {
     themeNotifier.dispose();
     scaleNotifier.dispose();
     shapeRevision.dispose();
+    lookRevision.dispose();
     super.dispose();
   }
 
@@ -473,8 +558,18 @@ class AppController extends ChangeNotifier {
     catalogWidth = CatalogWidth.normalize(
       int.tryParse(await _db.getSetting('catalog_width') ?? ''),
     );
-    buttonShape = await _db.getSetting('button_shape') ?? 'square';
-    AppShape.radius = buttonShape == 'rounded' ? 8 : 0;
+    backgroundImage = await _db.getSetting('background_image') ?? '';
+    backgroundBlur = BackdropBlur.normalize(
+      int.tryParse(await _db.getSetting('background_blur') ?? ''),
+    );
+    buttonShape = await _db.getSetting('button_shape') ?? 'rounded';
+    AppShape.rounded = buttonShape != 'square';
+    minimalTheme = await _db.getSetting('ui_theme') == 'minimal';
+    minimalBackground = await _db.getSetting('minimal_background') == '1';
+    accentTone = AccentScale.clamp(
+      int.tryParse(await _db.getSetting('accent_tone') ?? ''),
+    );
+    _applyLook();
     final savedVolume = double.tryParse(await _db.getSetting('volume') ?? '');
     if (savedVolume != null) await playback.setVolume(savedVolume);
     await epg.load();

@@ -9,6 +9,7 @@ import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/animation_categories_dialog.dart';
 import '../../core/format.dart';
+import '../widgets/glass.dart';
 
 /// Gerenciador dos banners do Início: "Continue de onde parou" é fixo (só
 /// aparece quando há algo em andamento); dá para ter de 1 a 4 banners, com
@@ -97,13 +98,7 @@ class _ManagerDialogState extends State<_ManagerDialog> {
   Widget build(BuildContext context) {
     final catalog = AppScope.read(context).catalog;
     final muted = TextStyle(color: AppColors.textMuted, fontSize: 12);
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border),
-      ),
+    return GlassDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640, maxHeight: 700),
         child: Padding(
@@ -154,12 +149,9 @@ class _ManagerDialogState extends State<_ManagerDialog> {
                                       initialValue: _list[i].name,
                                       maxLength: 28,
                                       onChanged: (v) => _list[i].name = v,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Nome do banner',
-                                        isDense: true,
-                                        counterText: '',
-                                        border: OutlineInputBorder(),
-                                      ),
+                                      decoration: fieldDecoration(
+                                        label: 'Nome do banner',
+                                      ).copyWith(counterText: ''),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -186,21 +178,15 @@ class _ManagerDialogState extends State<_ManagerDialog> {
                               const SizedBox(height: 10),
                               Row(
                                 children: [
-                                  DropdownButton<BannerSource>(
-                                    value: _list[i].source,
-                                    underline: const SizedBox.shrink(),
-                                    items: [
-                                      for (final s in BannerSource.values)
-                                        DropdownMenuItem(
-                                          value: s,
-                                          child: Text(s.label),
-                                        ),
-                                    ],
-                                    onChanged: (v) {
-                                      if (v != null) {
-                                        setState(() => _list[i].source = v);
-                                      }
-                                    },
+                                  GlassMenuButton<BannerSource>(
+                                    tooltip: 'Conteúdo do banner',
+                                    menuWidth: 248,
+                                    options: BannerSource.values,
+                                    labelOf: (s) => s.label,
+                                    selected: _list[i].source,
+                                    onSelected: (v) =>
+                                        setState(() => _list[i].source = v),
+                                    child: _SourceTrigger(_list[i].source.label),
                                   ),
                                   const SizedBox(width: 12),
                                   if (_list[i].source == BannerSource.categories ||
@@ -281,7 +267,7 @@ class _ManagerDialogState extends State<_ManagerDialog> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.bg,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppShape.card,
           border: Border.all(color: AppColors.border),
         ),
         child: child,
@@ -354,13 +340,7 @@ class _TitlePickerState extends State<_TitlePicker> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border),
-      ),
+    return GlassDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
         child: Padding(
@@ -381,9 +361,8 @@ class _TitlePickerState extends State<_TitlePicker> {
               TextField(
                 autofocus: true,
                 onChanged: _onChanged,
-                decoration: InputDecoration(
-                  hintText: 'Buscar filmes e séries',
-                  isDense: true,
+                decoration: fieldDecoration(
+                  hint: 'Buscar filmes e séries',
                   prefixIcon: const Icon(Icons.search, size: 18),
                   suffixIcon: _loading
                       ? const Padding(
@@ -395,9 +374,6 @@ class _TitlePickerState extends State<_TitlePicker> {
                           ),
                         )
                       : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
                 ),
               ),
               if (_chosen.isNotEmpty)
@@ -462,6 +438,34 @@ class _TitlePickerState extends State<_TitlePicker> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Rótulo clicável do menu de conteúdo, com a cara de um campo.
+class _SourceTrigger extends StatelessWidget {
+  const _SourceTrigger(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.only(left: 16, right: 8),
+      decoration: BoxDecoration(
+        color: AppGlass.field,
+        border: Border.all(color: AppColors.border),
+        borderRadius: AppShape.control,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          const SizedBox(width: 6),
+          const Icon(Icons.arrow_drop_down),
+        ],
       ),
     );
   }

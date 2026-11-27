@@ -13,7 +13,9 @@ import '../catalog/poster_image.dart';
 import '../catalog/title_details_page.dart';
 import '../catalog/title_details_panel.dart';
 import '../catalog/vod_player_page.dart';
+import '../widgets/app_popup_menu.dart';
 import '../widgets/common.dart';
+import '../widgets/glass.dart';
 import '../widgets/sliding_tabs.dart';
 import '../widgets/state_views.dart';
 import 'history_view.dart';
@@ -281,88 +283,88 @@ class _QueueRow extends StatelessWidget {
     }
     final running = e.status == DownloadStatus.downloading ||
         e.status == DownloadStatus.queued;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 44,
-            height: 64,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: PosterImage(url: e.image, name: e.title, cacheWidth: 140),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  e.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GlassSurface(
+        child: Padding(
+          // 12 + 1 da borda.
+          padding: const EdgeInsets.all(13),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 44,
+                height: 64,
+                child: ClipRRect(
+                  borderRadius: AppShape.thumb,
+                  child: PosterImage(url: e.image, name: e.title, cacheWidth: 140),
                 ),
-                if (e.subtitle != null)
-                  Text(
-                    e.subtitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-                  ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: e.status == DownloadStatus.queued ? 0 : e.fraction,
-                    minHeight: 5,
-                    backgroundColor: AppColors.hover,
-                    color: e.status == DownloadStatus.error
-                        ? AppColors.danger
-                        : AppColors.accent,
-                  ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      e.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    if (e.subtitle != null)
+                      Text(
+                        e.subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: AppShape.control,
+                      child: LinearProgressIndicator(
+                        value: e.status == DownloadStatus.queued ? 0 : e.fraction,
+                        minHeight: 5,
+                        backgroundColor: AppGlass.line,
+                        color: e.status == DownloadStatus.error
+                            ? AppColors.danger
+                            : AppColors.accent,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      status,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: e.status == DownloadStatus.error
+                            ? AppColors.danger
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  status,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: e.status == DownloadStatus.error
-                        ? AppColors.danger
-                        : AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              IconButton(
+                tooltip: running ? 'Pausar' : 'Retomar',
+                onPressed: () => running ? downloads.pause(e) : downloads.resume(e),
+                icon: Icon(running ? Icons.pause : Icons.play_arrow),
+              ),
+              IconButton(
+                tooltip: 'Cancelar e apagar o que foi baixado',
+                onPressed: () async {
+                  final ok = await confirmDialog(
+                    context,
+                    title: 'Cancelar este download?',
+                    message: 'O que já foi baixado será apagado.',
+                    action: 'Cancelar download',
+                  );
+                  if (ok) await downloads.cancel(e);
+                },
+                icon: const Icon(Icons.close),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: running ? 'Pausar' : 'Retomar',
-            onPressed: () => running ? downloads.pause(e) : downloads.resume(e),
-            icon: Icon(running ? Icons.pause : Icons.play_arrow),
-          ),
-          IconButton(
-            tooltip: 'Cancelar e apagar o que foi baixado',
-            onPressed: () async {
-              final ok = await confirmDialog(
-                context,
-                title: 'Cancelar este download?',
-                message: 'O que já foi baixado será apagado.',
-                action: 'Cancelar download',
-              );
-              if (ok) await downloads.cancel(e);
-            },
-            icon: const Icon(Icons.close),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -511,14 +513,14 @@ class _LandCardState extends State<_LandCard> {
                   duration: const Duration(milliseconds: 150),
                   height: _LibRow._imageHeight,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppShape.card,
                     border: Border.all(
                       color: _hover ? AppColors.accent : AppColors.border,
                       width: _hover ? 2 : 1,
                     ),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: AppShape.inset(2),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -548,9 +550,9 @@ class _LandCardState extends State<_LandCard> {
                             icon: Container(
                               width: 30,
                               height: 30,
-                              decoration: const BoxDecoration(
-                                color: Color(0xB3000000),
-                                shape: BoxShape.circle,
+                              decoration: BoxDecoration(
+                                color: const Color(0xB3000000),
+                                borderRadius: AppShape.control,
                               ),
                               child: const Icon(
                                 Icons.more_vert,
@@ -564,14 +566,14 @@ class _LandCardState extends State<_LandCard> {
                                 _confirmDelete(context, [e], '"$primary"');
                               }
                             },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
+                            itemBuilder: (_) => [
+                              AppPopupMenuItem(
                                 value: 'folder',
-                                child: Text('Mostrar na pasta'),
+                                child: const Text('Mostrar na pasta'),
                               ),
-                              PopupMenuItem(
+                              AppPopupMenuItem(
                                 value: 'delete',
-                                child: Text('Excluir arquivo'),
+                                child: const Text('Excluir arquivo'),
                               ),
                             ],
                           ),
@@ -644,7 +646,7 @@ class _LandImage extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: AppShape.thumb,
                         child: PosterImage(url: e.image, name: e.title, cacheWidth: 300),
                       ),
                     ),
@@ -760,9 +762,7 @@ class _ImportCardState extends State<_ImportCard> {
     final app = AppScope.read(context);
     final choice = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        surfaceTintColor: Colors.transparent,
+      builder: (ctx) => GlassAlertDialog(
         title: const Text('Tirar da biblioteca?', style: TextStyle(fontSize: 16)),
         content: const Text(
           'Tirar: o item some daqui e o arquivo continua no seu computador.\n'
@@ -838,7 +838,7 @@ class _ImportCardState extends State<_ImportCard> {
                 duration: const Duration(milliseconds: 150),
                 height: _LibRow._imageHeight,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppShape.card,
                   border: Border.all(
                     color: _hover ? AppColors.accent : AppColors.border,
                     width: _hover ? 2 : 1,

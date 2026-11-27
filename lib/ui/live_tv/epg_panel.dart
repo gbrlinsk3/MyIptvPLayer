@@ -284,7 +284,7 @@ class _ProgramCard extends StatelessWidget {
             border: Border.all(
               color: isCurrent ? AppColors.accent : AppColors.border,
             ),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppShape.card,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,7 +296,7 @@ class _ProgramCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: isCurrent ? AppColors.accent : AppColors.textMuted,
+                  color: isCurrent ? AppColors.accentInk : AppColors.textMuted,
                 ),
               ),
               const SizedBox(height: 4),
@@ -322,7 +322,7 @@ class _ProgramCard extends StatelessWidget {
               const Spacer(),
               if (progress != null)
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: AppShape.control,
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 3,
@@ -359,7 +359,7 @@ class _EpgSkeleton extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppShape.card,
                 ),
                 child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,7 +405,7 @@ class EpgErrorView extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: AppColors.hover,
-                shape: BoxShape.circle,
+                borderRadius: AppShape.control,
               ),
               child: Icon(
                 Icons.warning_amber_rounded,

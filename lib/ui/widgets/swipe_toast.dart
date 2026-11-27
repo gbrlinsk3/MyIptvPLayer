@@ -333,9 +333,7 @@ class _SwipeToastState extends State<SwipeToast> with TickerProviderStateMixin {
                         // duas pontas, como no SwipeToast de referência.
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(
-                              SwipeToast.fuseHeight,
-                            ),
+                            borderRadius: AppShape.control,
                             gradient: LinearGradient(
                               colors: [
                                 color.withValues(alpha: 0),

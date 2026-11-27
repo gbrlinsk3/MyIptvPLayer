@@ -7,6 +7,7 @@ import '../../state/app_scope.dart';
 import '../catalog/play_actions.dart';
 import '../catalog/poster_image.dart';
 import '../catalog/title_details_page.dart';
+import '../live_tv/live_recent_card.dart' show CornerButton;
 import '../widgets/carousel_arrows.dart';
 import '../widgets/press_scale.dart';
 import '../widgets/shimmer.dart';
@@ -41,6 +42,26 @@ class _ContinueStripState extends State<ContinueStrip> {
     } finally {
       if (mounted) setState(() => _pinned = false);
     }
+  }
+
+  /// X do cartão: só tira da lista (histórico e progresso ficam).
+  void _remove(CatalogTitle title) {
+    final catalog = AppScope.read(context).catalog;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final before = catalog.dismissContinue(title);
+    messenger
+      ?..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          persist: false,
+          duration: const Duration(seconds: 5),
+          content: const Text('Removido de "Continuar assistindo"'),
+          action: SnackBarAction(
+            label: 'Desfazer',
+            onPressed: () => catalog.restoreContinue(title, before),
+          ),
+        ),
+      );
   }
 
   // Folga em cima e embaixo do cartão para sombra e borda.
@@ -106,6 +127,7 @@ class _ContinueStripState extends State<ContinueStrip> {
                           ),
                           onResume: () =>
                               _open(i, () => resumeTitle(context, list[i])),
+                          onRemove: () => _remove(list[i]),
                         ),
                       ),
                     ),
@@ -141,7 +163,7 @@ class _ContinueSkeleton extends StatelessWidget {
               children: [
                 const Padding(
                   padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
-                  child: SkeletonBox(width: 260, height: 22, radius: 4),
+                  child: SkeletonBox(width: 260, height: 22),
                 ),
                 SizedBox(
                   height: sizes.height + _ContinueStripState._vPad * 2,
@@ -158,7 +180,6 @@ class _ContinueSkeleton extends StatelessWidget {
                       child: SkeletonBox(
                         width: sizes.collapsed,
                         height: sizes.height,
-                        radius: 16,
                       ),
                     ),
                   ),
@@ -180,6 +201,7 @@ class _ContinueCard extends StatelessWidget {
     required this.onEnter,
     required this.onOpenCard,
     required this.onResume,
+    required this.onRemove,
   });
 
   final CatalogTitle title;
@@ -193,6 +215,8 @@ class _ContinueCard extends StatelessWidget {
   /// Clique na chamada "continuar assistindo": abre o player.
   final VoidCallback onResume;
 
+  final VoidCallback onRemove;
+
   @override
   Widget build(BuildContext context) {
     final catalog = AppScope.of(context).catalog;
@@ -204,11 +228,11 @@ class _ContinueCard extends StatelessWidget {
         child: GestureDetector(
           onTap: onOpenCard,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 280),
+            duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
             width: width,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: AppShape.card,
               border: Border.all(
                 color: expanded ? AppColors.accent : AppColors.border,
                 width: expanded ? 2 : 1,
@@ -224,7 +248,7 @@ class _ContinueCard extends StatelessWidget {
                   : const [],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: AppShape.inset(2),
               child: FutureBuilder<TitleDetails?>(
                 future: catalog.detailsOrNull(title.kind, title.id),
                 builder: (context, snap) => Stack(
@@ -263,9 +287,9 @@ class _ContinueCard extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (title.subtitle != null && expanded)
+                          if (title.continueLabel != null && expanded)
                             Text(
-                              title.subtitle!,
+                              title.continueLabel!,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -286,11 +310,11 @@ class _ContinueCard extends StatelessWidget {
                                       height: 26,
                                       decoration: BoxDecoration(
                                         color: AppColors.accent,
-                                        borderRadius: BorderRadius.circular(13),
+                                        borderRadius: AppShape.control,
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.play_arrow_rounded,
-                                        color: Colors.white,
+                                        color: AppColors.onAccent,
                                         size: 18,
                                       ),
                                     ),
@@ -318,6 +342,17 @@ class _ContinueCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (expanded)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: CornerButton(
+                          icon: Icons.close,
+                          iconColor: Colors.white,
+                          tooltip: 'Tirar de "Continuar assistindo"',
+                          onPressed: onRemove,
+                        ),
+                      ),
                     if (progress != null)
                       Positioned(
                         left: 0,
@@ -327,7 +362,7 @@ class _ContinueCard extends StatelessWidget {
                           value: progress,
                           minHeight: 4,
                           backgroundColor: const Color(0x66000000),
-                          color: AppColors.accent,
+                          color: AppColors.accentOnMedia,
                         ),
                       ),
                   ],

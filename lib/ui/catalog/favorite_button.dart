@@ -11,10 +11,19 @@ import '../widgets/press_scale.dart';
 /// visível (preenchido, na cor do perfil) quando o título já é favorito.
 /// Só o coração é reconstruído quando os favoritos mudam.
 class FavoriteOverlay extends StatelessWidget {
-  const FavoriteOverlay({super.key, required this.title, required this.hover});
+  const FavoriteOverlay({
+    super.key,
+    required this.title,
+    required this.hover,
+    this.onPoster = false,
+  });
 
   final CatalogTitle title;
   final bool hover;
+
+  /// Sobre o pôster: coração sem fundo, no canto de cima à esquerda de uma
+  /// faixa com degradê (ocupa a largura toda do pôster).
+  final bool onPoster;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +33,7 @@ class FavoriteOverlay extends StatelessWidget {
       builder: (context, _, _) {
         final fav = catalog.isFavorite(title.kind, title.id);
         if (!hover && !fav) return const SizedBox.shrink();
-        return PressShield(
+        final heart = PressShield(
           child: Tooltip(
             message: fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos',
             child: GestureDetector(
@@ -36,16 +45,38 @@ class FavoriteOverlay extends StatelessWidget {
               child: Container(
                 width: 30,
                 height: 30,
-                decoration: const BoxDecoration(
-                  color: Color(0xB3000000),
-                  shape: BoxShape.circle,
-                ),
+                decoration: onPoster
+                    ? null
+                    : BoxDecoration(
+                        color: const Color(0xB3000000),
+                        borderRadius: AppShape.control,
+                      ),
                 child: Icon(
                   fav ? Icons.favorite : Icons.favorite_border,
-                  size: 18,
-                  color: fav ? AppColors.accent : Colors.white,
+                  size: onPoster ? 20 : 18,
+                  color: fav ? AppColors.accentOnMedia : Colors.white,
+                  shadows: onPoster
+                      ? const [Shadow(color: Color(0x99000000), blurRadius: 6)]
+                      : null,
                 ),
               ),
+            ),
+          ),
+        );
+        if (!onPoster) return heart;
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xB3000000), Color(0x00000000)],
+            ),
+          ),
+          child: SizedBox(
+            height: 64,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Padding(padding: const EdgeInsets.all(4), child: heart),
             ),
           ),
         );
@@ -54,7 +85,7 @@ class FavoriteOverlay extends StatelessWidget {
   }
 }
 
-/// Botão redondo para o painel lateral de detalhes (mesmo estilo dos vizinhos).
+/// Botão só com ícone para o painel lateral de detalhes (mesmo estilo dos vizinhos).
 class FavoritePanelButton extends StatelessWidget {
   const FavoritePanelButton({super.key, required this.title});
 
@@ -75,7 +106,7 @@ class FavoritePanelButton extends StatelessWidget {
           },
           style: IconButton.styleFrom(
             backgroundColor: const Color(0x99000000),
-            foregroundColor: fav ? AppColors.accent : Colors.white,
+            foregroundColor: fav ? AppColors.accentOnMedia : Colors.white,
           ),
           icon: Icon(fav ? Icons.favorite : Icons.favorite_border, size: 18),
         );

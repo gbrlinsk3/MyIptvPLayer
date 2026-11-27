@@ -52,7 +52,10 @@ class _SearchResultCardState extends State<SearchResultCard> {
       _delay = Timer(const Duration(milliseconds: 150), () {
         if (mounted) {
           _requested = true;
-          setState(() => _details = catalog.requestBackdrop(t.kind, t.id));
+          // Corpo em bloco: com `=>` o setState receberia o Future de volta.
+          setState(() {
+            _details = catalog.requestBackdrop(t.kind, t.id);
+          });
         }
       });
     }
@@ -91,7 +94,7 @@ class _SearchResultCardState extends State<SearchResultCard> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppShape.card,
                   border: Border.all(
                     color: _hover ? AppColors.accent : AppColors.border,
                     width: _hover ? 2 : 1,
@@ -171,7 +174,7 @@ class _SearchResultCardState extends State<SearchResultCard> {
                         fontSize: 13.5,
                         height: 1.25,
                         fontWeight: FontWeight.w700,
-                        color: _hover ? AppColors.accent : AppColors.text,
+                        color: _hover ? AppColors.accentInk : AppColors.text,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -203,7 +206,7 @@ class _Badge extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xB3000000),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: AppShape.control,
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),

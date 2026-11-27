@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
@@ -19,7 +20,9 @@ import 'shell/search_overlay.dart';
 import 'shell/top_bar.dart';
 import 'widgets/animated_counter.dart';
 import 'widgets/animated_content.dart';
+import 'widgets/app_backdrop.dart';
 import 'widgets/content_frame.dart';
+import 'widgets/glass.dart';
 import 'widgets/split_text.dart';
 import 'window/title_bar.dart';
 import 'widgets/cubos_logo.dart';
@@ -58,6 +61,10 @@ class _ShellState extends State<Shell> {
   }
 
   static const double _railWidth = 68;
+
+  /// Folgas da barra flutuante (recolhida: 6 + 56 + 6 = trilho de 68).
+  static const double _barLeft = 6;
+  static const double _barGap = 8;
 
   /// Duração do destaque deslizando até a aba nova (um pouco mais que a
   /// animação, que começa no quadro seguinte ao clique).
@@ -131,6 +138,13 @@ class _ShellState extends State<Shell> {
     return Scaffold(
       body: Stack(
         children: [
+          // Imagem de fundo de todas as telas principais (os players pintam o
+          // próprio fundo preto por cima).
+          Positioned.fill(child: AppBackdrop(
+              chosen: c.backgroundImage,
+              blur: c.backgroundBlur,
+              enabled: !c.minimalTheme || c.minimalBackground,
+            )),
           // O conteúdo fica sempre ao lado do trilho de 68 px; a barra expandida
           // abre POR CIMA dele. Assim o conteúdo não é recalculado a cada quadro
           // da animação (era uma das causas de engasgo).
@@ -165,23 +179,36 @@ class _ShellState extends State<Shell> {
                     children: [
                       // Só a página aberta é construída; as visitadas ficam vivas
                       // por 6 s e depois são descartadas (memória e animações).
-                      LazyPages(
-                        index: index,
-                        onDrop: () => c.catalog.trimCache(),
-                        // Início, TV ao vivo, Filmes e séries, Favoritos e
-                        // Minha biblioteca: entrada suave na primeira abertura.
-                        revealFirstOpen: const {0, 1, 2, 3, 4},
-                        builders: [
-                          (_) => DashboardPage(
-                                onOpenCatalog: () => c.setShellIndex(2),
-                              ),
-                          (_) => LiveTvPage(active: c.shellIndex == 1),
-                          (_) => CatalogPage(active: c.shellIndex == 2),
-                          (_) => const FavoritesPage(),
-                          (_) => const LibraryPage(),
-                          (_) => const AccountPage(),
-                          (_) => const CarryoverPage(),
-                        ],
+                      // Com a busca aberta a página some: os resultados não
+                      // têm fundo sólido e a imagem continua aparecendo.
+                      IgnorePointer(
+                        ignoring: searching,
+                        child: ExcludeFocus(
+                          excluding: searching,
+                          child: AnimatedOpacity(
+                            opacity: searching ? 0 : 1,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutCubic,
+                            child: LazyPages(
+                              index: index,
+                              onDrop: () => c.catalog.trimCache(),
+                              // Início, TV ao vivo, Filmes e séries, Favoritos e
+                              // Minha biblioteca: entrada suave na primeira abertura.
+                              revealFirstOpen: const {0, 1, 2, 3, 4},
+                              builders: [
+                                (_) => DashboardPage(
+                                      onOpenCatalog: c.requestCatalog,
+                                    ),
+                                (_) => LiveTvPage(active: c.shellIndex == 1),
+                                (_) => CatalogPage(active: c.shellIndex == 2),
+                                (_) => const FavoritesPage(),
+                                (_) => const LibraryPage(),
+                                (_) => const AccountPage(),
+                                (_) => const CarryoverPage(),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                       Positioned.fill(
                         child: AnimatedSwitcher(
@@ -206,7 +233,6 @@ class _ShellState extends State<Shell> {
           ),
           // Toque fora da barra expandida recolhe.
           Positioned.fill(
-            left: _railWidth,
             child: IgnorePointer(
               ignoring: !expanded,
               child: AnimatedOpacity(
@@ -227,12 +253,16 @@ class _ShellState extends State<Shell> {
             child: MouseRegion(
               onEnter: (_) => _onSidebarHover(c, true),
               onExit: (_) => _onSidebarHover(c, false),
-              child: _Sidebar(
-                index: index,
-                collapsed: c.sidebarCollapsed,
-                carryoverCount: c.carryoverCount,
-                onSelect: (i) => _selectTab(c, i),
-                onToggle: () => _toggleSidebar(c),
+              // Barra flutuante: solta das bordas da janela.
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(_barLeft, _barGap, 0, _barGap),
+                child: _Sidebar(
+                  index: index,
+                  collapsed: c.sidebarCollapsed,
+                  carryoverCount: c.carryoverCount,
+                  onSelect: (i) => _selectTab(c, i),
+                  onToggle: () => _toggleSidebar(c),
+                ),
               ),
             ),
           ),
@@ -241,6 +271,14 @@ class _ShellState extends State<Shell> {
     );
   }
 }
+
+/// Posição das dicas da barra lateral: ao lado do botão, centrada na altura
+/// dele (embaixo ela cobriria o item seguinte).
+@visibleForTesting
+Offset dicaAoLado(TooltipPositionContext c) => Offset(
+      c.target.dx + c.targetSize.width / 2 + 8,
+      c.target.dy - c.tooltipSize.height / 2,
+    );
 
 class _Sidebar extends StatefulWidget {
   const _Sidebar({
@@ -315,8 +353,8 @@ class _SidebarState extends State<_Sidebar> {
       height: 40,
       child: collapsed
           ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Center(child: Divider(color: AppColors.border)),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Center(child: Divider(color: AppGlass.line)),
             )
           : Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -351,33 +389,12 @@ class _SidebarState extends State<_Sidebar> {
       top: top,
       height: _itemHeight,
       child: IgnorePointer(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.accentSoft,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            // Indicador lateral na cor de destaque do perfil.
-            Positioned(
-              left: -8,
-              top: 9,
-              bottom: 9,
-              width: 3,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: const BorderRadius.horizontal(
-                    right: Radius.circular(3),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppGlass.selected,
+            borderRadius: AppShape.control,
+            border: Border.all(color: AppGlass.selectedEdge),
+          ),
         ),
       ),
     );
@@ -393,21 +410,11 @@ class _SidebarState extends State<_Sidebar> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      width: collapsed ? 68 : 220,
-      decoration: BoxDecoration(
-        color: AppColors.sidebar,
-        border: Border(right: BorderSide(color: AppColors.border)),
-        boxShadow: collapsed
-            ? const []
-            : const [
-                BoxShadow(
-                  color: Color(0x55000000),
-                  blurRadius: 24,
-                  offset: Offset(6, 0),
-                ),
-              ],
-      ),
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+      width: collapsed ? 56 : 220,
+      child: _GlassPanel(
+        open: !collapsed,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       // Decide pelo tamanho real durante a animação: os rótulos só aparecem
       // quando cabem (antes estouravam alguns pixels ao expandir).
       child: LayoutBuilder(builder: (context, box) {
@@ -423,9 +430,9 @@ class _SidebarState extends State<_Sidebar> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Faixa de arrastar a janela.
-          const DragToMoveArea(child: SizedBox(height: 24)),
+          const DragToMoveArea(child: SizedBox(height: 16)),
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+            padding: EdgeInsets.fromLTRB(compact ? 0 : 4, 4, compact ? 0 : 4, 8),
             child: Row(
               mainAxisAlignment:
                   compact ? MainAxisAlignment.center : MainAxisAlignment.start,
@@ -433,6 +440,7 @@ class _SidebarState extends State<_Sidebar> {
                 // Clicar no logo expande (ou recolhe) a barra.
                 Tooltip(
                   message: collapsed ? 'Expandir menu' : 'Recolher menu',
+                  positionDelegate: dicaAoLado,
                   waitDuration: const Duration(milliseconds: 500),
                   child: Semantics(
                     button: true,
@@ -543,13 +551,16 @@ class _SidebarState extends State<_Sidebar> {
           ],
           Align(
             alignment: collapsed ? Alignment.center : Alignment.centerLeft,
-            child: IconButton(
-              tooltip: collapsed ? 'Expandir menu' : 'Recolher menu',
-              onPressed: onToggle,
-              icon: Icon(
-                collapsed ? Icons.chevron_right : Icons.chevron_left,
-                size: 20,
-                color: AppColors.textMuted,
+            child: Tooltip(
+              message: collapsed ? 'Expandir menu' : 'Recolher menu',
+              positionDelegate: dicaAoLado,
+              child: IconButton(
+                onPressed: onToggle,
+                icon: Icon(
+                  collapsed ? Icons.chevron_right : Icons.chevron_left,
+                  size: 20,
+                  color: AppColors.textMuted,
+                ),
               ),
             ),
           ),
@@ -558,6 +569,43 @@ class _SidebarState extends State<_Sidebar> {
           ],
         );
       }),
+        ),
+      ),
+    );
+  }
+}
+
+/// O [GlassSurface] da barra flutuante, que fica mais fechado ao abrir.
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({required this.open, required this.child});
+
+  final bool open;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: open ? 1 : 0),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      child: Material(type: MaterialType.transparency, child: child),
+      builder: (context, t, child) => GlassSurface(
+        radius: AppShape.panel,
+        shadow: true,
+        fill: Color.lerp(
+          AppGlass.fill(open: false),
+          AppGlass.fill(open: true),
+          t,
+        ),
+        blur: ui.lerpDouble(
+          AppGlass.blur(open: false),
+          AppGlass.blur(open: true),
+          t,
+        ),
+        child: child!,
+      ),
     );
   }
 }
@@ -598,10 +646,10 @@ class _NavItemState extends State<_NavItem> {
     // "Sem fundo" é a própria cor do hover com opacidade 0: animar a partir de
     // Colors.transparent (preto) passava por um cinza escuro no meio do caminho.
     final Color background = !widget.selected && _hover
-        ? AppColors.hover
-        : AppColors.hover.withValues(alpha: 0);
+        ? AppGlass.hover
+        : AppGlass.hover.withValues(alpha: 0);
     final Color foreground =
-        widget.selected ? AppColors.accent : AppColors.text;
+        widget.selected ? AppColors.accentInk : AppColors.text;
 
     final content = Stack(
       clipBehavior: Clip.none,
@@ -610,13 +658,12 @@ class _NavItemState extends State<_NavItem> {
           duration: const Duration(milliseconds: 140),
           height: 42,
           // Com contador, a margem direita encolhe para o rótulo caber inteiro.
-          padding: EdgeInsets.only(
-            left: 12,
-            right: !widget.collapsed && widget.badge > 0 ? 6 : 12,
-          ),
+          padding: widget.collapsed
+              ? EdgeInsets.zero
+              : EdgeInsets.only(left: 12, right: widget.badge > 0 ? 6 : 12),
           decoration: BoxDecoration(
             color: background,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppShape.control,
           ),
           child: Row(
             mainAxisAlignment: widget.collapsed
@@ -666,7 +713,11 @@ class _NavItemState extends State<_NavItem> {
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
         child: widget.collapsed
-            ? Tooltip(message: widget.label, child: content)
+            ? Tooltip(
+                message: widget.label,
+                positionDelegate: dicaAoLado,
+                child: content,
+              )
             : content,
       ),
     );
@@ -689,14 +740,14 @@ class _Badge extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: AppColors.accent,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: AppShape.control,
         border: small ? Border.all(color: AppColors.sidebar, width: 2) : null,
       ),
       child: AnimatedCounter(
         value: count,
         maxShown: 99,
         style: TextStyle(
-          color: Colors.white,
+          color: AppColors.onAccent,
           fontSize: small ? 9.5 : 10.5,
           fontWeight: FontWeight.w700,
           height: 1,

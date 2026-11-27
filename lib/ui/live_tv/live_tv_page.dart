@@ -66,8 +66,11 @@ class _LiveTvPageState extends State<LiveTvPage> {
   static const Duration _hideAfter = Duration(milliseconds: 4500);
   static const double _drawerFraction = 0.72;
   static const double _sidePad = 28;
-  /// Altura da camada escura de "Todos os canais"; o botão de tela cheia fica acima dela.
-  static const double _fullscreenLift = 76 + 56;
+
+  /// Texto e ícone do botão "Guia". No Minimalista, aberto, ele é preenchido.
+  Color get _guideInk => !_guideOpen
+      ? Colors.white
+      : (AppColors.minimal ? AppColors.onAccent : AppColors.accent);
   static const int _maxRecentGroups = 24;
 
   static const Duration _snapTime = Duration(milliseconds: 250);
@@ -604,7 +607,10 @@ class _LiveTvPageState extends State<LiveTvPage> {
                 return Stack(
                   fit: StackFit.expand,
                   children: [
-                    ColoredBox(color: session ? Colors.black : AppColors.bg),
+                    // Sem vídeo, a imagem de fundo do app aparece.
+                    ColoredBox(
+                      color: session ? Colors.black : Colors.transparent,
+                    ),
                     if (session) ...[
                       Video(
                         controller: c.playback.video,
@@ -614,20 +620,13 @@ class _LiveTvPageState extends State<LiveTvPage> {
                       _scrim(fade, box.maxHeight),
                       _topBar(c, fade, controlsOn),
                       _bottomArea(c, fade, controlsOn),
-                      // Tela cheia: acima da camada escura de "Todos os canais" e por cima da
-                      // área inferior (a fileira de recentes ocupa a largura toda e
-                      // engoliria o clique).
-                      Positioned.fill(
-                        bottom: _fullscreenLift,
-                        child: PlayerControls(
-                          playback: c.playback,
-                          fullscreen: false,
-                          visible: controlsOn,
-                          part: PlayerControlsPart.fullscreen,
-                          onToggleFullscreen: () => unawaited(
-                            enterVideoFullscreen(context, c.playback),
-                          ),
-                        ),
+                      // Selo "REC": continua visível com os controles escondidos.
+                      PlayerControls(
+                        playback: c.playback,
+                        fullscreen: false,
+                        visible: controlsOn,
+                        part: PlayerControlsPart.recBadge,
+                        onToggleFullscreen: () {},
                       ),
                     ],
                     _drawer(c, box.maxHeight, slide),
@@ -703,10 +702,13 @@ class _LiveTvPageState extends State<LiveTvPage> {
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: session
-                    ? AppColors.bg.withValues(alpha: 0.96)
-                    : AppColors.bg,
+                    // No Minimalista a gaveta é sólida: o vídeo não aparece.
+                    ? AppColors.bg.withValues(alpha: AppColors.minimal ? 1 : 0.96)
+                    : Colors.transparent,
                 borderRadius: session
-                    ? const BorderRadius.vertical(top: Radius.circular(14))
+                    ? BorderRadius.vertical(
+                        top: Radius.circular(AppShape.panelRadius),
+                      )
                     : null,
                 border: session ? Border.all(color: AppColors.border) : null,
               ),
@@ -841,7 +843,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
                   child: Icon(
                     fav ? Icons.favorite : Icons.favorite_border,
                     size: 20,
-                    color: fav ? AppColors.accent : Colors.white,
+                    color: fav ? AppColors.accentOnMedia : Colors.white,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -876,7 +878,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
                       Icon(
                         Icons.event_note_outlined,
                         size: 18,
-                        color: _guideOpen ? AppColors.accent : Colors.white,
+                        color: _guideInk,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -884,7 +886,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: _guideOpen ? AppColors.accent : Colors.white,
+                          color: _guideInk,
                         ),
                       ),
                     ],
@@ -910,8 +912,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
         backgroundColor: WidgetStatePropertyAll(AppColors.surface),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+          AppShape.cardBorder.copyWith(
             side: BorderSide(color: AppColors.border),
           ),
         ),
@@ -934,42 +935,46 @@ class _LiveTvPageState extends State<LiveTvPage> {
           ),
         ),
         for (final v in g.versions)
-          MenuItemButton(
-            style: MenuItemButton.styleFrom(foregroundColor: AppColors.text),
-            onPressed: () => _chooseVersion(g, v),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  g.labelOf(v),
-                  style: TextStyle(
-                    fontWeight: v.streamId == sel.streamId
-                        ? FontWeight.w700
-                        : FontWeight.w400,
+          // Em pílula o item não encosta nas bordas do menu.
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppShape.r(8)),
+            child: MenuItemButton(
+              style: MenuItemButton.styleFrom(foregroundColor: AppColors.text),
+              onPressed: () => _chooseVersion(g, v),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    g.labelOf(v),
+                    style: TextStyle(
+                      fontWeight: v.streamId == sel.streamId
+                          ? FontWeight.w700
+                          : FontWeight.w400,
+                    ),
                   ),
-                ),
-                if (v.streamId == sel.streamId) ...[
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(3),
-                      border: Border.all(color: AppColors.accent),
-                    ),
-                    child: Text(
-                      'Em uso',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.accent,
+                  if (v.streamId == sel.streamId) ...[
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: AppShape.control,
+                        border: Border.all(color: AppColors.accentInk),
+                      ),
+                      child: Text(
+                        'Em uso',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accentInk,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
       ],
@@ -995,8 +1000,9 @@ class _LiveTvPageState extends State<LiveTvPage> {
     );
   }
 
-  /// Faixa de baixo: volume e gravação, e abaixo o guia (se aberto) ou "Recentes e
-  /// favoritos" com o botão que abre a gaveta. Fica acima da barra com a tela cheia.
+  /// Faixa de baixo: uma linha com volume, gravação e tela cheia e, abaixo dela,
+  /// o guia (se aberto) ou o divisor, "Recentes e favoritos" e o convite que abre
+  /// a gaveta. Nada pode ficar por cima dela: os cartões precisam do mouse.
   Widget _bottomArea(AppController c, Duration fade, bool on) {
     final Widget content;
     if (_guideOpen) {
@@ -1005,7 +1011,7 @@ class _LiveTvPageState extends State<LiveTvPage> {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppShape.card,
         ),
         child: const EpgPanel(),
       );
@@ -1016,7 +1022,17 @@ class _LiveTvPageState extends State<LiveTvPage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Separa os controles do que é navegação de canais.
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: _sidePad),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: Color.fromRGBO(255, 255, 255, 0.3),
+            ),
+          ),
           if (recents.isNotEmpty) ...[
+            const SizedBox(height: 10),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: _sidePad),
               child: Text(
@@ -1035,18 +1051,8 @@ class _LiveTvPageState extends State<LiveTvPage> {
               currentStreamId: current,
               onOpen: _openGroup,
             ),
-            const SizedBox(height: 8),
           ],
-          // Divisor; abaixo dele a tela escurece e o convite abre a gaveta
-          // (clique ou arrasto para cima).
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: _sidePad),
-            child: Divider(
-              height: 1,
-              thickness: 1,
-              color: Color.fromRGBO(255, 255, 255, 0.3),
-            ),
-          ),
+          // Convite para abrir a gaveta (clique ou arrasto para cima).
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
@@ -1056,7 +1062,8 @@ class _LiveTvPageState extends State<LiveTvPage> {
                 if (d.delta.dy < -2) _setDrawer(true);
               },
               child: SizedBox(
-                height: 76,
+                height: 56,
+                width: double.infinity,
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1100,8 +1107,8 @@ class _LiveTvPageState extends State<LiveTvPage> {
           ignoring: !on,
           child: Stack(
             children: [
-              // O gradiente não recebe cliques; sobra ~56 px embaixo para a
-              // barra do PlayerControls.
+              // Um degradê só, cada vez mais escuro até a borda de baixo. Não
+              // recebe cliques.
               const Positioned.fill(
                 child: IgnorePointer(
                   child: DecoratedBox(
@@ -1111,31 +1118,21 @@ class _LiveTvPageState extends State<LiveTvPage> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Color.fromRGBO(0, 0, 0, 0),
-                          Color.fromRGBO(0, 0, 0, 0.85),
+                          Color.fromRGBO(0, 0, 0, 0.55),
+                          Color.fromRGBO(0, 0, 0, 0.92),
                         ],
+                        stops: [0, 0.3, 1],
                       ),
                     ),
                   ),
                 ),
               ),
-              // Camada escura semitransparente do divisor até a borda de baixo.
-              if (!_guideOpen)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: 76 + 56,
-                  child: const IgnorePointer(
-                    child: ColoredBox(color: Color.fromRGBO(0, 0, 0, 0.35)),
-                  ),
-                ),
               Padding(
-                padding: const EdgeInsets.only(top: 40, bottom: 56),
+                padding: EdgeInsets.only(top: 40, bottom: _guideOpen ? 16 : 4),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Volume e gravação ficam acima de "Recentes e favoritos".
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: _sidePad - 12,
@@ -1143,11 +1140,14 @@ class _LiveTvPageState extends State<LiveTvPage> {
                       child: PlayerControls(
                         playback: c.playback,
                         fullscreen: false,
-                        part: PlayerControlsPart.audioRec,
-                        onToggleFullscreen: () {},
+                        visible: on,
+                        part: PlayerControlsPart.row,
+                        onToggleFullscreen: () => unawaited(
+                          enterVideoFullscreen(context, c.playback),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     content,
                   ],
                 ),
@@ -1180,16 +1180,18 @@ class _OverlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // No Minimalista o item ligado é preenchido: não depende do vídeo atrás.
+    final solid = active && AppColors.minimal;
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: const Color.fromRGBO(0, 0, 0, 0.45),
+        color: solid ? AppColors.accent : const Color.fromRGBO(0, 0, 0, 0.45),
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: AppShape.control,
           side: BorderSide(
             color: active
-                ? AppColors.accent
+                ? AppColors.accentOnMedia
                 : const Color.fromRGBO(255, 255, 255, 0.2),
           ),
         ),

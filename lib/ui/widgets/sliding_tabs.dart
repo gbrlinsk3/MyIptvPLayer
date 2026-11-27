@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import 'glass.dart';
 
 /// Abas com um indicador que desliza até a aba escolhida. Visual e animação do
-/// protótipo aprovado (test/_previews/motion_preview_test.dart), com cantos em
-/// pílula como os ChoiceChip do app.
+/// protótipo aprovado (test/_previews/motion_preview_test.dart), com os cantos
+/// dos controles ([AppShape.control]).
 ///
 /// As larguras são medidas pelo texto, então um rótulo que muda (ex.: contador
 /// "Filmes · 12" para "Filmes · 13") é tratado sem ajuste extra. Se a largura
@@ -50,44 +51,43 @@ class SlidingTabs extends StatelessWidget {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Container(
-        padding: const EdgeInsets.all(_margem),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular((_altura + 2 * _margem + 2) / 2),
-        ),
-        child: Stack(
-          children: [
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              left: esquerdaDe(indice),
-              top: 0,
-              bottom: 0,
-              width: larguras[indice],
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.accentSoft,
-                  borderRadius: BorderRadius.circular(_altura / 2),
+      child: GlassSurface(
+        radius: AppShape.control,
+        child: Padding(
+          // + 1: o espaço da borda.
+          padding: const EdgeInsets.all(_margem + 1),
+          child: Stack(
+            children: [
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                left: esquerdaDe(indice),
+                top: 0,
+                bottom: 0,
+                width: larguras[indice],
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.accentSoft,
+                    borderRadius: AppShape.control,
+                  ),
                 ),
               ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < labels.length; i++) ...[
-                  if (i > 0) SizedBox(width: spacing),
-                  _Aba(
-                    label: labels[i],
-                    largura: larguras[i],
-                    ativa: i == indice,
-                    onTap: () => onChanged(i),
-                  ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < labels.length; i++) ...[
+                    if (i > 0) SizedBox(width: spacing),
+                    _Aba(
+                      label: labels[i],
+                      largura: larguras[i],
+                      ativa: i == indice,
+                      onTap: () => onChanged(i),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -127,7 +127,7 @@ class _Aba extends StatelessWidget {
                 duration: const Duration(milliseconds: 200),
                 style: SlidingTabs._estilo.copyWith(
                   fontFamily: AppFonts.body,
-                  color: ativa ? AppColors.accent : AppColors.textMuted,
+                  color: ativa ? AppColors.accentInk : AppColors.textMuted,
                 ),
                 child: Text(label),
               ),

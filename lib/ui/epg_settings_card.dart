@@ -4,6 +4,7 @@ import '../core/format.dart';
 import '../core/theme.dart';
 import '../data/models.dart';
 import '../state/app_scope.dart';
+import 'widgets/app_switch.dart';
 import 'widgets/common.dart';
 
 /// Card de Ajustes: fontes EPG por URL e a opção de preferir o EPG do usuário.
@@ -90,7 +91,7 @@ class _EpgSettingsCardState extends State<EpgSettingsCard> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Switch(value: epg.preferUser, onChanged: epg.setPreferUser),
+                AppSwitch(value: epg.preferUser, onChanged: epg.setPreferUser),
               ],
             ),
             const SizedBox(height: 16),

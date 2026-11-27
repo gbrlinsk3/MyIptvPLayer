@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../update/app_updater.dart';
 import '../../update/update_info.dart';
 import '../widgets/cubos_logo.dart';
+import '../widgets/glass.dart';
 import '../widgets/swipe_toast.dart';
 
 /// Tela de abertura enquanto o app procura atualização (no máximo ~6 s).
@@ -76,7 +77,6 @@ class _UpdateToastState extends State<UpdateToast> {
         final compact = TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 10),
         );
-        final radius = BorderRadius.circular(AppShape.rounded ? 12 : 2);
         // Arrastar para baixo ou deixar o pavio de 25 s acabar equivale a
         // "Depois": o aviso volta na próxima abertura do programa. O tempo para
         // com o mouse em cima, baixando e com "Detalhes" aberto; mudar a etapa
@@ -91,90 +91,83 @@ class _UpdateToastState extends State<UpdateToast> {
             dismissible: !busy,
             restartKey: u.state,
             onDismiss: u.dismiss,
-            child: ClipRRect(
-            borderRadius: radius,
-            child: Material(
-            color: AppColors.surface,
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: radius,
-              side: BorderSide(color: AppColors.accent),
-            ),
-            child: SizedBox(
-              width: 400,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Nova versão ${info.version} disponível',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Você está na ${AppInfo.version}.'
-                      '${info.notes.isEmpty ? '' : '\n${info.notes}'}',
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                    ),
-                    if (busy) ...[
-                      const SizedBox(height: 10),
-                      LinearProgressIndicator(
-                        value: u.progress == 0 ? null : u.progress,
-                        minHeight: 3,
-                      ),
-                    ],
-                    if (u.state == UpdateState.error && u.error != null) ...[
-                      const SizedBox(height: 8),
+            child: GlassPane(
+              radius: AppShape.card,
+              edge: AppColors.accent,
+              child: SizedBox(
+                width: 400,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        u.error!,
-                        style: TextStyle(color: AppColors.danger, fontSize: 12),
+                        'Nova versão ${info.version} disponível',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
                       ),
-                    ],
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        FilledButton(
-                          onPressed: busy
-                              ? null
-                              : ready
-                                  ? u.installAndRestart
-                                  : u.download,
-                          child: Text(
-                            busy
-                                ? 'Baixando…'
+                      const SizedBox(height: 4),
+                      Text(
+                        'Você está na ${AppInfo.version}.'
+                        '${info.notes.isEmpty ? '' : '\n${info.notes}'}',
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      ),
+                      if (busy) ...[
+                        const SizedBox(height: 10),
+                        LinearProgressIndicator(
+                          value: u.progress == 0 ? null : u.progress,
+                          minHeight: 3,
+                        ),
+                      ],
+                      if (u.state == UpdateState.error && u.error != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          u.error!,
+                          style: TextStyle(color: AppColors.danger, fontSize: 12),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          FilledButton(
+                            onPressed: busy
+                                ? null
                                 : ready
-                                    ? 'Instalar e reiniciar'
-                                    : 'Atualizar agora',
+                                    ? u.installAndRestart
+                                    : u.download,
+                            child: Text(
+                              busy
+                                  ? 'Baixando…'
+                                  : ready
+                                      ? 'Instalar e reiniciar'
+                                      : 'Atualizar agora',
+                            ),
                           ),
-                        ),
-                        TextButton(
-                          style: compact,
-                          onPressed: busy ? null : u.dismiss,
-                          child: const Text('Depois'),
-                        ),
-                        if (info.hasDetails || info.notes.isNotEmpty)
                           TextButton(
                             style: compact,
-                            onPressed: () => setState(() => _details = true),
-                            child: const Text('Detalhes'),
+                            onPressed: busy ? null : u.dismiss,
+                            child: const Text('Depois'),
                           ),
-                      ],
-                    ),
-                  ],
+                          if (info.hasDetails || info.notes.isNotEmpty)
+                            TextButton(
+                              style: compact,
+                              onPressed: () => setState(() => _details = true),
+                              child: const Text('Detalhes'),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
             ),
             ),
           ),
@@ -215,13 +208,7 @@ class _UpdateDetails extends StatelessWidget {
           child: const ColoredBox(color: Color(0x99000000)),
         ),
         Center(
-          child: Material(
-            color: AppColors.surface,
-            elevation: 12,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppShape.rounded ? 12 : 2),
-              side: BorderSide(color: AppColors.border),
-            ),
+          child: GlassPane(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480, maxHeight: 480),
               child: Padding(
@@ -252,7 +239,7 @@ class _UpdateDetails extends StatelessWidget {
                                     child: Text(
                                       e.value,
                                       style: TextStyle(
-                                        color: AppColors.accent,
+                                        color: AppColors.accentInk,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,
                                       ),

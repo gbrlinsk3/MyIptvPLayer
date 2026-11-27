@@ -11,6 +11,7 @@ import '../../data/models.dart';
 import '../../state/app_scope.dart';
 import '../catalog/poster_image.dart';
 import '../widgets/common.dart';
+import '../widgets/glass.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/sliding_tabs.dart';
 
@@ -285,7 +286,7 @@ class _EntryRowState extends State<_EntryRow> {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: _hover ? AppColors.hover : AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppShape.card,
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
@@ -354,14 +355,14 @@ class _Thumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: AppShape.thumb,
       child: SizedBox(
         width: 40,
         height: 56,
         child: url == null || url!.isEmpty
             ? ColoredBox(
                 color: AppColors.accentSoft,
-                child: Icon(icon, size: 20, color: AppColors.accent),
+                child: Icon(icon, size: 20, color: AppColors.accentInk),
               )
             : PosterImage(url: url, name: name, cacheWidth: 120),
       ),
@@ -422,7 +423,7 @@ class _ResultsSkeleton extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
               child: Row(
                 children: [
-                  SkeletonBox(width: 40, height: 56, radius: 6),
+                  SkeletonBox(width: 40, height: 56),
                   SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -431,12 +432,12 @@ class _ResultsSkeleton extends StatelessWidget {
                       children: [
                         FractionallySizedBox(
                           widthFactor: 0.75,
-                          child: SkeletonBox(height: 13, radius: 4),
+                          child: SkeletonBox(height: 13),
                         ),
                         SizedBox(height: 6),
                         FractionallySizedBox(
                           widthFactor: 0.45,
-                          child: SkeletonBox(height: 10, radius: 4),
+                          child: SkeletonBox(height: 10),
                         ),
                       ],
                     ),
@@ -535,9 +536,7 @@ class _RelinkDialogState<T> extends State<_RelinkDialog<T>> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
+    return GlassAlertDialog(
       title: Text(widget.title, style: const TextStyle(fontSize: 16)),
       content: SizedBox(
         width: 480,
@@ -575,7 +574,7 @@ class _RelinkDialogState<T> extends State<_RelinkDialog<T>> {
                       : ListView.builder(
                           itemCount: _results.length,
                           itemBuilder: (context, i) => InkWell(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: AppShape.card,
                             onTap: () => Navigator.of(context).pop(_results[i]),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(

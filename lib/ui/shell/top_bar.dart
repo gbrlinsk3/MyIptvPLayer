@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../profiles/profiles_scope.dart';
 import '../../state/app_scope.dart';
 import '../profiles/profile_avatar.dart';
+import '../widgets/glass.dart';
 import '../widgets/text_type.dart';
 
 /// Conteúdo do topo: busca global à esquerda, área de arrastar a janela e o
@@ -85,43 +86,47 @@ class _SearchField extends StatelessWidget {
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
-        return TextField(
-          controller: controller,
-          focusNode: focus,
-          onChanged: onChanged,
-          style: const TextStyle(fontSize: 14),
-          decoration: InputDecoration(
-            hint: dica,
-            isDense: true,
-            filled: true,
-            fillColor: AppColors.surface,
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            prefixIcon: Icon(
-              Icons.search,
-              size: 20,
-              color: AppColors.textMuted,
-            ),
-            suffixIcon: value.text.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Limpar',
-                    icon: Icon(Icons.close, size: 18, color: AppColors.textMuted),
-                    onPressed: () {
-                      controller.clear();
-                      onChanged('');
-                    },
-                  ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(22),
-              borderSide: BorderSide(color: AppColors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(22),
-              borderSide: BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(22),
-              borderSide: BorderSide(color: AppColors.accent, width: 1.4),
+        final radius = AppShape.control;
+        // A borda de repouso é a do vidro; o campo só desenha a de foco.
+        final semBorda = OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide.none,
+        );
+        return GlassSurface(
+          radius: radius,
+          child: TextField(
+            controller: controller,
+            focusNode: focus,
+            onChanged: onChanged,
+            style: const TextStyle(fontSize: 14),
+            decoration: InputDecoration(
+              hint: dica,
+              isDense: true,
+              filled: true,
+              fillColor: Colors.transparent,
+              hoverColor: Colors.transparent,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              prefixIcon: Icon(
+                Icons.search,
+                size: 20,
+                color: AppColors.textMuted,
+              ),
+              suffixIcon: value.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Limpar',
+                      icon: Icon(Icons.close, size: 18, color: AppColors.textMuted),
+                      onPressed: () {
+                        controller.clear();
+                        onChanged('');
+                      },
+                    ),
+              border: semBorda,
+              enabledBorder: semBorda,
+              focusedBorder: OutlineInputBorder(
+                borderRadius: radius,
+                borderSide: BorderSide(color: AppColors.accent, width: 1.4),
+              ),
             ),
           ),
         );
@@ -130,11 +135,26 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-/// Perfil ativo no topo, à direita. Menu: conta e ajustes, tema e trocar de perfil.
-class _ProfileMenu extends StatelessWidget {
+/// Perfil ativo no topo, à direita. Menu: conta e ajustes, tema e trocar de
+/// perfil. É um [MenuAnchor] (e não um PopupMenuButton) para o painel poder ser
+/// de vidro, desfocando o conteúdo que fica atrás dele.
+class _ProfileMenu extends StatefulWidget {
   const _ProfileMenu({required this.onOpenAccount});
 
   final VoidCallback onOpenAccount;
+
+  @override
+  State<_ProfileMenu> createState() => _ProfileMenuState();
+}
+
+class _ProfileMenuState extends State<_ProfileMenu> {
+  final _focus = FocusNode(debugLabel: 'menu do perfil');
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -144,35 +164,50 @@ class _ProfileMenu extends StatelessWidget {
     final app = AppScope.of(context);
     final dark = AppColors.isDark;
 
-    return PopupMenuButton<String>(
-      tooltip: 'Perfil',
-      offset: const Offset(0, 48),
-      color: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border),
-      ),
-      onSelected: (v) {
-        switch (v) {
-          case 'account':
-            onOpenAccount();
-          case 'theme':
-            app.setThemePref(dark ? ThemePref.light : ThemePref.dark);
-          case 'switch':
-            profiles.leave();
-        }
-      },
-      itemBuilder: (context) => [
-        _item('account', Icons.settings_outlined, 'Conta e ajustes'),
-        _item(
-          'theme',
-          dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-          dark ? 'Tema claro' : 'Tema escuro',
+    return MenuAnchor(
+      childFocusNode: _focus,
+      consumeOutsideTap: true,
+      // O painel é o próprio vidro: o do Material fica invisível e não recorta
+      // a sombra.
+      clipBehavior: Clip.none,
+      alignmentOffset: const Offset(0, 4),
+      style: glassMenuStyle,
+      menuChildren: [
+        GlassMenuPanel(
+          children: [
+            GlassMenuItem(
+              icon: Icons.settings_outlined,
+              label: 'Conta e ajustes',
+              onPressed: widget.onOpenAccount,
+            ),
+            GlassMenuItem(
+              icon: dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              label: dark ? 'Tema claro' : 'Tema escuro',
+              onPressed: () => app.setThemePref(
+                dark ? ThemePref.light : ThemePref.dark,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Divider(height: 1, color: AppGlass.line),
+            ),
+            GlassMenuItem(
+              icon: Icons.swap_horiz,
+              label: 'Trocar de perfil',
+              onPressed: profiles.leave,
+            ),
+          ],
         ),
-        const PopupMenuDivider(),
-        _item('switch', Icons.swap_horiz, 'Trocar de perfil'),
       ],
+      builder: (context, menu, child) => Tooltip(
+        message: 'Perfil',
+        child: InkWell(
+          focusNode: _focus,
+          borderRadius: AppShape.control,
+          onTap: () => menu.isOpen ? menu.close() : menu.open(),
+          child: child,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: Row(
@@ -199,20 +234,6 @@ class _ProfileMenu extends StatelessWidget {
             Icon(Icons.expand_more, size: 18, color: AppColors.textMuted),
           ],
         ),
-      ),
-    );
-  }
-
-  PopupMenuItem<String> _item(String value, IconData icon, String label) {
-    return PopupMenuItem<String>(
-      value: value,
-      height: 40,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.textMuted),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontSize: 13)),
-        ],
       ),
     );
   }

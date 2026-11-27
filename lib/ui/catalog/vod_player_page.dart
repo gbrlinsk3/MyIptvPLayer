@@ -12,7 +12,9 @@ import '../../core/app_log.dart';
 import '../../core/format.dart';
 import '../../core/system_dialogs.dart';
 import '../../core/theme.dart';
+import '../widgets/app_popup_menu.dart';
 import '../../data/catalog_models.dart';
+import '../../playback/vod_end_guard.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../widgets/swipe_toast.dart';
@@ -101,6 +103,9 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   Duration? _pendingSeek;
   Duration _lastSavedAt = Duration.zero;
   bool _finished = false;
+
+  /// Separa o fim de verdade do vídeo cortado e segura o ponto do corte.
+  final VodEndGuard _end = VodEndGuard();
 
   String? _lastError;
   String? _error;
@@ -196,6 +201,9 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   Future<void> _openCurrent(Duration? startAt) async {
     _nextTimer?.cancel();
     _nextPanelTimer?.cancel();
+    // Até a reprodução chegar ao ponto de retomada, nada grava por cima dele
+    // (se o vídeo falhar antes, o ponto continua guardado).
+    _end.hold(startAt);
     setState(() {
       _error = null;
       _lastError = null;
@@ -224,6 +232,8 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   }
 
   void _onPosition(Duration p) {
+    // Depois do corte o libmpv ainda ajusta a posição; ela não tira o erro.
+    if (_end.interrupted) return;
     if (p != _position) _lastProgress = DateTime.now();
     if (_lastError != null && p > _position) {
       _lastError = null;
@@ -232,6 +242,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     if (!mounted) return;
     // Só reconstrói a tela a cada mudança visível (a cada ~0,25 s o player avisa).
     setState(() => _position = p);
+    if (_pendingSeek == null && _duration > Duration.zero) _end.reached(p);
     _checkEnding(p);
   }
 
@@ -285,12 +296,19 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
       _pendingSeek = null;
       // Se o ponto salvo está no fim, volta ao começo.
       final target = seek >= d - const Duration(seconds: 15) ? Duration.zero : seek;
+      if (target == Duration.zero) _end.release();
       unawaited(_player.seek(target));
     }
   }
 
   void _onCompleted(bool done) {
-    if (!done || _finished || !mounted) return;
+    if (!done || _finished || _end.interrupted || !mounted) return;
+    // "Terminou" também chega quando o servidor corta o vídeo no meio.
+    if (!VodEndGuard.isRealEnd(_position, _duration)) {
+      _interrupt();
+      return;
+    }
+    _end.release();
     _finished = true;
     _autoWatched = true;
     _save(force: true, watched: true); // terminou: a posição volta ao início
@@ -322,6 +340,33 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     }
   }
 
+  /// Vídeo cortado antes do fim: guarda onde parou (sem marcar como assistido
+  /// por isso), não avança para o próximo episódio e mostra o erro.
+  void _interrupt() {
+    AppLog.warn(
+      'player.fim',
+      'Vídeo cortado em ${formatDuration(_position)} de '
+          '${formatDuration(_duration)}',
+    );
+    // Com um ponto já segurado, o que está no banco vale mais que o atual.
+    if (_end.canSave && _position > Duration.zero) _save(force: true);
+    _end.interrupt(_position);
+    _nextTimer?.cancel();
+    _nextPanelTimer?.cancel();
+    setState(() {
+      _nextPanel = _NextPanel.hidden;
+      _nextCountdown = null;
+      _episodesOpen = false;
+      _buffering = false;
+      _error = vodInterruptedMessage(
+        at: _end.resumeAt,
+        duration: _duration,
+        local: !_item.url.startsWith('http'),
+        watched: _autoWatched,
+      );
+    });
+  }
+
   /// Se o player reportou erro e a posição não anda há um tempo, mostra o erro.
   void _watch() {
     if (!mounted || _error != null || _finished) return;
@@ -334,8 +379,9 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   }
 
   Future<void> _goNext() async {
-    if (!_hasNext) return;
+    if (!_hasNext || _end.interrupted) return;
     _save(force: true, watched: true);
+    _end.release();
     setState(() => _index++);
     await _openCurrent(null);
   }
@@ -344,6 +390,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   Future<void> _jumpTo(int i) async {
     if (i == _index || i < 0 || i >= widget.items.length) return;
     _save(force: true);
+    _end.release();
     setState(() => _index = i);
     final p = await widget.app.catalog.progressOf(_item);
     await _openCurrent(
@@ -351,10 +398,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     );
   }
 
-  Future<void> _retry() async {
-    final at = _position;
-    await _openCurrent(at);
-  }
+  Future<void> _retry() => _openCurrent(_end.retry(_position));
 
   void _close() {
     if (mounted) Navigator.of(context).pop();
@@ -363,7 +407,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
   /// Salva a posição. [watched] força "assistido"; sem ele, vale a regra de 92%.
   void _save({bool force = false, bool? watched}) {
     final dur = _duration;
-    if (dur <= Duration.zero) return;
+    if (dur <= Duration.zero || !_end.canSave) return;
     final pos = _position;
     if (!force && (pos - _lastSavedAt).abs() < const Duration(seconds: 5)) return;
     _lastSavedAt = pos;
@@ -419,11 +463,26 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     });
   }
 
+  /// Com o vídeo cortado, tocar de novo no libmpv voltaria ao começo: só vale
+  /// "Tentar de novo".
+  void _togglePlay() {
+    if (_end.interrupted) return;
+    _player.playOrPause();
+    _poke();
+  }
+
+  /// Posição escolhida pelo usuário: passa a valer no lugar do ponto segurado.
+  Future<void> _seekTo(Duration target) async {
+    if (_end.interrupted) return;
+    if (_pendingSeek == null && _duration > Duration.zero) _end.release();
+    await _player.seek(target);
+  }
+
   Future<void> _seekBy(Duration delta) async {
     var target = _position + delta;
     if (target < Duration.zero) target = Duration.zero;
     if (_duration > Duration.zero && target > _duration) target = _duration;
-    await _player.seek(target);
+    await _seekTo(target);
     _poke();
   }
 
@@ -482,10 +541,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onTap: () {
-              _player.playOrPause();
-              _poke();
-            },
+            onTap: _togglePlay,
             onDoubleTap: _toggleFullscreen,
           ),
         ),
@@ -541,10 +597,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): _escape,
-        const SingleActivator(LogicalKeyboardKey.space): () {
-          _player.playOrPause();
-          _poke();
-        },
+        const SingleActivator(LogicalKeyboardKey.space): _togglePlay,
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
             _seekBy(const Duration(seconds: -10)),
         const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
@@ -611,7 +664,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                 onChanged: (v) => setState(() => _dragValue = v),
                 onChangeEnd: (v) async {
                   setState(() => _dragValue = null);
-                  await _player.seek(Duration(milliseconds: v.round()));
+                  await _seekTo(Duration(milliseconds: v.round()));
                 },
               ),
             ),
@@ -626,10 +679,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
             _iconBtn(
               _playing ? Icons.pause : Icons.play_arrow,
               _playing ? 'Pausar' : 'Continuar',
-              () {
-                _player.playOrPause();
-                _poke();
-              },
+              _togglePlay,
               size: 28,
             ),
             _iconBtn(Icons.replay_10, 'Voltar 10 s',
@@ -679,7 +729,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
               },
               itemBuilder: (context) {
                 final items = <PopupMenuEntry<Object>>[
-                  PopupMenuItem<Object>(
+                  AppPopupMenuItem<Object>(
                     enabled: false,
                     height: 32,
                     child: Text(
@@ -692,7 +742,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                   ),
                 ];
                 if (audio.isEmpty) {
-                  items.add(const PopupMenuItem<Object>(
+                  items.add(AppPopupMenuItem<Object>(
                     enabled: false,
                     height: 32,
                     child: Text('Nenhuma faixa informada'),
@@ -700,7 +750,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                 }
                 for (var i = 0; i < audio.length; i++) {
                   final t = audio[i];
-                  items.add(PopupMenuItem<Object>(
+                  items.add(AppPopupMenuItem<Object>(
                     value: t,
                     height: 36,
                     child: _menuRow(
@@ -710,7 +760,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                   ));
                 }
                 items.add(const PopupMenuDivider());
-                items.add(PopupMenuItem<Object>(
+                items.add(AppPopupMenuItem<Object>(
                   enabled: false,
                   height: 32,
                   child: Text(
@@ -721,14 +771,14 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                     ),
                   ),
                 ));
-                items.add(PopupMenuItem<Object>(
+                items.add(AppPopupMenuItem<Object>(
                   value: SubtitleTrack.no(),
                   height: 36,
                   child: _menuRow('Desativada', _track.subtitle.id == 'no'),
                 ));
                 for (var i = 0; i < subs.length; i++) {
                   final t = subs[i];
-                  items.add(PopupMenuItem<Object>(
+                  items.add(AppPopupMenuItem<Object>(
                     value: t,
                     height: 36,
                     child: _menuRow(
@@ -738,7 +788,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                   ));
                 }
                 items.add(const PopupMenuDivider());
-                items.add(const PopupMenuItem<Object>(
+                items.add(AppPopupMenuItem<Object>(
                   value: 'load-subtitle',
                   height: 36,
                   child: Row(
@@ -769,7 +819,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
         SizedBox(
           width: 20,
           child: selected
-              ? Icon(Icons.check, size: 16, color: AppColors.accent)
+              ? Icon(Icons.check, size: 16, color: AppColors.accentInk)
               : null,
         ),
         Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
@@ -906,7 +956,9 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                 AppColors.accent,
               ],
             ),
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(26)),
+            borderRadius: BorderRadius.horizontal(
+              left: Radius.circular(AppShape.controlRadius),
+            ),
             boxShadow: [
               BoxShadow(
                 color: AppColors.accent.withValues(alpha: 0.45),
@@ -920,9 +972,13 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
               ),
             ],
           ),
-          child: const Padding(
-            padding: EdgeInsets.only(left: 4),
-            child: Icon(Icons.skip_next_rounded, color: Colors.white, size: 28),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Icon(
+              Icons.skip_next_rounded,
+              color: AppColors.onAccent,
+              size: 28,
+            ),
           ),
         ),
       ),
@@ -946,13 +1002,13 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
         onTimeout: counting ? null : _minimizeNext,
         onDismiss: counting ? _cancelNextCountdown : _minimizeNext,
         child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppShape.card,
         child: Container(
         width: 320,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: const Color(0xE6181817),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppShape.card,
           border: Border.all(color: Colors.white24),
         ),
         child: Column(
@@ -971,6 +1027,7 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
                 ),
                 if (!counting)
                   InkWell(
+                    borderRadius: AppShape.control,
                     onTap: () {
                       _nextPanelTimer?.cancel();
                       setState(() => _nextPanel = _NextPanel.minimized);
@@ -1031,9 +1088,11 @@ class _VodPlayerPageState extends State<VodPlayerPage> {
               children: [
                 const Icon(Icons.error_outline, color: Colors.white70, size: 32),
                 const SizedBox(height: 12),
-                const Text(
-                  'Não foi possível reproduzir',
-                  style: TextStyle(
+                Text(
+                  _end.interrupted && _duration > Duration.zero
+                      ? 'O vídeo parou antes do fim'
+                      : 'Não foi possível reproduzir',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

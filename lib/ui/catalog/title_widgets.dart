@@ -7,9 +7,10 @@ import '../../data/catalog_models.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/split_text.dart';
 import '../widgets/carousel_arrows.dart';
-import '../widgets/content_frame.dart';
 import '../widgets/full_name_tooltip.dart';
+import '../widgets/more_button.dart';
 import '../widgets/press_scale.dart';
+import 'endless_titles.dart';
 import 'favorite_button.dart';
 import 'poster_image.dart';
 
@@ -63,7 +64,7 @@ class _PosterCardState extends State<PosterCard> {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: AppShape.card,
                       border: Border.all(
                         color: _hover ? AppColors.accent : AppColors.border,
                         width: _hover ? 2 : 1,
@@ -79,37 +80,29 @@ class _PosterCardState extends State<PosterCard> {
                           : const [],
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppShape.inset(2),
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
                           PosterImage(url: t.image, name: t.name),
                           Positioned(
-                            top: 6,
-                            left: 6,
-                            child: FavoriteOverlay(title: t, hover: _hover),
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: FavoriteOverlay(
+                              title: t,
+                              hover: _hover,
+                              onPoster: true,
+                            ),
                           ),
                           if (t.rating != null)
                             Positioned(
-                              top: 6,
-                              right: 6,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xB3000000),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '★ ${t.rating!.toStringAsFixed(1)}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: _PosterRating(
+                                rating: t.rating!,
+                                visible: _hover,
                               ),
                             ),
                           if (progress != null)
@@ -121,7 +114,7 @@ class _PosterCardState extends State<PosterCard> {
                                 value: progress,
                                 minHeight: 4,
                                 backgroundColor: const Color(0x99000000),
-                                color: AppColors.accent,
+                                color: AppColors.accentOnMedia,
                               ),
                             ),
                         ],
@@ -158,15 +151,51 @@ class _PosterCardState extends State<PosterCard> {
   );
 }
 
-/// Largura de cada coluna lateral de setas (fileira enquadrada). A seta (36 px)
-/// fica centralizada nela.
-const double _colunaSetas = 44;
+/// Nota no pé do pôster, sem fundo, sobre um degradê. Só com o mouse em cima.
+class _PosterRating extends StatelessWidget {
+  const _PosterRating({required this.rating, required this.visible});
 
-/// Fileira horizontal com título, "Ver tudo" e setas fixas. Os pôsteres podem
-/// ser arrastados com o mouse. Com largura fixa (enquadrado) as setas ficam em
-/// colunas laterais, fora dos pôsteres; em "preenchido" ficam sobre as bordas
-/// da lista. Os dados vêm de um Future em cache do controller (não consulta o
-/// banco de novo a cada reconstrução). Fileira vazia não ocupa espaço.
+  final double rating;
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: Container(
+          height: 64,
+          alignment: Alignment.bottomCenter,
+          padding: const EdgeInsets.only(bottom: 10),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [Color(0xCC000000), Color(0x00000000)],
+            ),
+          ),
+          child: Text(
+            '★ ${rating.toStringAsFixed(1)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              shadows: [Shadow(color: Color(0x99000000), blurRadius: 6)],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fileira horizontal com título, "Ver tudo" e setas fixas em colunas
+/// laterais: os pôsteres ficam só entre elas e somem em degradê nas pontas.
+/// Podem ser arrastados com o mouse. Os dados vêm de um Future em cache do
+/// controller (não consulta o banco de novo a cada reconstrução). Com
+/// [loadMore] a fileira não tem fim. Fileira vazia não ocupa espaço.
 class TitleRow extends StatefulWidget {
   const TitleRow({
     super.key,
@@ -175,6 +204,7 @@ class TitleRow extends StatefulWidget {
     required this.onOpen,
     this.onSeeAll,
     this.showProgress = false,
+    this.loadMore,
   });
 
   final String label;
@@ -183,7 +213,16 @@ class TitleRow extends StatefulWidget {
   final VoidCallback? onSeeAll;
   final bool showProgress;
 
+  /// Blocos seguintes ao primeiro ([future]); depois do último, recomeça.
+  final TitlePageLoader? loadMore;
+
   static const double gap = RowMetrics.gap;
+
+  /// Largura de cada coluna lateral de setas. A seta (36 px) fica no meio dela.
+  static const double arrowColumn = 44;
+
+  /// Largura do degradê em cada ponta da lista.
+  static const double fadeWidth = 48;
 
   @override
   State<TitleRow> createState() => _TitleRowState();
@@ -191,11 +230,32 @@ class TitleRow extends StatefulWidget {
 
 class _TitleRowState extends State<TitleRow> {
   final ScrollController _scroll = ScrollController();
+  EndlessTitles _endless = EndlessTitles();
+
+  @override
+  void didUpdateWidget(TitleRow old) {
+    super.didUpdateWidget(old);
+    if (old.future != widget.future) _endless = EndlessTitles();
+  }
 
   @override
   void dispose() {
     _scroll.dispose();
     super.dispose();
+  }
+
+  void _fetchMore() {
+    final load = widget.loadMore;
+    if (load == null) return;
+    final endless = _endless;
+    endless.more(load).then(
+      (changed) {
+        if (changed && mounted && endless == _endless) setState(() {});
+      },
+      // Banco fechado ou ocupado: a fileira fica como está e tenta de novo
+      // quando for reconstruída.
+      onError: (Object e) => debugPrint('Fileira "${widget.label}": $e'),
+    );
   }
 
   @override
@@ -211,10 +271,9 @@ class _TitleRowState extends State<TitleRow> {
         // O pôster se ajusta à largura útil da lista para caber a quantidade por
         // linha do tamanho de interface escolhido (12/11/11/9).
         final perRow = AppScope.of(context).portraitPerRow;
-        final framed = ContentFrameScope.framedOf(context);
         return LayoutBuilder(builder: (context, box) {
-          // Enquadrado: as colunas laterais de setas tiram largura da lista.
-          final recuo = framed ? _colunaSetas : 0.0;
+          // As colunas laterais de setas tiram largura da lista.
+          const recuo = TitleRow.arrowColumn;
           final larguraLista = box.maxWidth - 2 * recuo;
           final posterWidth = RowMetrics.portraitWidth(larguraLista, perRow);
           final itemWidth = posterWidth + TitleRow.gap;
@@ -228,6 +287,12 @@ class _TitleRowState extends State<TitleRow> {
               ((larguraLista - RowMetrics.pad * 2 + TitleRow.gap) / itemWidth)
                   .floor();
           final comSetas = list != null && list.length > visiveis;
+          final endless = _endless;
+          // Só dá a volta quando há o que rolar.
+          final loop = widget.loadMore != null &&
+              endless.ended &&
+              list != null &&
+              endless.loaded(list) > visiveis;
           final passo = itemWidth * 4;
           final miolo = list == null
               ? _skeleton(itemWidth)
@@ -242,15 +307,20 @@ class _TitleRowState extends State<TitleRow> {
                       horizontal: 24,
                       vertical: 12,
                     ),
-                    itemCount: list.length,
-                    itemBuilder: (context, i) => Padding(
-                      padding: const EdgeInsets.only(right: TitleRow.gap),
-                      child: PosterCard(
-                        title: list[i],
-                        showProgress: widget.showProgress,
-                        onTap: () => widget.onOpen(list[i]),
-                      ),
-                    ),
+                    itemCount: loop ? null : endless.loaded(list),
+                    itemBuilder: (context, i) {
+                      // Perto do fim do que já veio: busca o próximo bloco.
+                      if (i >= endless.loaded(list) - perRow * 2) _fetchMore();
+                      final title = endless.at(list, i);
+                      return Padding(
+                        padding: const EdgeInsets.only(right: TitleRow.gap),
+                        child: PosterCard(
+                          title: title,
+                          showProgress: widget.showProgress,
+                          onTap: () => widget.onOpen(title),
+                        ),
+                      );
+                    },
                   ),
                 );
           final setaEsq = comSetas
@@ -279,41 +349,25 @@ class _TitleRowState extends State<TitleRow> {
                         ),
                       ),
                       if (widget.onSeeAll != null)
-                        TextButton(
-                          onPressed: widget.onSeeAll,
-                          child: const Text('Ver tudo'),
+                        MoreButton(
+                          label: 'Ver tudo',
+                          onPressed: widget.onSeeAll!,
                         ),
                     ],
                   ),
                 ),
                 SizedBox(
                   height: rowHeight,
-                  child: framed
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _colunaDeSetas(setaEsq, yCentro),
-                            Expanded(child: miolo),
-                            _colunaDeSetas(setaDir, yCentro),
-                          ],
-                        )
-                      : Stack(
-                          children: [
-                            miolo,
-                            if (setaEsq != null)
-                              Positioned(
-                                left: 4,
-                                top: yCentro - CarouselArrowButton.size / 2,
-                                child: setaEsq,
-                              ),
-                            if (setaDir != null)
-                              Positioned(
-                                right: 4,
-                                top: yCentro - CarouselArrowButton.size / 2,
-                                child: setaDir,
-                              ),
-                          ],
-                        ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _colunaDeSetas(setaEsq, yCentro),
+                      Expanded(
+                        child: comSetas ? _fade(miolo, larguraLista) : miolo,
+                      ),
+                      _colunaDeSetas(setaDir, yCentro),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -323,11 +377,28 @@ class _TitleRowState extends State<TitleRow> {
     );
   }
 
-  /// Coluna lateral de [_colunaSetas] px: a seta (se houver) fica na altura
-  /// dos pôsteres.
+  /// Os pôsteres das pontas somem em degradê antes das setas.
+  Widget _fade(Widget child, double width) {
+    final stop = (TitleRow.fadeWidth / width).clamp(0.0, 0.5);
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) => LinearGradient(
+        colors: const [
+          Color(0x00000000),
+          Color(0xFF000000),
+          Color(0xFF000000),
+          Color(0x00000000),
+        ],
+        stops: [0, stop, 1 - stop, 1],
+      ).createShader(rect),
+      child: child,
+    );
+  }
+
+  /// Coluna lateral: a seta (se houver) fica na altura dos pôsteres.
   Widget _colunaDeSetas(Widget? seta, double yCentro) {
     return SizedBox(
-      width: _colunaSetas,
+      width: TitleRow.arrowColumn,
       child: Column(
         children: [
           SizedBox(height: yCentro - CarouselArrowButton.size / 2),
@@ -354,7 +425,7 @@ class _TitleRowState extends State<TitleRow> {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: AppColors.hover,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppShape.card,
                 ),
               ),
             ),
@@ -418,12 +489,12 @@ class _PosterSkeleton extends StatelessWidget {
       children: [
         AspectRatio(
           aspectRatio: 2 / 3,
-          child: SkeletonBox(radius: 10),
+          child: SkeletonBox(),
         ),
         const SizedBox(height: 8),
         FractionallySizedBox(
           widthFactor: 0.7,
-          child: SkeletonBox(height: 10, radius: 4),
+          child: SkeletonBox(height: 10),
         ),
       ],
     );

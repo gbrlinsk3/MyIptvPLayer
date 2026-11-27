@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/foundation.dart';
@@ -40,11 +42,23 @@ class PaginaRolagemNotification extends Notification {
   final PosicaoRolagem? posicao;
 }
 
+/// Comprimento de um traço da faixa aberta: no trecho visível da página (entre
+/// [ini] e [fim], frações de 0 a 1) ele forma uma onda, maior no meio e menor
+/// nas duas pontas. [centro] é a posição do traço na mesma escala.
+@visibleForTesting
+double comprimentoDoTraco(double centro, double ini, double fim) {
+  const base = EdgeScrollMarks._traco;
+  if (centro <= ini || centro >= fim) return base;
+  final onda = math.sin(math.pi * (centro - ini) / (fim - ini));
+  return lerpDouble(base, EdgeScrollMarks._tracoNaJanela, onda)!;
+}
+
 /// Faixa de traços na borda direita da janela. Mostra a posição da página
 /// (os traços da janela visível ficam maiores e em destaque) e permite rolar
 /// clicando ou arrastando. Em repouso é compacta, uma coluna de pontos; com o
-/// mouse em cima (ou arrastando) os pontos viram os traços. Quando a página não tem o que rolar, a faixa some
-/// com fade e desliza para fora da borda, sem bloquear cliques.
+/// mouse em cima, arrastando ou enquanto a página rola, os pontos viram os
+/// traços e o trecho em destaque desliza até a nova posição.
+/// Quando a página não tem o que rolar, a faixa some com fade e desliza para fora da borda, sem bloquear cliques.
 class EdgeScrollMarks extends StatefulWidget {
   const EdgeScrollMarks({
     super.key,
@@ -63,6 +77,9 @@ class EdgeScrollMarks extends StatefulWidget {
   static const double _recuoPonto = 2;
   static const Duration _expansao = Duration(milliseconds: 180);
   static const Duration _duracao = Duration(milliseconds: 220);
+
+  /// Quanto a faixa fica aberta depois que a rolagem para.
+  static const Duration _repouso = Duration(milliseconds: 900);
   static const Curve _curva = Curves.easeOutCubic;
   static const Offset _deslocamentoOculto = Offset(0.6, 0);
 
@@ -83,6 +100,8 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
 
   bool _mouse = false;
   bool _arrastando = false;
+  bool _rolando = false;
+  Timer? _recolher;
 
   @override
   void initState() {
@@ -104,6 +123,7 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
   @override
   void dispose() {
     widget.posicao.removeListener(_aoMudar);
+    _recolher?.cancel();
     super.dispose();
   }
 
@@ -112,8 +132,26 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
 
   void _aoMudar() {
     final p = _rolavelOuNulo(widget.posicao.value);
-    if (p != null) _ultima = p;
+    if (p == null) return;
+    final antes = _ultima;
+    _ultima = p;
+    // Só a rolagem abre a faixa (roda, teclado, arraste); conteúdo que chega
+    // ou janela redimensionada não.
+    if (antes == null ||
+        antes.viewportDimension != p.viewportDimension ||
+        antes.pixels == p.pixels) {
+      return;
+    }
+    _recolher?.cancel();
+    _recolher = Timer(EdgeScrollMarks._repouso, () {
+      if (mounted) setState(() => _rolando = false);
+    });
+    if (!_rolando) setState(() => _rolando = true);
   }
+
+  static double _fracaoInicial(PosicaoRolagem? p) => p == null
+      ? 0
+      : p.pixels / (p.maxScrollExtent + p.viewportDimension);
 
   @override
   Widget build(BuildContext context) {
@@ -191,22 +229,35 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
                               },
                               child: TweenAnimationBuilder<double>(
                                 tween: Tween<double>(
-                                  end: _mouse || _arrastando ? 1 : 0,
+                                  end: _mouse || _arrastando || _rolando
+                                      ? 1
+                                      : 0,
                                 ),
                                 duration: duracao == Duration.zero
                                     ? Duration.zero
                                     : EdgeScrollMarks._expansao,
                                 curve: EdgeScrollMarks._curva,
-                                builder: (context, aberta, _) => CustomPaint(
-                                  size: Size(
-                                    EdgeScrollMarks.largura,
-                                    box.maxHeight,
+                                builder: (context, aberta, _) =>
+                                    TweenAnimationBuilder<double>(
+                                  // Início do trecho visível: a roda salta, o
+                                  // destaque desliza até lá.
+                                  tween: Tween<double>(
+                                    end: _fracaoInicial(_ultima),
                                   ),
-                                  painter: _TracosPainter(
-                                    posicao: _ultima,
-                                    cinza: cinza,
-                                    destaque: destaque,
-                                    aberta: aberta,
+                                  duration: duracao,
+                                  curve: EdgeScrollMarks._curva,
+                                  builder: (context, inicio, _) => CustomPaint(
+                                    size: Size(
+                                      EdgeScrollMarks.largura,
+                                      box.maxHeight,
+                                    ),
+                                    painter: _TracosPainter(
+                                      posicao: _ultima,
+                                      inicio: inicio,
+                                      cinza: cinza,
+                                      destaque: destaque,
+                                      aberta: aberta,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -231,12 +282,18 @@ class _EdgeScrollMarksState extends State<EdgeScrollMarks> {
 class _TracosPainter extends CustomPainter {
   _TracosPainter({
     required this.posicao,
+    required this.inicio,
     required this.cinza,
     required this.destaque,
     required this.aberta,
-  });
+  }) : rounded = AppShape.rounded;
+
+  final bool rounded;
 
   final PosicaoRolagem? posicao;
+
+  /// Início do destaque, em fração do conteúdo (animado).
+  final double inicio;
   final Color cinza;
   final Color destaque;
 
@@ -254,21 +311,16 @@ class _TracosPainter extends CustomPainter {
             .floor() +
         1;
     final total = p.maxScrollExtent + p.viewportDimension;
-    final janelaIni = p.pixels;
-    final janelaFim = p.pixels + p.viewportDimension;
+    final janelaFim = inicio + p.viewportDimension / total;
     final pCinza = Paint()..color = cinza;
     final pDestaque = Paint()..color = destaque;
     for (var i = 0; i < n; i++) {
       // Cada traço representa a fatia i/n do conteúdo da página.
-      final ini = i / n * total;
-      final fim = (i + 1) / n * total;
-      final naJanela = ini < janelaFim && fim > janelaIni;
+      final naJanela = i / n < janelaFim && (i + 1) / n > inicio;
       final ponto = naJanela
           ? EdgeScrollMarks._pontoNaJanela
           : EdgeScrollMarks._ponto;
-      final traco = naJanela
-          ? EdgeScrollMarks._tracoNaJanela
-          : EdgeScrollMarks._traco;
+      final traco = comprimentoDoTraco((i + 0.5) / n, inicio, janelaFim);
       final largura = lerpDouble(ponto, traco, aberta)!;
       final altura = lerpDouble(ponto, EdgeScrollMarks._altura, aberta)!;
       final recuo = lerpDouble(EdgeScrollMarks._recuoPonto, 0, aberta)!;
@@ -284,7 +336,7 @@ class _TracosPainter extends CustomPainter {
         altura,
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(altura / 2)),
+        RRect.fromRectAndRadius(rect, Radius.circular(AppShape.r(altura / 2))),
         naJanela ? pDestaque : pCinza,
       );
     }
@@ -293,7 +345,9 @@ class _TracosPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _TracosPainter old) =>
       old.posicao != posicao ||
+      old.inicio != inicio ||
       old.cinza != cinza ||
       old.destaque != destaque ||
-      old.aberta != aberta;
+      old.aberta != aberta ||
+      old.rounded != rounded;
 }

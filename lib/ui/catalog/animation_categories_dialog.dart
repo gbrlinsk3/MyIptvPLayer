@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../data/catalog_models.dart';
 import '../../state/app_scope.dart';
+import '../widgets/glass.dart';
 
 /// Escolhe categorias (de filmes `m:<id>` e de séries `s:<id>`) para um banner
 /// do Início. Devolve null se cancelar.
@@ -84,13 +85,7 @@ class _DialogState extends State<_Dialog> {
     final empty = catalog.section(CatalogKind.movies).categories.isEmpty &&
         catalog.section(CatalogKind.series).categories.isEmpty;
 
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border),
-      ),
+    return GlassDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520, maxHeight: 640),
         child: Padding(
@@ -109,13 +104,9 @@ class _DialogState extends State<_Dialog> {
               const SizedBox(height: 12),
               TextField(
                 onChanged: (v) => setState(() => _filter = v),
-                decoration: InputDecoration(
-                  hintText: 'Filtrar categorias',
-                  isDense: true,
+                decoration: fieldDecoration(
+                  hint: 'Filtrar categorias',
                   prefixIcon: const Icon(Icons.search, size: 18),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
                 ),
               ),
               Flexible(

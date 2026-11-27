@@ -153,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                   onPressed: _busy ? null : _submit,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.onAccent,
                     minimumSize: const Size.fromHeight(44),
                     shape: AppShape.button,
                   ),

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Ajuste "Tamanho da interface": monta o filho com `tamanho da janela / scale`
-/// e amplia o resultado para ocupar a janela inteira.
+import '../../core/layout_metrics.dart';
+
+/// Ajuste "Tamanho da interface": monta o filho com `tamanho da janela / zoom`
+/// e amplia o resultado para ocupar a janela inteira. O zoom é [scale] vezes
+/// [UiSizes.windowGrowth]: maior que 1 em janelas acima de 1920 × 1100 e,
+/// com a escala do Windows acima de 100 %, menor que 1 em janelas grandes.
 ///
 /// Usa [FittedBox] (e não `Transform.scale` solto) porque o `RenderFittedBox`
 /// ocupa a janela toda e converte as coordenadas no teste de acerto: toque,
@@ -24,7 +28,13 @@ class UiScale extends StatelessWidget {
         if (!box.hasBoundedWidth || !box.hasBoundedHeight || scale <= 0) {
           return child;
         }
-        final size = Size(box.maxWidth / scale, box.maxHeight / scale);
+        final zoom = scale *
+            UiSizes.windowGrowth(
+              box.maxWidth,
+              box.maxHeight,
+              MediaQuery.devicePixelRatioOf(context),
+            );
+        final size = Size(box.maxWidth / zoom, box.maxHeight / zoom);
         return FittedBox(
           fit: BoxFit.fill,
           alignment: Alignment.topLeft,
