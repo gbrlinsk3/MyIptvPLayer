@@ -7,7 +7,8 @@ import 'catalog_models.dart';
 
 /// Dados do perfil que sobrevivem à troca do Xtream do **mesmo provedor**:
 /// histórico ("Continuar assistindo"), favoritos de filmes/séries, canais
-/// favoritos e categorias ocultas.
+/// favoritos, categorias ocultas e, na TV ao vivo, as categorias favoritas e a
+/// ordem delas.
 ///
 /// Antes de apagar o catálogo antigo, [snapshot] guarda esses dados pelo nome
 /// (e ano), não pelo id. Quando cada catálogo novo chega ([applyLive] e
@@ -19,6 +20,8 @@ class CarryoverStore {
   final Database _db;
 
   static const _key = 'account_carryover';
+  static const _favoriteCategoriesKey = 'live_favorite_categories';
+  static const _categoryOrderKey = 'live_category_order';
 
   Future<Carryover?> load() async {
     final rows = await _db.query('settings', where: 'key = ?', whereArgs: [_key]);
@@ -149,6 +152,8 @@ class CarryoverStore {
       }
     }
 
+    await _snapshotCategories(c);
+
     final favChannels = await _db.query(
       'settings',
       where: 'key = ?',
@@ -174,8 +179,93 @@ class CarryoverStore {
     await _save(c);
   }
 
-  /// Religa canais favoritos e categorias ocultas da TV ao vivo ao catálogo
-  /// recém-baixado. Devolve true se algo mudou.
+  Future<String?> _setting(String key) async {
+    final rows = await _db.query('settings', where: 'key = ?', whereArgs: [key]);
+    return rows.isEmpty ? null : rows.first['value'] as String?;
+  }
+
+  Future<void> _setSetting(String key, String value) => _db.insert(
+        'settings',
+        {'key': key, 'value': value},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+  /// Ids de categoria gravados em [key] (lista JSON); vazio se não houver.
+  Future<List<String>> _categoryIds(String key) async {
+    final raw = await _setting(key);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final data = jsonDecode(raw);
+      return data is List ? data.whereType<String>().toList() : const [];
+    } on FormatException {
+      return const [];
+    }
+  }
+
+  /// Categorias favoritas e ordem da gaveta da TV, pelo nome.
+  Future<void> _snapshotCategories(Carryover c) async {
+    final favorites = await _categoryIds(_favoriteCategoriesKey);
+    final order = await _categoryIds(_categoryOrderKey);
+    if (favorites.isEmpty && order.isEmpty) return;
+    final names = {
+      for (final r in await _db.query('live_categories', columns: ['id', 'name']))
+        r['id'] as String: r['name'] as String,
+    };
+    Map<String, dynamic>? entry(String id) {
+      final name = names[id];
+      return name == null ? null : {'name': name, 'old_id': id};
+    }
+
+    final pending = {for (final f in c.liveFavorites) f['name']};
+    for (final id in favorites) {
+      final e = entry(id);
+      if (e != null && pending.add(e['name'])) c.liveFavorites.add(e);
+    }
+    final ordered = [for (final id in order) ?entry(id)];
+    // Uma ordem mais nova substitui a que ainda esperava o catálogo.
+    if (ordered.isNotEmpty) {
+      c.liveOrder
+        ..clear()
+        ..addAll(ordered);
+    }
+  }
+
+  /// Religa as categorias favoritas (as sem par continuam esperando) e a ordem
+  /// (uma vez só; o que o usuário já tiver arrastado na conta nova vale mais).
+  Future<bool> _applyCategories(Carryover c) async {
+    if (c.liveFavorites.isEmpty && c.liveOrder.isEmpty) return false;
+    final m = await _categoryMatcher('live_categories');
+    String? match(Map<String, dynamic> e) =>
+        m.find(e['name'] as String, previousId: e['old_id'] as String?);
+    var changed = false;
+
+    final found = <String>{};
+    for (final f in [...c.liveFavorites]) {
+      final id = match(f);
+      if (id == null) continue;
+      found.add(id);
+      c.liveFavorites.remove(f);
+    }
+    if (found.isNotEmpty) {
+      final now = await _categoryIds(_favoriteCategoriesKey);
+      await _setSetting(_favoriteCategoriesKey, jsonEncode([...{...now, ...found}]));
+      changed = true;
+    }
+
+    // Catálogo ainda vazio: a ordem espera o próximo.
+    final order = {for (final e in c.liveOrder) ?match(e)};
+    if (order.isNotEmpty) {
+      if ((await _categoryIds(_categoryOrderKey)).isEmpty) {
+        await _setSetting(_categoryOrderKey, jsonEncode([...order]));
+      }
+      c.liveOrder.clear();
+      changed = true;
+    }
+    return changed;
+  }
+
+  /// Religa canais favoritos e categorias (ocultas, favoritas e a ordem) da TV
+  /// ao vivo ao catálogo recém-baixado. Devolve true se algo mudou.
   Future<bool> applyLive() async {
     final c = await load();
     if (c == null) return false;
@@ -229,6 +319,8 @@ class CarryoverStore {
         changed = true;
       }
     }
+
+    if (await _applyCategories(c)) changed = true;
 
     if (changed) await _save(c);
     return changed;
@@ -376,7 +468,11 @@ class Carryover {
     List<Map<String, dynamic>>? favorites,
     List<Map<String, dynamic>>? hidden,
     List<Map<String, dynamic>>? channels,
-  })  : progress = progress ?? [],
+    List<Map<String, dynamic>>? liveFavorites,
+    List<Map<String, dynamic>>? liveOrder,
+  })  : liveFavorites = liveFavorites ?? [],
+        liveOrder = liveOrder ?? [],
+        progress = progress ?? [],
         favorites = favorites ?? [],
         hidden = hidden ?? [],
         channels = channels ?? [];
@@ -386,8 +482,18 @@ class Carryover {
   final List<Map<String, dynamic>> hidden;
   final List<Map<String, dynamic>> channels;
 
+  // Categorias favoritas e ordem da TV ao vivo: religadas sozinhas, sem aba em
+  // "Dados anteriores" e fora de [total].
+  final List<Map<String, dynamic>> liveFavorites;
+  final List<Map<String, dynamic>> liveOrder;
+
   bool get isEmpty =>
-      progress.isEmpty && favorites.isEmpty && hidden.isEmpty && channels.isEmpty;
+      progress.isEmpty &&
+      favorites.isEmpty &&
+      hidden.isEmpty &&
+      channels.isEmpty &&
+      liveFavorites.isEmpty &&
+      liveOrder.isEmpty;
 
   int get total => progress.length + favorites.length + hidden.length + channels.length;
 
@@ -403,6 +509,8 @@ class Carryover {
         'favorites': favorites,
         'hidden': hidden,
         'channels': channels,
+        'live_favorites': liveFavorites,
+        'live_order': liveOrder,
       };
 
   static List<Map<String, dynamic>> _list(Object? v) => [
@@ -416,5 +524,7 @@ class Carryover {
         favorites: _list(j['favorites']),
         hidden: _list(j['hidden']),
         channels: _list(j['channels']),
+        liveFavorites: _list(j['live_favorites']),
+        liveOrder: _list(j['live_order']),
       );
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/layout_metrics.dart';
@@ -247,6 +248,32 @@ class HeroViewportClipper extends CustomClipper<Rect> {
   @override
   bool shouldReclip(HeroViewportClipper old) =>
       old.stage != stage || old.scroll != scroll;
+}
+
+/// Leva a roda do mouse à rolagem da página também fora do [HeroViewportClipper]:
+/// o recorte barra o mouse, e com a largura em px sobram faixas ao lado do
+/// conteúdo. Dentro do recorte a própria rolagem atende primeiro.
+class HeroWheelArea extends StatelessWidget {
+  const HeroWheelArea({super.key, required this.scroll, required this.child});
+
+  final ScrollController scroll;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerSignal: (event) {
+        if (event is! PointerScrollEvent || event.scrollDelta.dy == 0) return;
+        // Quem registra primeiro (o mais interno) fica com o evento.
+        GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+          if (!scroll.hasClients) return;
+          scroll.position.pointerScroll(event.scrollDelta.dy);
+        });
+      },
+      child: child,
+    );
+  }
 }
 
 /// Põe o banner grande e os dois menores no lugar a cada quadro da rolagem.

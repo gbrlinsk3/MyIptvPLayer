@@ -26,12 +26,17 @@ class RubberSegment<T> extends StatefulWidget {
     required this.selected,
     required this.onChanged,
     this.iconOf,
+    this.overBackdrop = false,
   });
 
   final List<T> values;
   final String Function(T value) labelOf;
   final T selected;
   final ValueChanged<T> onChanged;
+
+  /// Verdadeiro quando só o fundo do app fica atrás (ver
+  /// [GlassSurface.overBackdrop]).
+  final bool overBackdrop;
 
   /// Ícone opcional à esquerda do rótulo.
   final IconData? Function(T value)? iconOf;
@@ -222,6 +227,7 @@ class _RubberSegmentState<T> extends State<RubberSegment<T>>
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: GlassSurface(
+          overBackdrop: widget.overBackdrop,
           radius: AppShape.control,
           edge: contorno ? AppColors.accent : null,
           edgeWidth: contorno ? 2 : 1,

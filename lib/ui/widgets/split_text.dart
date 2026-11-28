@@ -105,7 +105,10 @@ class _SplitTextState extends State<SplitText> with SingleTickerProviderStateMix
       final escopo = RevealScope.maybeOf(context);
       final id = widget.revealId;
       final jaRevelado = escopo != null && id != null && escopo.jaRevelado(id);
-      if (escopo != null && id != null) escopo.marcarRevelado(id);
+      // Montado escondido (página pré-carregada): a entrada ainda não foi vista.
+      if (escopo != null && id != null && TickerMode.valuesOf(context).enabled) {
+        escopo.marcarRevelado(id);
+      }
       if (jaRevelado) {
         _ctl.value = 1;
       } else {

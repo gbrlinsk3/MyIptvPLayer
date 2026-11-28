@@ -198,6 +198,68 @@ void main() {
     });
   });
 
+  group('roda fora do recorte', () {
+    // Largura em px: o conteúdo fica no meio, com sobra dos dois lados.
+    const estreito = HeroStage(
+      size: Size(1600, 900),
+      margins: EdgeInsets.only(left: 268, top: 64, right: 200),
+      height: 440,
+    );
+
+    Future<ScrollController> montar(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1600, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HeroWheelArea(
+            scroll: scroll,
+            child: ClipRect(
+              clipper: HeroViewportClipper(estreito, scroll),
+              child: SingleChildScrollView(
+                controller: scroll,
+                child: const SizedBox(height: 3000, width: 1600),
+              ),
+            ),
+          ),
+        ),
+      );
+      scroll.jumpTo(estreito.distance + 100);
+      await tester.pump();
+      return scroll;
+    }
+
+    for (final (onde, x) in [('à esquerda', 150.0), ('à direita', 1500.0)]) {
+      testWidgets('na sobra $onde a página rola', (tester) async {
+        final scroll = await montar(tester);
+        final antes = scroll.offset;
+        await tester.sendEventToBinding(
+          PointerScrollEvent(
+            position: Offset(x, 450),
+            scrollDelta: const Offset(0, 100),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(scroll.offset, antes + 100);
+      });
+    }
+
+    testWidgets('sobre o conteúdo a roda não conta duas vezes', (tester) async {
+      final scroll = await montar(tester);
+      final antes = scroll.offset;
+      await tester.sendEventToBinding(
+        const PointerScrollEvent(
+          position: Offset(800, 450),
+          scrollDelta: Offset(0, 100),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(scroll.offset, antes + 100);
+    });
+  });
+
   group('palco', () {
     testWidgets(
         'menores escondidos na tela cheia, revelados ao rolar, sem reconstruir',

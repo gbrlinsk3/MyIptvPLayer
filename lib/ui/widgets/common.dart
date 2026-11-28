@@ -88,6 +88,8 @@ class SectionCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 16),
       child: GlassSurface(
         radius: AppShape.panel,
+        // Os cartões só aparecem em Conta e ajustes, sobre o fundo do app.
+        overBackdrop: true,
         child: Padding(
           // 16 + 1 da borda.
           padding: const EdgeInsets.all(17),

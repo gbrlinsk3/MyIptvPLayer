@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -30,7 +31,10 @@ import 'widgets/cubos_logo.dart';
 /// Estrutura principal: barra lateral (recolhida ao abrir), topo com busca e
 /// perfil, e a página selecionada.
 class Shell extends StatefulWidget {
-  const Shell({super.key});
+  const Shell({super.key, this.introRunning});
+
+  /// True enquanto a animação de abertura cobre a tela.
+  final ValueListenable<bool>? introRunning;
 
   @override
   State<Shell> createState() => _ShellState();
@@ -38,7 +42,7 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   // 0 Início, 1 TV ao vivo, 2 Catálogo, 3 Minha biblioteca, 4 Conta e ajustes.
-  // A página e a barra lateral ficam no AppController (sobrevivem à troca de tema).
+  // A página e a barra lateral ficam no AppController (sobrevivem à hibernação).
 
   final TextEditingController _search = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -202,6 +206,9 @@ class _ShellState extends State<Shell> {
                               // e Minha biblioteca: entrada suave na primeira
                               // abertura.
                               revealFirstOpen: const {0, 1, 2, 3, 4},
+                              // TV ao vivo já abre com as imagens lidas.
+                              warm: const {1},
+                              warmHold: widget.introRunning,
                               builders: [
                                 (_) => DashboardPage(
                                       onOpenCatalog: c.requestCatalog,

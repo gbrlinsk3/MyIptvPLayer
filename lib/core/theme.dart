@@ -150,6 +150,31 @@ class AppColors {
     applyBrightness(isDark);
   }
 
+  /// Lê as cores de **outra** aparência sem trocar a do app (prévias em
+  /// Personalização): aplica, lê e restaura no mesmo instante, antes de
+  /// qualquer desenho. [read] não pode guardar nada além das cores lidas.
+  static T sample<T>({
+    required bool dark,
+    required bool minimal,
+    required int tone,
+    required T Function() read,
+  }) {
+    final wasDark = isDark, wasMinimal = AppColors.minimal, wasTone = accentTone;
+    void apply(bool d, bool m, int t) {
+      AppColors.minimal = m;
+      isDark = d;
+      applyAccentTone(t);
+      applyBrightness(d);
+    }
+
+    apply(dark, minimal, tone);
+    try {
+      return read();
+    } finally {
+      apply(wasDark, wasMinimal, wasTone);
+    }
+  }
+
   /// Troca a paleta (claro/escuro). Chamar antes de reconstruir a interface.
   static void applyBrightness(bool dark) {
     isDark = dark;

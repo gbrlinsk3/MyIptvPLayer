@@ -10,6 +10,7 @@ import '../data/db.dart';
 import '../data/live_highlight.dart';
 import '../data/models.dart';
 import '../data/carryover_store.dart';
+import '../data/category_order.dart';
 import '../data/catalog_models.dart' show CatalogKind, CatalogTitle, Episode;
 import '../data/xtream_client.dart';
 import '../downloads/downloads_controller.dart';
@@ -365,11 +366,11 @@ class AppController extends ChangeNotifier {
   }
 
   /// O texto da busca já foi "digitado" nesta abertura de perfil (a animação
-  /// toca uma vez; não é salvo). Fica aqui para não repetir ao trocar de tema.
+  /// toca uma vez; não é salvo). Fica aqui para não repetir quando a tela é remontada.
   bool searchHintTyped = false;
 
   /// Página aberta e estado da barra lateral; guardados aqui para sobreviver
-  /// à reconstrução da interface ao trocar de tema.
+  /// quando a tela é desmontada (hibernação).
   int shellIndex = 0;
   bool sidebarCollapsed = true;
 
@@ -531,6 +532,12 @@ class AppController extends ChangeNotifier {
       for (final part in (await _db.getSetting('favorite_channels') ?? '').split(','))
         if (int.tryParse(part) != null) int.parse(part),
     };
+    favoriteCategories = _parseTextList(
+      await _db.getSetting('live_favorite_categories'),
+    ).toSet();
+    categoryOrder = _parseTextList(
+      await _db.getSetting('live_category_order'),
+    );
     recentChannels = _parseIdList(await _db.getSetting('recent_live_channels'))
         .take(maxRecentChannels)
         .toList(growable: false);
@@ -591,12 +598,19 @@ class AppController extends ChangeNotifier {
     notifyListeners();
 
     unawaited(_refreshInfo());
-    if (_catalog.isEmpty) {
-      unawaited(refreshCatalog());
-    } else {
-      unawaited(epg.refreshStale(epgChannelKeys));
-    }
+    unawaited(_refreshOnOpen());
   }
+
+  /// Os canais são atualizados a cada vez que o perfil abre. O que já está no
+  /// PC aparece na hora e continua valendo se o servidor não responder.
+  Future<void> _refreshOnOpen() async {
+    await refreshCatalog();
+    // Sem servidor, o guia ainda tenta se atualizar com os canais que há.
+    if (syncError != null && !_disposed) await epg.refreshStale(epgChannelKeys);
+  }
+
+  bool _isAccount(SavedAccount other) =>
+      account?.server == other.server && account?.username == other.username;
 
   // ---- conta -------------------------------------------------------------
 
@@ -648,6 +662,12 @@ class AppController extends ChangeNotifier {
       _hiddenLive = <String>{};
       favoriteChannels = <int>{};
       unawaited(_db.setSetting('favorite_channels', ''));
+      // Ids de categoria também são do provedor antigo.
+      favoriteCategories = const {};
+      categoryOrder = const [];
+      _categoryOpen.clear();
+      unawaited(_db.setSetting('live_favorite_categories', ''));
+      unawaited(_db.setSetting('live_category_order', ''));
       // Os ids de canal são do provedor antigo: recentes e versões não valem.
       recentChannels = const [];
       preferredVersions = const {};
@@ -775,7 +795,7 @@ class AppController extends ChangeNotifier {
   // ---- catálogo ----------------------------------------------------------
 
   /// Depois de baixar a TV ao vivo: religa canais favoritos e categorias
-  /// ocultas guardados na troca de Xtream (se houver algo guardado).
+  /// (ocultas, favoritas e a ordem) guardados na troca de Xtream (se houver algo guardado).
   Future<void> _applyCarryover() async {
     try {
       if (!await _db.carryover.applyLive()) return;
@@ -784,6 +804,12 @@ class AppController extends ChangeNotifier {
           if (int.tryParse(part) != null) int.parse(part),
       };
       _hiddenLive = await _db.loadHiddenCategories('live');
+      favoriteCategories = {
+        ..._parseTextList(await _db.getSetting('live_favorite_categories')),
+      };
+      categoryOrder = _parseTextList(
+        await _db.getSetting('live_category_order'),
+      );
       carryover = await _db.carryover.load();
     } catch (e, st) {
       AppLog.error('conta.troca.ao_vivo', e, st);
@@ -905,6 +931,14 @@ class AppController extends ChangeNotifier {
       );
       final cats = await client.fetchLiveCategories();
       final chans = await client.fetchLiveChannels();
+      // A conta pode ter sido trocada, ou o perfil fechado, enquanto baixava.
+      if (_disposed || !_isAccount(acc)) return;
+      // Resposta que não é lista vira lista vazia: não apaga o que funciona.
+      if (_catalog.isNotEmpty && (cats.isEmpty || chans.isEmpty)) {
+        throw XtreamException(
+          'O servidor devolveu a lista de canais vazia. A lista anterior foi mantida.',
+        );
+      }
       await _db.replaceCatalog(cats, chans);
       final now = DateTime.now();
       await _db.setSetting('catalog_updated_at', now.toIso8601String());
@@ -923,7 +957,11 @@ class AppController extends ChangeNotifier {
     } finally {
       client?.close();
       syncing = false;
+      // Conta nova durante o download: o erro era da antiga e falta a lista dela.
+      final replaced = !_disposed && account != null && !_isAccount(acc);
+      if (replaced) syncError = null;
       notifyListeners();
+      if (replaced) unawaited(refreshCatalog());
     }
   }
 
@@ -1010,6 +1048,74 @@ class AppController extends ChangeNotifier {
   void selectChannel(LiveChannel channel) {
     selected = channel;
     notifyListeners();
+  }
+
+  // ---- categorias na gaveta da TV ---------------------------------------
+
+  /// Categorias favoritas: vêm primeiro na gaveta e começam abertas.
+  Set<String> favoriteCategories = const {};
+
+  /// Ordem escolhida arrastando (vazia = a do provedor).
+  List<String> categoryOrder = const [];
+
+  /// O que o usuário abriu ou fechou. Não é salvo: a cada carga do perfil só
+  /// as favoritas começam abertas.
+  final Map<String, bool> _categoryOpen = {};
+
+  bool isCategoryOpen(String id) =>
+      _categoryOpen[id] ?? favoriteCategories.contains(id);
+
+  /// Sem aviso: só a gaveta mostra isto e ela mesma se redesenha.
+  void setCategoryOpen(String id, bool open) => _categoryOpen[id] = open;
+
+  /// [categories] na ordem da gaveta: as favoritas e depois as outras.
+  List<LiveCategory> get drawerCategories {
+    final byId = {for (final c in categories) c.id: c};
+    final ordered = [
+      for (final id in _orderedCategoryIds())
+        ?byId[id],
+    ];
+    return [
+      for (final c in ordered)
+        if (favoriteCategories.contains(c.id)) c,
+      for (final c in ordered)
+        if (!favoriteCategories.contains(c.id)) c,
+    ];
+  }
+
+  /// Inclui as ocultas, para elas não perderem o lugar.
+  List<String> _orderedCategoryIds() => orderCategoryIds([
+    for (final c in _allCategories) c.id,
+  ], categoryOrder);
+
+  /// Favoritar abre a categoria; desfavoritar a deixa como está.
+  Future<void> toggleFavoriteCategory(String id) async {
+    final open = isCategoryOpen(id);
+    final next = {...favoriteCategories};
+    final added = !next.remove(id);
+    if (added) next.add(id);
+    _categoryOpen[id] = added || open;
+    favoriteCategories = next;
+    notifyListeners();
+    await _db.setSetting('live_favorite_categories', jsonEncode([...next]));
+  }
+
+  /// [id] vai para o lugar de [target] (arraste na gaveta, no mesmo bloco).
+  Future<void> moveCategory(String id, String target) async {
+    final next = moveCategoryId(_orderedCategoryIds(), id, target);
+    categoryOrder = next;
+    notifyListeners();
+    await _db.setSetting('live_category_order', jsonEncode(next));
+  }
+
+  static List<String> _parseTextList(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final data = jsonDecode(raw);
+      return data is List ? data.whereType<String>().toList() : const [];
+    } on FormatException {
+      return const [];
+    }
   }
 
   // ---- gerenciar categorias ---------------------------------------------

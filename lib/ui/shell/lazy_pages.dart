@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../widgets/animated_content.dart';
@@ -10,9 +11,17 @@ import '../widgets/edge_scroll_marks.dart';
 /// (voltar logo em seguida é instantâneo) e depois é descartada, liberando
 /// memória e animações. A página que entra aparece com fade e leve subida.
 ///
-/// As páginas em [revealFirstOpen] têm uma entrada mais marcada (subida maior e
-/// leve desfoque, `AnimatedContent`) só na primeira vez que abrem nesta
-/// sessão; depois voltam a usar a transição curta de sempre.
+/// As páginas em [revealFirstOpen] têm uma entrada mais marcada (esmaecimento
+/// com subida maior, `AnimatedContent`) só na primeira vez que abrem nesta
+/// sessão; depois voltam a usar a transição curta de sempre. Sem desfoque: ele
+/// redesenhava a página inteira a cada quadro (quadros de 130 a 290 ms).
+///
+/// As páginas em [warm] são montadas uma vez, escondidas, logo depois da
+/// abertura: pedem as imagens antes do primeiro clique. Com [warmHold] em
+/// true elas esperam: montar uma página custa um quadro lento, que apareceria
+/// na animação de abertura. Saem depois de
+/// [keepFor] (as imagens continuam no cache) ou quando são abertas, quando são
+/// montadas de novo, já como página normal.
 class LazyPages extends StatefulWidget {
   const LazyPages({
     super.key,
@@ -21,6 +30,8 @@ class LazyPages extends StatefulWidget {
     this.keepFor = const Duration(seconds: 6),
     this.onDrop,
     this.revealFirstOpen = const {},
+    this.warm = const {},
+    this.warmHold,
   });
 
   final int index;
@@ -33,6 +44,15 @@ class LazyPages extends StatefulWidget {
   /// Índices com entrada especial na primeira abertura.
   final Set<int> revealFirstOpen;
 
+  /// Índices pré-carregados na abertura.
+  final Set<int> warm;
+
+  /// Enquanto for true, o pré-carregamento não começa.
+  final ValueListenable<bool>? warmHold;
+
+  /// Espera antes do pré-carregamento: o primeiro quadro é da página aberta.
+  static const warmDelay = Duration(milliseconds: 500);
+
   @override
   State<LazyPages> createState() => _LazyPagesState();
 }
@@ -44,12 +64,35 @@ class _LazyPagesState extends State<LazyPages> {
   /// Páginas que já fizeram a entrada da primeira abertura.
   final Set<int> _reveladas = {};
   Timer? _sweeper;
+  Set<int> _warming = const {};
+  Timer? _warmTimer;
+  bool _warmed = false;
 
   @override
   void initState() {
     super.initState();
     _alive.add(widget.index);
     _sweeper = Timer.periodic(const Duration(seconds: 1), (_) => _sweep());
+    if (widget.warm.isNotEmpty) {
+      widget.warmHold?.addListener(_scheduleWarm);
+      _scheduleWarm();
+    }
+  }
+
+  /// Conta a espera a partir de agora, ou desiste dela se voltou a segurar.
+  void _scheduleWarm() {
+    if (_warmed) return;
+    _warmTimer?.cancel();
+    if (widget.warmHold?.value ?? false) return;
+    _warmTimer = Timer(LazyPages.warmDelay, _warmUp);
+  }
+
+  void _warmUp() {
+    _warmed = true;
+    setState(() => _warming = widget.warm.difference(_alive));
+    _warmTimer = Timer(widget.keepFor, () {
+      setState(() => _warming = const {});
+    });
   }
 
   @override
@@ -59,6 +102,7 @@ class _LazyPagesState extends State<LazyPages> {
       _alive.add(widget.index);
       _leftAt.remove(widget.index);
       _leftAt[old.index] = DateTime.now();
+      _warming = _warming.difference({widget.index});
     }
   }
 
@@ -82,6 +126,8 @@ class _LazyPagesState extends State<LazyPages> {
   @override
   void dispose() {
     _sweeper?.cancel();
+    _warmTimer?.cancel();
+    widget.warmHold?.removeListener(_scheduleWarm);
     super.dispose();
   }
 
@@ -91,8 +137,27 @@ class _LazyPagesState extends State<LazyPages> {
       fit: StackFit.expand,
       children: [
         for (var i = 0; i < widget.builders.length; i++)
-          if (_alive.contains(i)) _slot(i),
+          if (_alive.contains(i))
+            _slot(i)
+          else if (_warming.contains(i))
+            _hidden(i),
       ],
+    );
+  }
+
+  /// Montada e com layout, mas sem desenho, animação, foco nem avisos.
+  Widget _hidden(int i) {
+    return Offstage(
+      key: ValueKey('warm_$i'),
+      child: ExcludeFocus(
+        child: TickerMode(
+          enabled: false,
+          child: NotificationListener<Notification>(
+            onNotification: (_) => true,
+            child: Builder(builder: widget.builders[i]),
+          ),
+        ),
+      ),
     );
   }
 
@@ -107,7 +172,6 @@ class _LazyPagesState extends State<LazyPages> {
         key: ValueKey('reveal_$i'),
         duration: primeira ? const Duration(milliseconds: 620) : Duration.zero,
         distance: 48,
-        blur: 6,
         child: filho,
       );
     }

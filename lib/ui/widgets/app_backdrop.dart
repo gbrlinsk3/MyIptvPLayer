@@ -73,6 +73,14 @@ class BackdropRender {
   /// Largura de trabalho: de sobra para uma imagem desfocada.
   static const workWidth = 1280;
 
+  /// O fundo que está sendo preparado: a troca de aparência espera por ele
+  /// antes de mostrar a tela nova.
+  static Future<void> pending = Future<void>.value();
+
+  /// Verdadeiro quando a imagem do usuário está menos desfocada que o padrão:
+  /// só aí o vidro que tem apenas o fundo atrás precisa desfocar ao vivo.
+  static final ValueNotifier<bool> sharp = ValueNotifier(false);
+
   /// O que está em uso agora (para o texto em Personalização).
   static final ValueNotifier<BackdropInfo?> info = ValueNotifier(null);
 
@@ -132,6 +140,7 @@ class BackdropRender {
     required bool dark,
     required bool chose,
     int blur = BackdropBlur.standard,
+    bool report = true,
   }) async {
     for (final c in list) {
       // O nível do usuário não alcança a imagem padrão.
@@ -145,10 +154,14 @@ class BackdropRender {
         while (_cache.length > 2) {
           _cache.remove(_cache.keys.first)!.dispose();
         }
-        info.value = BackdropInfo(
-          c.origin,
-          chosenFailed: chose && c.origin != BackdropOrigin.chosen,
-        );
+        // As prévias carregam sem mudar o que Personalização informa.
+        if (report) {
+          sharp.value = level < BackdropBlur.standard;
+          info.value = BackdropInfo(
+            c.origin,
+            chosenFailed: chose && c.origin != BackdropOrigin.chosen,
+          );
+        }
         return image.clone();
       } catch (e) {
         AppLog.warn('fundo.${c.origin.name}', e);
@@ -315,12 +328,14 @@ class _AppBackdropState extends State<AppBackdrop> with WindowListener {
     if (wanted == _shown) return;
     _shown = wanted;
     final request = ++_request;
-    final image = await BackdropRender.load(
+    final loading = BackdropRender.load(
       list,
       dark: dark,
       chose: widget.chosen.isNotEmpty,
       blur: widget.blur,
     );
+    BackdropRender.pending = loading.then<void>((_) {});
+    final image = await loading;
     if (!mounted || request != _request) {
       image?.dispose();
       return;

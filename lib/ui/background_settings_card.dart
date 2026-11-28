@@ -5,6 +5,7 @@ import '../core/system_dialogs.dart';
 import '../core/theme.dart';
 import '../state/app_controller.dart';
 import '../state/app_scope.dart';
+import 'personalization/preview_hover.dart';
 import 'widgets/app_backdrop.dart';
 import 'widgets/app_switch.dart';
 import 'widgets/common.dart';
@@ -74,17 +75,28 @@ class _BackgroundSettingsCardState extends State<BackgroundSettingsCard> {
           ),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
-            child: Slider(
-              value: level.toDouble(),
-              max: (BackdropBlur.labels.length - 1).toDouble(),
-              divisions: BackdropBlur.labels.length - 1,
-              semanticFormatterCallback: (v) =>
-                  'Desfoque ${BackdropBlur.labels[v.round()]}',
-              onChanged: (v) => setState(() => _dragged = v.round()),
-              onChangeEnd: (v) {
-                setState(() => _dragged = null);
-                c.setBackgroundBlur(v.round());
+            child: HoverRange(
+              inset: 24,
+              specAt: (f) {
+                final n = (f * (BackdropBlur.labels.length - 1)).round();
+                return CompareSpec(
+                  'desfoque.$n',
+                  'Desfoque: ${BackdropBlur.labels[n]}',
+                  change: (look) => look.copyWith(blur: n),
+                );
               },
+              child: Slider(
+                value: level.toDouble(),
+                max: (BackdropBlur.labels.length - 1).toDouble(),
+                divisions: BackdropBlur.labels.length - 1,
+                semanticFormatterCallback: (v) =>
+                    'Desfoque ${BackdropBlur.labels[v.round()]}',
+                onChanged: (v) => setState(() => _dragged = v.round()),
+                onChangeEnd: (v) {
+                  setState(() => _dragged = null);
+                  c.setBackgroundBlur(v.round());
+                },
+              ),
             ),
           ),
         ],
@@ -98,24 +110,36 @@ class _BackgroundSettingsCardState extends State<BackgroundSettingsCard> {
     final chosen = c.backgroundImage;
     final minimalSwitch = !c.minimalTheme
         ? null
-        : MergeSemantics(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppSwitch(
-                    value: c.minimalBackground,
-                    onChanged: c.setMinimalBackground,
-                  ),
-                  const SizedBox(width: 12),
-                  const Flexible(
-                    child: Text(
-                      'Mostrar imagem de fundo',
-                      style: TextStyle(fontSize: 13),
+        : HoverCompare(
+            spec: CompareSpec(
+              'fundo.imagem',
+              c.minimalBackground
+                  ? 'Imagem de fundo desligada'
+                  : 'Imagem de fundo ligada',
+              // A opção é o contrário do que está em uso.
+              change: (look) => look.copyWith(
+                minimalBackground: !look.minimalBackground,
+              ),
+            ),
+            child: MergeSemantics(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppSwitch(
+                      value: c.minimalBackground,
+                      onChanged: c.setMinimalBackground,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    const Flexible(
+                      child: Text(
+                        'Mostrar imagem de fundo',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -168,14 +192,21 @@ class _BackgroundSettingsCardState extends State<BackgroundSettingsCard> {
               ),
             ),
             if (chosen.isNotEmpty)
-              TextButton(
-                onPressed: _picking
-                    ? null
-                    : () {
-                        setState(() => _error = null);
-                        c.setBackgroundImage('');
-                      },
-                child: const Text('Usar o padrão'),
+              HoverCompare(
+                spec: CompareSpec(
+                  'fundo.padrao',
+                  'Imagem de fundo padrão',
+                  change: (look) => look.copyWith(background: ''),
+                ),
+                child: TextButton(
+                  onPressed: _picking
+                      ? null
+                      : () {
+                          setState(() => _error = null);
+                          c.setBackgroundImage('');
+                        },
+                  child: const Text('Usar o padrão'),
+                ),
               ),
           ],
         ),

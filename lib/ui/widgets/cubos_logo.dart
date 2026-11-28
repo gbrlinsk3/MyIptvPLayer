@@ -8,18 +8,22 @@ import '../../core/theme.dart';
 /// `extras/app_icon.ico`), pintados com a cor de destaque do perfil: face de
 /// cima mais clara, lateral esquerda na cor de destaque e direita mais escura.
 class CubosLogo extends StatelessWidget {
-  const CubosLogo({super.key, this.size = 36});
+  const CubosLogo({super.key, this.size = 36, this.color});
 
   final double size;
 
+  /// Outra cor de destaque (as prévias de Personalização); sem ela, a atual.
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
-    final hsl = HSLColor.fromColor(AppColors.accent);
+    final accent = color ?? AppColors.accent;
+    final hsl = HSLColor.fromColor(accent);
     return CustomPaint(
       size: Size.square(size),
       painter: _CubosPainter(
         top: hsl.withLightness((hsl.lightness + 0.14).clamp(0.0, 0.9)).toColor(),
-        left: AppColors.accent,
+        left: accent,
         right: hsl.withLightness((hsl.lightness - 0.16).clamp(0.1, 1.0)).toColor(),
       ),
     );

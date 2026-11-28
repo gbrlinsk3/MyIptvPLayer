@@ -37,6 +37,7 @@ class GlassSurface extends StatelessWidget {
     this.shadow = false,
     this.halo = false,
     this.liveBlur = true,
+    this.overBackdrop = false,
   });
 
   final Widget child;
@@ -44,6 +45,11 @@ class GlassSurface extends StatelessWidget {
   /// Falso para a peça que só tem o fundo parado do app atrás: mantém o
   /// preenchimento, o filete e a borda, sem refazer o desfoque a cada quadro.
   final bool liveBlur;
+
+  /// Verdadeiro para a peça que só tem o fundo do app atrás. Ele já vem
+  /// desfocado, então desfocar de novo não muda o visual: só desfoca ao vivo
+  /// quando a imagem do usuário está mais nítida ([BackdropRender.sharp]).
+  final bool overBackdrop;
 
   /// Grupo de desfoque ([GlassGroups]): as peças de um grupo dividem uma
   /// única cópia do fundo, o que poupa trabalho da placa de vídeo a cada
@@ -73,6 +79,14 @@ class GlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!overBackdrop) return _glass(liveBlur);
+    return ValueListenableBuilder<bool>(
+      valueListenable: BackdropRender.sharp,
+      builder: (context, sharp, _) => _glass(liveBlur && sharp),
+    );
+  }
+
+  Widget _glass(bool live) {
     final sigma = blur ?? AppGlass.blur(open: false);
     final radius = this.radius ?? AppShape.card;
     return CustomPaint(
@@ -87,7 +101,7 @@ class GlassSurface extends StatelessWidget {
         child: BackdropFilter(
           backdropGroupKey: group,
           // Desligado, não desfoca; a estrutura da tela continua a mesma.
-          enabled: liveBlur && !AppColors.minimal,
+          enabled: live && !AppColors.minimal,
           filter: ui.ImageFilter.compose(
             outer: saturationFilter(AppGlass.saturation),
             inner: ui.ImageFilter.blur(

@@ -137,80 +137,83 @@ class _DashboardPageState extends State<DashboardPage> {
 
         // Column dentro de rolagem simples (poucas fileiras): sem alturas
         // estimadas, então não "pula" ao subir.
-        return ClipRect(
-          clipper: HeroViewportClipper(stage, _scroll),
-          child: SingleChildScrollView(
-            controller: _scroll,
-            padding: const EdgeInsets.only(bottom: 24),
-            child: ConstrainedBox(
-              // Mesmo antes de as fileiras chegarem dá para rolar a transição.
-              constraints: BoxConstraints(
-                minHeight: box.maxHeight + stage.distance,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (showHero)
-                    HeroCarousel(
-                      key: heroKey,
-                      future: catalog.heroSlides(),
-                      onOpenCatalog: widget.onOpenCatalog,
-                      stage: stage,
-                      scroll: _scroll,
-                      onScreen: onScreen,
-                      onUnavailable: () =>
-                          setState(() => _emptyHeroKey = heroKey),
-                    )
-                  else
+        return HeroWheelArea(
+          scroll: _scroll,
+          child: ClipRect(
+            clipper: HeroViewportClipper(stage, _scroll),
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: const EdgeInsets.only(bottom: 24),
+              child: ConstrainedBox(
+                // Mesmo antes de as fileiras chegarem dá para rolar a transição.
+                constraints: BoxConstraints(
+                  minHeight: box.maxHeight + stage.distance,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (showHero)
+                      HeroCarousel(
+                        key: heroKey,
+                        future: catalog.heroSlides(),
+                        onOpenCatalog: widget.onOpenCatalog,
+                        stage: stage,
+                        scroll: _scroll,
+                        onScreen: onScreen,
+                        onUnavailable: () =>
+                            setState(() => _emptyHeroKey = heroKey),
+                      )
+                    else
+                      Padding(
+                        padding: sides.copyWith(top: margins.top),
+                        child: hasCatalog
+                            ? const SizedBox.shrink()
+                            : _EmptyHero(
+                                syncing: syncing,
+                                error: catalog
+                                        .section(CatalogKind.movies)
+                                        .error ??
+                                    catalog.section(CatalogKind.series).error,
+                                onRetry: _load,
+                              ),
+                      ),
                     Padding(
-                      padding: sides.copyWith(top: margins.top),
-                      child: hasCatalog
-                          ? const SizedBox.shrink()
-                          : _EmptyHero(
-                              syncing: syncing,
-                              error: catalog
-                                      .section(CatalogKind.movies)
-                                      .error ??
-                                  catalog.section(CatalogKind.series).error,
-                              onRetry: _load,
+                      padding: sides,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 28),
+                          ContinueStrip(
+                            key: ValueKey(
+                              'home:continue:${catalog.progressRevision}',
                             ),
-                    ),
-                  Padding(
-                    padding: sides,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 28),
-                        ContinueStrip(
-                          key: ValueKey(
-                            'home:continue:${catalog.progressRevision}',
+                            future: catalog.continueAll(),
                           ),
-                          future: catalog.continueAll(),
-                        ),
-                        TitleRow(
-                          key: const ValueKey('home:movies:recent'),
-                          label: 'Filmes adicionados recentemente',
-                          future: catalog.recentTitles(CatalogKind.movies),
-                          loadMore: (offset) =>
-                              catalog.recentPage(CatalogKind.movies, offset),
-                          onOpen: open,
-                          onSeeAll: () =>
-                              widget.onOpenCatalog(CatalogKind.movies),
-                        ),
-                        TitleRow(
-                          key: const ValueKey('home:series:recent'),
-                          label: 'Séries adicionadas recentemente',
-                          future: catalog.recentTitles(CatalogKind.series),
-                          loadMore: (offset) =>
-                              catalog.recentPage(CatalogKind.series, offset),
-                          onOpen: open,
-                          onSeeAll: () =>
-                              widget.onOpenCatalog(CatalogKind.series),
-                        ),
-                      ],
+                          TitleRow(
+                            key: const ValueKey('home:movies:recent'),
+                            label: 'Filmes adicionados recentemente',
+                            future: catalog.recentTitles(CatalogKind.movies),
+                            loadMore: (offset) =>
+                                catalog.recentPage(CatalogKind.movies, offset),
+                            onOpen: open,
+                            onSeeAll: () =>
+                                widget.onOpenCatalog(CatalogKind.movies),
+                          ),
+                          TitleRow(
+                            key: const ValueKey('home:series:recent'),
+                            label: 'Séries adicionadas recentemente',
+                            future: catalog.recentTitles(CatalogKind.series),
+                            loadMore: (offset) =>
+                                catalog.recentPage(CatalogKind.series, offset),
+                            onOpen: open,
+                            onSeeAll: () =>
+                                widget.onOpenCatalog(CatalogKind.series),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

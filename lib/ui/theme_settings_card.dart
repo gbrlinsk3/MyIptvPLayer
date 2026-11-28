@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../state/app_controller.dart';
 import '../state/app_scope.dart';
+import 'personalization/preview_hover.dart';
 import 'widgets/common.dart';
 
 /// "Tema" (Conta e ajustes → Personalização): o visual (Liquid Glass ou
@@ -17,22 +18,36 @@ class ThemeSettingsCard extends StatelessWidget {
     return SectionCard(
       title: 'Tema',
       children: [
-        SegmentedButton<bool>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(
-              value: false,
-              icon: Icon(Icons.blur_on, size: 18),
-              label: Text('Liquid Glass'),
+        HoverRange.segments(
+          specs: [
+            CompareSpec(
+              'tema.vidro',
+              'Tema: Liquid Glass',
+              change: (look) => look.copyWith(minimal: false),
             ),
-            ButtonSegment(
-              value: true,
-              icon: Icon(Icons.layers_outlined, size: 18),
-              label: Text('Minimalista'),
+            CompareSpec(
+              'tema.minimo',
+              'Tema: Minimalista',
+              change: (look) => look.copyWith(minimal: true),
             ),
           ],
-          selected: {c.minimalTheme},
-          onSelectionChanged: (v) => c.setMinimalTheme(v.first),
+          child: SegmentedButton<bool>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(
+                value: false,
+                icon: Icon(Icons.blur_on, size: 18),
+                label: Text('Liquid Glass'),
+              ),
+              ButtonSegment(
+                value: true,
+                icon: Icon(Icons.layers_outlined, size: 18),
+                label: Text('Minimalista'),
+              ),
+            ],
+            selected: {c.minimalTheme},
+            onSelectionChanged: (v) => c.setMinimalTheme(v.first),
+          ),
         ),
         const SizedBox(height: 4),
         Text(
@@ -61,6 +76,12 @@ class _AccentScaleControl extends StatelessWidget {
   final AppController c;
 
   static const double _width = 360;
+
+  static CompareSpec _toneSpec(int tone) => CompareSpec(
+        'tom.$tone',
+        'Cor de destaque: ${AccentScale.label(tone)}',
+        change: (look) => look.copyWith(tone: tone),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -92,15 +113,23 @@ class _AccentScaleControl extends StatelessWidget {
               tickMarkShape: SliderTickMarkShape.noTickMark,
               overlayColor: AppColors.accent.withValues(alpha: 0.18),
             ),
-            child: Slider(
-              value: c.accentTone.toDouble(),
-              min: -AccentScale.limit.toDouble(),
-              max: AccentScale.limit.toDouble(),
-              divisions: 2 * AccentScale.limit ~/ AccentScale.step,
-              semanticFormatterCallback: (v) =>
-                  'Cor de destaque: ${AccentScale.label(v.round())}',
-              onChanged: (v) => c.previewAccentTone(v.round()),
-              onChangeEnd: (v) => c.setAccentTone(v.round()),
+            child: HoverRange(
+              // A trilha do controle começa depois desta margem.
+              inset: 24,
+              specAt: (f) => _toneSpec(
+                ((2 * f - 1) * AccentScale.limit / AccentScale.step).round() *
+                    AccentScale.step,
+              ),
+              child: Slider(
+                value: c.accentTone.toDouble(),
+                min: -AccentScale.limit.toDouble(),
+                max: AccentScale.limit.toDouble(),
+                divisions: 2 * AccentScale.limit ~/ AccentScale.step,
+                semanticFormatterCallback: (v) =>
+                    'Cor de destaque: ${AccentScale.label(v.round())}',
+                onChanged: (v) => c.previewAccentTone(v.round()),
+                onChangeEnd: (v) => c.setAccentTone(v.round()),
+              ),
             ),
           ),
           Padding(
@@ -117,9 +146,12 @@ class _AccentScaleControl extends StatelessWidget {
           if (c.accentTone != 0)
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => c.setAccentTone(0),
-                child: const Text('Usar a cor do perfil'),
+              child: HoverCompare(
+                spec: _toneSpec(0),
+                child: TextButton(
+                  onPressed: () => c.setAccentTone(0),
+                  child: const Text('Usar a cor do perfil'),
+                ),
               ),
             ),
         ],

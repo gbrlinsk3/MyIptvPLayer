@@ -178,6 +178,48 @@ void main() {
       expect(await store.load(), isNull, reason: 'sem itens, a chave some');
     });
 
+    test('categorias favoritas e a ordem da TV seguem pelo nome', () async {
+      final db = await _openDb();
+      addTearDown(db.close);
+      final store = CarryoverStore(db);
+      Future<void> ajuste(String chave, String valor) => db.insert(
+            'settings', {'key': chave, 'value': valor},
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+      Future<String?> ler(String chave) async {
+        final r = await db.query('settings', where: "key = '$chave'");
+        return r.isEmpty ? null : r.single['value'] as String;
+      }
+
+      for (final c in [('1', 'Esportes'), ('2', 'Filmes'), ('3', 'Sumiu')]) {
+        await db.insert('live_categories', {'id': c.$1, 'name': c.$2});
+      }
+      await ajuste('live_favorite_categories', '["2","3"]');
+      await ajuste('live_category_order', '["3","2","1"]');
+      await store.snapshot();
+      expect((await store.load())!.total, 0, reason: 'sem aba para revisar');
+
+      // Conta nova: ajustes apagados; o catálogo ainda não chegou.
+      await db.delete('live_categories');
+      await ajuste('live_favorite_categories', '');
+      await ajuste('live_category_order', '');
+      expect(await store.applyLive(), isFalse);
+
+      await db.insert('live_categories', {'id': '70', 'name': 'ESPORTES'});
+      await db.insert('live_categories', {'id': '80', 'name': 'Filmes'});
+      expect(await store.applyLive(), isTrue);
+      expect(await ler('live_favorite_categories'), '["80"]');
+      expect(await ler('live_category_order'), '["80","70"]');
+
+      // A favorita sem par continua esperando; a ordem não volta.
+      await ajuste('live_category_order', '["70","80"]');
+      await db.insert('live_categories', {'id': '90', 'name': 'Sumiu'});
+      expect(await store.applyLive(), isTrue);
+      expect(await ler('live_favorite_categories'), '["80","90"]');
+      expect(await ler('live_category_order'), '["70","80"]');
+      expect(await store.load(), isNull);
+    });
+
     test('religar não sobrescreve progresso mais novo; descartar remove', () async {
       final db = await _openDb();
       addTearDown(db.close);

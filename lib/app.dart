@@ -18,6 +18,7 @@ import 'ui/profiles/profile_picker_page.dart';
 import 'ui/shell.dart';
 import 'ui/update/update_toast.dart';
 import 'ui/widgets/app_backdrop.dart';
+import 'ui/widgets/appearance_fade.dart';
 import 'ui/widgets/intro_sound.dart';
 import 'ui/widgets/morph_reveal.dart';
 import 'ui/widgets/profile_intro.dart';
@@ -147,30 +148,49 @@ class _IptvAppState extends State<IptvApp> with WidgetsBindingObserver {
       session?.app.themePref ?? ThemePref.dark,
       platformDark: _platformDark,
     );
-    // As cores são estáticas: atualiza a paleta e recria a árvore (key).
+    // As cores são estáticas: atualiza a paleta; quem as lê direto é
+    // redesenhado pelo `RebuildOnChange`, sem recriar nada.
     AppColors.applyBrightness(dark);
     return MaterialApp(
-      key: ValueKey(dark),
       title: AppInfo.name,
       debugShowCheckedModeBanner: false,
       // Sem a barra de rolagem padrão: a posição aparece na faixa de traços
       // da borda direita (ver ContentFrame / EdgeScrollMarks).
       scrollBehavior: MaterialScrollBehavior().copyWith(scrollbars: false),
       theme: _themeFor(dark),
+      // O tema troca de uma vez; a suavidade vem do `AppearanceFade`.
+      themeAnimationDuration: Duration.zero,
       // "Tamanho da interface": tudo (telas, diálogos, botões da janela e
       // aviso de atualização) fica dentro da mesma ampliação. Antes de entrar
       // num perfil não há ajuste salvo: tamanho 100 %.
-      builder: (context, child) => RebuildOnChange(
-        // Valores lidos direto (sem Theme): quando mudam, redesenha tudo.
-        value: (AppShape.rounded, AppColors.minimal, AppColors.accent),
-        child: UiScale(
-          scale: session?.app.uiScale ?? 1.0,
-          child: Stack(
-            children: [
-              if (child != null) Positioned.fill(child: child),
-              const WindowButtonsOverlay(),
-              const UpdateToast(),
-            ],
+      builder: (context, child) => AppearanceFade(
+        owner: session?.profile.id,
+        look: (AppColors.isDark, AppColors.minimal, AppShape.rounded),
+        ready: () => BackdropRender.pending.timeout(
+          const Duration(milliseconds: 600),
+          onTimeout: () {},
+        ),
+        // Com vídeo à vista (troca por horário ou pelo Windows) a foto não o
+        // pegaria; com o perfil ainda abrindo, ela travaria a abertura.
+        skip: () =>
+            _playback.isPlaying || session?.app.phase == AppPhase.booting,
+        child: RebuildOnChange(
+          // Valores lidos direto (sem Theme): quando mudam, redesenha tudo.
+          value: (
+            AppShape.rounded,
+            AppColors.minimal,
+            AppColors.accent,
+            AppColors.isDark,
+          ),
+          child: UiScale(
+            scale: session?.app.uiScale ?? 1.0,
+            child: Stack(
+              children: [
+                if (child != null) Positioned.fill(child: child),
+                const WindowButtonsOverlay(),
+                const UpdateToast(),
+              ],
+            ),
           ),
         ),
       ),
@@ -215,7 +235,13 @@ class _RootState extends State<_Root> {
   // Animação de abertura ao entrar no perfil (cobre o carregamento). Ao fim da
   // cena, ela e o Início são capturados como imagens e trocados com a transição
   // "derreter" do Morph Slider (MorphReveal).
-  bool _intro = true;
+  final _introRunning = ValueNotifier<bool>(true);
+  bool get _intro => _introRunning.value;
+  set _intro(bool value) => _introRunning.value = value;
+
+  // A mesma instância em todo build: a tela principal não é refeita a cada
+  // passo da abertura.
+  late final Widget _shell = Shell(introRunning: _introRunning);
   bool _sceneDone = false;
   bool _morphStarted = false;
   ui.Image? _fromImage;
@@ -237,6 +263,7 @@ class _RootState extends State<_Root> {
   void dispose() {
     Hibernator.asleep.removeListener(_onHibernate);
     _introSound.dispose();
+    _introRunning.dispose();
     _fromImage?.dispose();
     _toImage?.dispose();
     super.dispose();
@@ -363,7 +390,7 @@ class _RootState extends State<_Root> {
       case AppPhase.loggedOut:
         page = const PlainFrame(child: LoginPage());
       case AppPhase.ready:
-        page = _slept ? const SizedBox.expand() : const Shell();
+        page = _slept ? const SizedBox.expand() : _shell;
     }
     if (_intro && _sceneDone && !_morphStarted && controller.phase != AppPhase.booting) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
